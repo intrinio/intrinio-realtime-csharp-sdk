@@ -51,6 +51,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Test.cs" />
     <Compile Include="Src\Intrinio\QuoteHandler.cs" />
     <Compile Include="Src\Intrinio\IexQuote.cs" />
     <Compile Include="Src\Intrinio\IQuote.cs" />
@@ -59,11 +60,10 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
-    <None Include="IntrinioRealTimeSDK.nuspec" />
-    <None Include="LICENSE" />
-    <None Include="log4net.config">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    <None Include="IntrinioRealTimeSDK.nuspec">
+      <SubType>Designer</SubType>
     </None>
+    <None Include="LICENSE" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
