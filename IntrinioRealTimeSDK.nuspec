@@ -20,4 +20,8 @@
       <dependency id="WebSocketSharp" version="1.0.3-rc11" />
     </dependencies>
   </metadata>
+  <files>
+    <file src="bin\Release\IntrinioRealTime.dll" target="lib\Net40" />
+    <file src="bin\Release\IntrinioRealTime.xml" target="lib\Net40" />
+  </files>
 </package>

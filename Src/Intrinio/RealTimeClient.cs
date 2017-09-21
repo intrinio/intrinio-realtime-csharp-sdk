@@ -24,10 +24,24 @@ namespace Intrinio
         }
     }
 
-    public enum QuoteProvider { IEX };
+    /// <summary>
+    /// The available providers/vendors of real-time price quotes. Each provider requires a subscription from https://intrinio.com
+    /// </summary>
+    public enum QuoteProvider {
+        /// <summary>
+        /// The Investor's Exchange https://iextrading.com/
+        /// </summary>
+        IEX
+    };
 
+    /// <summary>
+    /// Intrinio's client for receiving real-time stock prices via a WebSocket connection.
+    /// </summary>
     public class RealTimeClient : IDisposable
     {
+        /// <summary>
+        /// A log4net logger instance. By default a console logger that logs INFO-level messages, but you can set your own configured logger.
+        /// </summary>
         public ILog Logger { get; set; }
 
         private string username;
@@ -47,6 +61,12 @@ namespace Intrinio
 
         #region Public Methods
 
+        /// <summary>
+        /// Initializes a new real-time client instance.
+        /// </summary>
+        /// <param name="username">Your Intrinio API Username</param>
+        /// <param name="password">Your Intrinio API password</param>
+        /// <param name="provider">A QuoteProvider</param>
         public RealTimeClient(string username, string password, QuoteProvider provider)
         {
             this.username = username;
@@ -73,6 +93,9 @@ namespace Intrinio
             }
         }
 
+        /// <summary>
+        /// Establishes a WebSocket connection and starts listening for price quotes. Attempts to self-heal if the connection is interrupted or dropped. This method will return after a connection is established. You may want to block the thread afterwards in order to allow the client to keep listening for prices.
+        /// </summary>
         public void Connect()
         {
             this.Logger.Info("Connecting...");
@@ -97,6 +120,9 @@ namespace Intrinio
             }
         }
 
+        /// <summary>
+        /// Severs the WebSocket connection and stops listening for quotes.
+        /// </summary>
         public void Disconnect()
         {
             this.ready = false;
@@ -110,6 +136,10 @@ namespace Intrinio
             this.Logger.Info("Disconnected!");
         }
 
+        /// <summary>
+        /// Registers a QuoteHandler instance to handle quotes in the client's queue. Multiple QuoteHandler instances can be registered. Quotes will be taken off the queue and given to the next available QuoteHander.
+        /// </summary>
+        /// <param name="handler">An instance of QuoteHandler</param>
         public void RegisterQuoteHandler(QuoteHandler handler)
         {
             handler.Client = this;
@@ -120,6 +150,10 @@ namespace Intrinio
             this.Logger.Debug("Registered quote handler");
         }
 
+        /// <summary>
+        /// Blocks until a quote can be dequeued from the queue/
+        /// </summary>
+        /// <returns>An IQuote</returns>
         public IQuote GetNextQuote()
         {
             IQuote quote = null;
@@ -127,11 +161,28 @@ namespace Intrinio
             return quote;
         }
 
+        /// <summary>
+        /// Returns the size of the quote queue. Monitor this to make sure your QuoteHandler instances are not falling behind.
+        /// </summary>
+        /// <returns>An integer representing the size of the quote queue</returns>
+        public int QueueSize()
+        {
+            return this.queue.Count;
+        }
+
+        /// <summary>
+        /// Listen for price quotes on the given channel.
+        /// </summary>
+        /// <param name="channel">A channel to join, which may be a security ticker such as "AAPL"</param>
         public void Join(string channel)
         {
             this.Join(new string[] { channel });
         }
 
+        /// <summary>
+        /// Listen for price quotes on the given channels.
+        /// </summary>
+        /// <param name="channels">The channels to join, which may be a list of security tickers such as "AAPL"</param>
         public void Join(string[] channels)
         {
             foreach (string channel in channels)
@@ -141,11 +192,19 @@ namespace Intrinio
             this.RefreshChannels();
         }
 
+        /// <summary>
+        /// Stop listening for price quotes on the given channel.
+        /// </summary>
+        /// <param name="channel">A channel to leave, which may be a security ticker such as "AAPL"</param>
         public void Leave(string channel)
         {
             this.Leave(new string[] { channel });
         }
 
+        /// <summary>
+        /// Stop listening for price quotes on the given channels.
+        /// </summary>
+        /// <param name="channels">The channels to leave, which may be a list of security tickers such as "AAPL"</param>
         public void Leave(string[] channels)
         {
             foreach (string channel in channels)
@@ -155,12 +214,19 @@ namespace Intrinio
             this.RefreshChannels();
         }
 
+        /// <summary>
+        /// Stop listening for price quotes on all channels.
+        /// </summary>
         public void LeaveAll()
         {
             this.channels.Clear();
             this.RefreshChannels();
         }
-        
+
+        /// <summary>
+        /// Stop listening for price quotes on all channels, then start listening for price quotes on the given channels
+        /// </summary>
+        /// <param name="channels">The channels to join, which may be a list of security tickers such as "AAPL"</param>
         public void SetChannels(string[] channels)
         {
             this.channels.Clear();
@@ -175,6 +241,9 @@ namespace Intrinio
 
         #region Private Methods
 
+        /// <summary>
+        /// Disposes of the client. 
+        /// </summary>
         public void Dispose()
         {
             this.Logger.Debug("Client disposing...");

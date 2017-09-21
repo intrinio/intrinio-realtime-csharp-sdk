@@ -29,6 +29,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Release\IntrinioRealTime.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject>
@@ -64,6 +65,7 @@
     </None>
     <None Include="LICENSE" />
     <None Include="packages.config" />
+    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <Content Include=".gitignore" />
