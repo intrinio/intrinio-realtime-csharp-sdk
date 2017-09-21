@@ -29,30 +29,30 @@ using Intrinio;
 
 namespace MyNamespace
 {
-  class MyProgram
-  {
-    static void Main(string[] args)
+    class MyProgram
     {
-      string username = "YOUR_INTRINIO_API_USERNAME";
-      string password = "YOUR_INTRINIO_API_PASSWORD";
-      QuoteProvider provider = QuoteProvider.IEX;
-
-      using (RealTimeClient client = new RealTimeClient(username, password, provider))
-      {
-        QuoteHandler handler = new QuoteHandler();
-        handler.OnQuote += (IQuote quote) =>
+        static void Main(string[] args)
         {
-            Console.WriteLine(quote);
-        };
+            string username = "YOUR_INTRINIO_API_USERNAME";
+            string password = "YOUR_INTRINIO_API_PASSWORD";
+            QuoteProvider provider = QuoteProvider.IEX;
 
-        client.RegisterQuoteHandler(handler);
-        client.Join(new string[] { "MSFT", "AAPL", "AMZN" });
-        client.Connect();
+            using (RealTimeClient client = new RealTimeClient(username, password, provider))
+            {
+                QuoteHandler handler = new QuoteHandler();
+                handler.OnQuote += (IQuote quote) =>
+                {
+                    Console.WriteLine(quote);
+                };
 
-        Console.ReadLine();
-      }
+                client.RegisterQuoteHandler(handler);
+                client.Join(new string[] { "MSFT", "AAPL", "AMZN" });
+                client.Connect();
+
+                Console.ReadLine();
+            }
+        }
     }
-  }
 }
 ```
 
