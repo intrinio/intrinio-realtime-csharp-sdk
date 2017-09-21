@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package >
   <metadata>
-    <id>IntrinioRealTime</id>
+    <id>IntrinioRealTimeClient</id>
     <version>1.0.0-rc</version>
     <title>Intrinio SDK for Real-Time Stock Prices</title>
     <authors>Intrinio</authors>

@@ -12,6 +12,16 @@
 * Subscribe to updates from individual securities
 * Subscribe to updates for all securities (contact us for special access)
 
+### Installation
+
+Use NuGet to include the client DLL in your project.
+
+```
+Install-Package IntrinioRealTimeClient -Version 1.0.0-rc
+```
+
+Alternatively, you can download the required DLLs from the [Releases page](https://github.com/intrinio/intrinio-realtime-csharp-sdk/releases).
+
 ## Example Usage
 ```csharp
 using System;
