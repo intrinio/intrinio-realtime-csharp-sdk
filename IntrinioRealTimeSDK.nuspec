@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>IntrinioRealTime</id>
-    <version>1.0.0</version>
+    <version>1.0.0-rc</version>
     <title>Intrinio SDK for Real-Time Stock Prices</title>
     <authors>Intrinio</authors>
     <owners>Intrinio</owners>

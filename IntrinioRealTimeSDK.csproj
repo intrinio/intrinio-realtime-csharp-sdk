@@ -51,7 +51,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Test.cs" />
     <Compile Include="Src\Intrinio\QuoteHandler.cs" />
     <Compile Include="Src\Intrinio\IexQuote.cs" />
     <Compile Include="Src\Intrinio\IQuote.cs" />
