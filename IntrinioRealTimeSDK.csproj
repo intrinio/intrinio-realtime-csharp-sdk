@@ -52,6 +52,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Src\Intrinio\QuoddBookQuote.cs" />
+    <Compile Include="Src\Intrinio\QuoddTradeQuote.cs" />
     <Compile Include="Src\Intrinio\QuoteHandler.cs" />
     <Compile Include="Src\Intrinio\IexQuote.cs" />
     <Compile Include="Src\Intrinio\IQuote.cs" />

@@ -8,6 +8,8 @@ using System.Threading;
 using WebSocketSharp;
 using Newtonsoft.Json;
 using log4net;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 
 [assembly: log4net.Config.XmlConfigurator(Watch = true)]
 
@@ -27,9 +29,9 @@ namespace Intrinio
     class QuoddMessage
     {
         public String Event { get; }
-        public String Data { get; }
+        public JObject Data { get; }
 
-        public QuoddMessage(String Event, String Data)
+        public QuoddMessage(String Event, JObject Data)
         {
             this.Event = Event;
             this.Data = Data;
@@ -363,6 +365,7 @@ namespace Intrinio
 
             this.ws.OnMessage += (sender, e) => {
                 IQuote quote = null;
+                this.Logger.Info(e.Data);
 
                 if (this.provider == QuoteProvider.IEX)
                 {
@@ -377,7 +380,7 @@ namespace Intrinio
                     QuoddMessage message = JsonConvert.DeserializeObject<QuoddMessage>(e.Data);
                     if (message.Event == "info")
                     {
-                        QuoddInfoData info = JsonConvert.DeserializeObject<QuoddInfoData>(message.Data);
+                        QuoddInfoData info = message.Data.ToObject<QuoddInfoData>();
                         if (info.Message == "Connected")
                         {
                             this.ready = true;
@@ -390,11 +393,11 @@ namespace Intrinio
                     }
                     else if (message.Event == "quote")
                     {
-                        quote = JsonConvert.DeserializeObject<QuoddBookQuote>(message.Data);
+                        quote = message.Data.ToObject<QuoddBookQuote>();
                     }
                     else if (message.Event == "trade")
                     {
-                        quote = JsonConvert.DeserializeObject<QuoddTradeQuote>(message.Data);
+                        quote = message.Data.ToObject<QuoddTradeQuote>();
                     }
                 }
 
