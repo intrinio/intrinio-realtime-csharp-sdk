@@ -8,19 +8,45 @@ using System.Threading;
 using WebSocketSharp;
 using Newtonsoft.Json;
 using log4net;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 
 [assembly: log4net.Config.XmlConfigurator(Watch = true)]
 
 namespace Intrinio
 {
-    class PhoenixMessage
+    class IexMessage
     {
         public String Event { get;  }
         public IexQuote Payload { get; }
 
-        public PhoenixMessage(String Event, IexQuote Payload) {
+        public IexMessage(String Event, IexQuote Payload) {
             this.Event = Event;
             this.Payload = Payload;
+        }
+    }
+
+    class QuoddMessage
+    {
+        public String Event { get; }
+        public JObject Data { get; }
+
+        public QuoddMessage(String Event, JObject Data)
+        {
+            this.Event = Event;
+            this.Data = Data;
+        }
+    }
+
+    class QuoddInfoData
+    {
+        public String Action { get; }
+        public String Message { get; }
+
+        public QuoddInfoData(String Action, String Message)
+        {
+            this.Action = Action;
+            this.Message = Message;
         }
     }
 
@@ -31,7 +57,11 @@ namespace Intrinio
         /// <summary>
         /// The Investor's Exchange https://iextrading.com/
         /// </summary>
-        IEX
+        IEX,
+        /// <summary>
+        /// QUODD http://home.quodd.com/
+        /// </summary>
+        QUODD,
     };
 
     /// <summary>
@@ -85,12 +115,9 @@ namespace Intrinio
 
             this.Logger = LogManager.GetLogger(this.GetType().FullName);
 
-            if (provider == QuoteProvider.IEX)
-            {
-                Thread heartbeat = new Thread(new ThreadStart(this.SendHeartbeat));
-                heartbeat.Start();
-                this.runningThreads.Add(heartbeat);
-            }
+            Thread heartbeat = new Thread(new ThreadStart(this.SendHeartbeat));
+            heartbeat.Start();
+            this.runningThreads.Add(heartbeat);
         }
 
         /// <summary>
@@ -269,6 +296,10 @@ namespace Intrinio
             {
                 return "https://realtime.intrinio.com/auth";
             }
+            else if (this.provider == QuoteProvider.QUODD)
+            {
+                return "https://api.intrinio.com/token?type=QUODD";
+            }
             return null;
         }
 
@@ -300,6 +331,10 @@ namespace Intrinio
             {
                 return "wss://realtime.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
             }
+            else if (this.provider == QuoteProvider.QUODD)
+            {
+                return "wss://www5.quodd.com/websocket/webStreamer/intrinio/" + this.token;
+            }
             return null;
         }
 
@@ -309,8 +344,11 @@ namespace Intrinio
 
             this.ws.OnOpen += (sender, e) => {
                 this.Logger.Info("Websocket connected!");
-                this.ready = true;
-                this.RefreshChannels();
+                if (this.provider == QuoteProvider.IEX)
+                {
+                    this.ready = true;
+                    this.RefreshChannels();
+                }
             };
 
             this.ws.OnClose += (sender, e) => {
@@ -327,13 +365,39 @@ namespace Intrinio
 
             this.ws.OnMessage += (sender, e) => {
                 IQuote quote = null;
+                this.Logger.Info(e.Data);
 
                 if (this.provider == QuoteProvider.IEX)
                 {
-                    PhoenixMessage message = JsonConvert.DeserializeObject<PhoenixMessage>(e.Data);
+                    IexMessage message = JsonConvert.DeserializeObject<IexMessage>(e.Data);
                     if (message.Event == "quote")
                     {
                         quote = message.Payload;
+                    }
+                }
+                else if (this.provider == QuoteProvider.QUODD)
+                {
+                    QuoddMessage message = JsonConvert.DeserializeObject<QuoddMessage>(e.Data);
+                    if (message.Event == "info")
+                    {
+                        QuoddInfoData info = message.Data.ToObject<QuoddInfoData>();
+                        if (info.Message == "Connected")
+                        {
+                            this.ready = true;
+                            this.RefreshChannels();
+                        }
+                        else
+                        {
+                            this.Logger.Info(info.Message);
+                        }
+                    }
+                    else if (message.Event == "quote")
+                    {
+                        quote = message.Data.ToObject<QuoddBookQuote>();
+                    }
+                    else if (message.Event == "trade")
+                    {
+                        quote = message.Data.ToObject<QuoddTradeQuote>();
                     }
                 }
 
@@ -403,6 +467,10 @@ namespace Intrinio
             {
                 message = "{\"topic\":\"" + this.ParseIexTopic(channel) + "\",\"event\":\"phx_leave\",\"payload\":{},\"ref\":null}";
             }
+            else if (this.provider == QuoteProvider.QUODD)
+            {
+                message = "{\"event\": \"unsubscribe\", \"data\": { \"ticker\": " + channel + ", \"action\": \"unsubscribe\"}}";
+            }
 
             return message;
         }
@@ -414,6 +482,10 @@ namespace Intrinio
             if (this.provider == QuoteProvider.IEX)
             {
                 message = "{\"topic\":\"" + this.ParseIexTopic(channel) + "\",\"event\":\"phx_join\",\"payload\":{},\"ref\":null}";
+            }
+            else if (this.provider == QuoteProvider.QUODD)
+            {
+                message = "{\"event\": \"subscribe\", \"data\": { \"ticker\": " + channel + ", \"action\": \"subscribe\"}}";
             }
 
             return message;
@@ -442,7 +514,17 @@ namespace Intrinio
                     if (this.ws != null && this.ws.IsAlive)
                     {
                         this.Logger.Debug("Sending heartbeat");
-                        this.ws.Send(IEX_HEARTBEAT_MSG);
+                        if (this.provider == QuoteProvider.IEX)
+                        {
+                            this.ws.Send("{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}");
+                        }
+                        else if (this.provider == QuoteProvider.QUODD)
+                        {
+                            var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                            var timestamp = (DateTime.UtcNow - epoch).TotalMilliseconds;
+                            this.ws.Send("{\"event\": \"heartbeat\", \"data\": {\"action\": \"heartbeat\", \"ticker\": " + timestamp + "}}");
+                        }
+
                     }
                 }
             }
