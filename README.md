@@ -77,40 +77,40 @@ Each data provider has a different format for their quote data.
 
 NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will be present in every message. Upon subscribing to a channel, you will receive one quote and one trade message containing all fields of the latest data available.
 
-#### Quote Message
+#### Trade Message
 
-```json
-{ "ticker": "AAPL.NB",
-  "root_ticker": "AAPL",
-  "protocol_id": 301,
-  "last_price_4d": 1594850,
-  "trade_volume": 100,
-  "trade_exchange": "t",
-  "change_price_4d": 24950,
-  "percent_change_4d": 15892,
-  "trade_time": 1508165070052,
-  "up_down": "v",
-  "vwap_4d": 1588482,
-  "total_volume": 10209883,
-  "day_high_4d": 1596600,
-  "day_high_time": 1508164532269,
-  "day_low_4d": 1576500,
-  "day_low_time": 1508160605345,
-  "prev_close_4d": 1569900,
-  "volume_plus": 6333150,
-  "ext_last_price_4d": 1579000,
-  "ext_trade_volume": 100,
-  "ext_trade_exchange": "t",
-  "ext_change_price_4d": 9100,
-  "ext_percent_change_4d": 5796,
-  "ext_trade_time": 1508160600567,
-  "ext_up_down": "-",
-  "open_price_4d": 1582200,
-  "open_volume": 100,
-  "open_time": 1508141103583,
-  "rtl": 30660,
-  "is_halted": false,
-  "is_short_restricted": false }
+```ruby
+{ ticker: "AAPL.NB",
+  root_ticker: "AAPL",
+  protocol_id: 301,
+  last_price_4d: 1594850,
+  trade_volume: 100,
+  trade_exchange: "t",
+  change_price_4d: 24950,
+  percent_change_4d: 15892,
+  trade_time: 1508165070052,
+  up_down: "v",
+  vwap_4d: 1588482,
+  total_volume: 10209883,
+  day_high_4d: 1596600,
+  day_high_time: 1508164532269,
+  day_low_4d: 1576500,
+  day_low_time: 1508160605345,
+  prev_close_4d: 1569900,
+  volume_plus: 6333150,
+  ext_last_price_4d: 1579000,
+  ext_trade_volume: 100,
+  ext_trade_exchange: "t",
+  ext_change_price_4d: 9100,
+  ext_percent_change_4d: 5796,
+  ext_trade_time: 1508160600567,
+  ext_up_down: "-",
+  open_price_4d: 1582200,
+  open_volume: 100,
+  open_time: 1508141103583,
+  rtl: 30660,
+  is_halted: false,
+  is_short_restricted: false }
 ```
 
 * **ticker** - Stock Symbol for the security
@@ -145,24 +145,33 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 * **protocol_id** - Internal Quodd ID defining Source of Data
 * **rtl** - Record Transaction Level - number of records published that day
 
-### IEX
+#### Quote Message
 
-```json
-{ "type": "ask",
-  "timestamp": 1493409509.3932788,
-  "ticker": "GE",
-  "size": 13750,
-  "price": 28.97 }
+```ruby
+{ ticker: "AAPL.NB",
+  root_ticker: "AAPL",
+  bid_size: 500,
+  ask_size: 600,
+  bid_price_4d: 1594800,
+  ask_price_4d: 1594900,
+  ask_exchange: "t",
+  bid_exchange: "t",
+  quote_time: 1508165070850,
+  protocol_id: 302,
+  rtl: 129739 }
 ```
 
-*   **type** - the quote type
-  *    **`last`** - represents the last traded price
-  *    **`bid`** - represents the top-of-book bid price
-  *    **`ask`** - represents the top-of-book ask price
-*   **timestamp** - a Unix timestamp (with microsecond precision)
-*   **ticker** - the ticker of the security
-*   **size** - the size of the `last` trade, or total volume of orders at the top-of-book `bid` or `ask` price
-*   **price** - the price in USD
+* **ticker** - Stock Symbol for the security
+* **root_ticker** - Underlying symbol for a particular contract
+* **ask_price_4d** - The price a seller is willing to accept for a security
+* **ask_size** - The amount of a security that a market maker is offering to sell at the ask price
+* **ask_exchange** - The market center from which the ask is being quoted
+* **bid_price_4d** - A bid price is the price a buyer is willing to pay for a security.
+* **bid_size** - The bid size number of shares being offered for purchase at a specified bid price
+* **bid_exchange** - The market center from which the bid is being quoted
+* **quote_time** - Time of the quote in milliseconds
+* **rtl** - Record Transaction Level - number of records published that day
+* **protocol_id** - Internal Quodd ID defining Source of Data
 
 ## Channels
 
