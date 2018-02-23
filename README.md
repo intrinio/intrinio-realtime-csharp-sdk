@@ -190,7 +190,40 @@ To receive price quotes from IEX, you need to instruct the client to "join" a ch
 Special access is required for both lobby channels. [Contact us](mailto:sales@intrinio.com) for more information.
 
 ## API Keys
+
 You will receive your Intrinio API Username and Password after [creating an account](https://intrinio.com/signup). You will need a subscription to a [realtime data feed](https://intrinio.com/marketplace/data/prices/realtime) as well.
+
+## Logging
+
+If you are experiencing issues, we recommend attaching a logger to the client, which will show you detailed debugging information. Add the following sections to your `app.config`:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <configSections>
+    <section name="log4net" type="log4net.Config.Log4NetConfigurationSectionHandler, log4net"/>
+  </configSections>
+  <log4net>
+    <appender name="ConsoleAppender" type="log4net.Appender.ColoredConsoleAppender">
+      <layout type="log4net.Layout.PatternLayout">
+        <conversionPattern value="%date %level [%thread] %logger{1} %username - %message%newline"/>
+      </layout>
+      <mapping>
+        <level value="WARN"/>
+        <foreColor value="Yellow, HighIntensity"/>
+      </mapping>
+      <mapping>
+        <level value="ERROR"/>
+        <foreColor value="Red, HighIntensity"/>
+      </mapping>
+    </appender>
+    <root>
+      <level value="DEBUG"/>
+      <appender-ref ref="ConsoleAppender"/>
+    </root>
+  </log4net>
+</configuration>
+```
 
 ## Documentation
 
