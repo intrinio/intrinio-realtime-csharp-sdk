@@ -36,7 +36,7 @@ namespace MyNamespace
             string api_key = "YOUR_INTRINIO_API_KEY";
             QuoteProvider provider = QuoteProvider.IEX;
 
-            using (RealTimeClient client = new RealTimeClient(parovider, api_key: api_key))
+            using (RealTimeClient client = new RealTimeClient(provider, api_key: api_key))
             {
                 QuoteHandler handler = new QuoteHandler();
                 handler.OnQuote += (IQuote quote) =>
