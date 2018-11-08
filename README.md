@@ -33,11 +33,10 @@ namespace MyNamespace
     {
         static void Main(string[] args)
         {
-            string username = "YOUR_INTRINIO_API_USERNAME";
-            string password = "YOUR_INTRINIO_API_PASSWORD";
+            string api_key = "YOUR_INTRINIO_API_KEY";
             QuoteProvider provider = QuoteProvider.IEX;
 
-            using (RealTimeClient client = new RealTimeClient(username, password, provider))
+            using (RealTimeClient client = new RealTimeClient(parovider, api_key: api_key))
             {
                 QuoteHandler handler = new QuoteHandler();
                 handler.OnQuote += (IQuote quote) =>
@@ -191,7 +190,7 @@ Special access is required for both lobby channels. [Contact us](mailto:sales@in
 
 ## API Keys
 
-You will receive your Intrinio API Username and Password after [creating an account](https://intrinio.com/signup). You will need a subscription to a [realtime data feed](https://intrinio.com/marketplace/data/prices/realtime) as well.
+You will receive your Intrinio API Key after [creating an account](https://intrinio.com/signup). You will need a subscription to a [realtime data feed](https://intrinio.com/marketplace/data/prices/realtime) as well.
 
 ## Logging
 
