@@ -65,6 +65,7 @@ Currently, Intrinio offers real-time data for this SDK from the following provid
 
 * IEX - [Homepage](https://iextrading.com/)
 * QUODD [Homepage](http://home.quodd.com/)
+* Cryptoquote - [Homepage](https://cryptoquote.io/)
 
 Each has distinct price channels and quote formats, but a very similar API.
 
@@ -78,7 +79,7 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 
 #### Trade Message
 
-```ruby
+```csharp
 { ticker: "AAPL.NB",
   root_ticker: "AAPL",
   protocol_id: 301,
@@ -146,7 +147,7 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 
 #### Quote Message
 
-```ruby
+```csharp
 { ticker: "AAPL.NB",
   root_ticker: "AAPL",
   bid_size: 500,
@@ -172,6 +173,153 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 * **rtl** - Record Transaction Level - number of records published that day
 * **protocol_id** - Internal Quodd ID defining Source of Data
 
+### IEX
+
+```csharp
+{ type: "ask",
+  timestamp: 1493409509.3932788,
+  ticker: "GE",
+  size: 13750,
+  price: 28.97 }
+```
+
+*   **type** - the quote type
+  *    **`last`** - represents the last traded price
+  *    **`bid`** - represents the top-of-book bid price
+  *    **`ask`** - represents the top-of-book ask price
+*   **timestamp** - a Unix timestamp (with microsecond precision)
+*   **ticker** - the ticker of the security
+*   **size** - the size of the `last` trade, or total volume of orders at the top-of-book `bid` or `ask` price
+*   **price** - the price in USD
+
+### Cryptoquote
+
+#### Book Update
+```csharp
+{ type: "book_update",
+  pair_name: "BTCUSD",
+  pair_code: "btcusd",
+  exchange_name: "Gemini",
+  exchange_code: "gemini",
+  side: "buy",
+  price: 6337.4,
+  size: 0.3 }
+```
+
+*   **type** - the type of message this is
+  *    **`book_update`** - a message that denotes a change to an order book
+  *    **`ticker`** - a snapshot of the market as depicted by the Exchange
+  *    **`trade`** - a trade message (updating `last_trade_price`, `last_trade_time`, and `last_trade_size`)
+*   **pair_name** - the name of the currency pair
+*   **pair_code** - the code of the currency pair
+*   **exchange_name** - the name of the exchange
+*   **exchange_code** - the code of the exchange
+*   **side** - the side of the book this update is for
+  *    **`buy`** - this is an update to the buy side of the book
+  *    **`sell`** - this is an update to the sell side of the book
+*   **price** - the price of this book entry
+*   **size** - the size of this book entry
+
+#### Ticker
+```csharp
+{ type: "ticker",
+  pair_name: "BTCUSD",
+  pair_code: "btcusd",
+  exchange_name: "Binance",
+  exchange_code: "binance",
+  last_updated: "2018-10-29 23:08:02.277Z",
+  bid: 6326,
+  bid_size: 6.51933000,
+  ask: 6326.97,
+  ask_size: 6.12643000,
+  change: -151.6899999999996,
+  change_percent: -2.340895061728389,
+  volume: 13777.232772,
+  open: 6480,
+  high: 6505.01,
+  low: 6315,
+  last_trade_time: "2018-10-29 23:08:01.834Z",
+  last_trade_side: null,
+  last_trade_price: 6326.97000000,
+  last_trade_size: 0.00001200 }
+```
+
+*   **type** - the type of message this is
+  *    **`book_update`** - a message that denotes a change to an order book
+  *    **`ticker`** - a snapshot of the market as depicted by the Exchange
+  *    **`trade`** - a trade message (updating `last_trade_price`, `last_trade_time`, and `last_trade_size`)
+*   **pair_name** - the name of the currency pair
+*   **pair_code** - the code of the currency pair
+*   **exchange_name** - the name of the exchange
+*   **exchange_code** - the code of the exchange
+*   **last_updated** - a UTC timestamp of when the ticker was last updated
+*   **ask** - the ask for the currency pair on the exchange
+*   **ask_size** - the size of the ask for the currency pair on the exchange
+*   **bid** - the bid for the currency pair on the exchange
+*   **bid_size** - the size of the bid for the currency pair on the exchange
+*   **change** - the notional change in price since the last ticker
+*   **change_percent** - the percent change in price since the last ticker
+*   **volume** - the volume of the currency pair on the exchange
+*   **open** - the opening price of the currency pair on the exchange
+*   **high** - the highest price of the currency pair on the exchange
+*   **low** - the lowest price of the currency pair on the exchange
+*   **last_trade_time** - a UTC timestamp of the last trade for the currency pair on the exchange
+*   **last_trade_side** - the side of the last trade
+  *    **`buy`** - this is an update to the buy side of the book
+  *    **`sell`** - this is an update to the sell side of the book
+*   **last_trade_price** - the price of the last trade for the currency pair on the exchange
+*   **last_trade_size** - the size of the last trade for the currency pair on the exchange
+
+#### Trade
+```csharp
+{ type: "trade",
+  pair_name: "BTCUSD",
+  par_code: "btcusd",
+  exchange_name: "Gemini",
+  exchange_code: "gemini",
+  last_updated: "2018-10-29 23:08:02.277Z",
+  bid: null,
+  bid_size: null,
+  ask: null,
+  ask_size: null,
+  change: -133.40760000000046,
+  change_percent: -2.059762280845255,
+  volume: 22121.79710206001,
+  open: 6476.8445,
+  high: 6506.2724,
+  low: 6311,
+  last_trade_time: "2018-10-29 23:08:01.834Z",
+  last_trade_side: "sell",
+  last_trade_price: 6343.7124,
+  last_trade_size: 1.6045 }
+```
+
+*   **type** - the type of message this is
+  *    **`book_update`** - a message that denotes a change to an order book
+  *    **`ticker`** - a snapshot of the market as depicted by the Exchange
+  *    **`trade`** - a trade message (updating `last_trade_price`, `last_trade_time`, and `last_trade_size`)
+*   **pair_name** - the name of the currency pair
+*   **pair_code** - the code of the currency pair
+*   **exchange_name** - the name of the exchange
+*   **exchange_code** - the code of the exchange
+*   **last_updated** - a UTC timestamp of when the ticker was last updated
+*   **ask** - the ask for the currency pair on the exchange
+*   **ask_size** - the size of the ask for the currency pair on the exchange
+*   **bid** - the bid for the currency pair on the exchange
+*   **bid_size** - the size of the bid for the currency pair on the exchange
+*   **change** - the notional change in price since the last ticker
+*   **change_percent** - the percent change in price since the last ticker
+*   **volume** - the volume of the currency pair on the exchange
+*   **open** - the opening price of the currency pair on the exchange
+*   **high** - the highest price of the currency pair on the exchange
+*   **low** - the lowest price of the currency pair on the exchange
+*   **last_trade_time** - a UTC timestamp of the last trade for the currency pair on the exchange
+*   **last_trade_side** - the side of the last trade
+  *    **`buy`** - this is an update to the buy side of the book
+  *    **`sell`** - this is an update to the sell side of the book
+*   **last_trade_price** - the price of the last trade for the currency pair on the exchange
+*   **last_trade_size** - the size of the last trade for the currency pair on the exchange
+
 ## Channels
 
 ### QUODD
@@ -187,6 +335,16 @@ To receive price quotes from IEX, you need to instruct the client to "join" a ch
 * The security last price lobby (`$lobby_last_price`) where only last price quotes for all securities are posted
 
 Special access is required for both lobby channels. [Contact us](mailto:sales@intrinio.com) for more information.
+
+### Cryptoquote
+
+To receive price quotes from Cryptoquote, you need to instruct the client to "join" a channel. A channel can be
+* The lobby (`crypto:lobby`) where all message types for all currency pairs are posted
+* The type lobby (`crypto:lobby:{message_type}`) where all messages for the given type for all currency pairs are posted (i.e. `crypto:lobby:trade`)
+* The pair lobby (`crypto:pair:{pair_code}`) where all message types for the provided currency pair are posted (i.e. `crypto:pair:btcusd`)
+* The book_update pair lobby (`crypto:pair:book_update:{pair_code}`) where book_updates for the provided currency pair are posted (i.e. `crypto:pair:book_update:btcusd`)
+* The ticker pair lobby (`crypto:pair:ticker:{pair_code}`) where tickers for the provided currency pair are posted (i.e. `crypto:pair:ticker:btcusd`)
+* The trade pair lobby (`crypto:pair:trade:{pair_code}`) where trades for the provided currency pair are posted (i.e. `crypto:pair:trade:btcusd`)
 
 ## API Keys
 
