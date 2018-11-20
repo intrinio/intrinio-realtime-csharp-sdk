@@ -329,8 +329,7 @@ namespace Intrinio
             }
             else if (this.provider == QuoteProvider.CRYPTOQUOTE)
             {
-                //url = "https://crypto.intrinio.com/auth";
-                url = "http://localhost:4000/auth";
+                url = "https://crypto.intrinio.com/auth";
             }
 
             if (!String.IsNullOrEmpty(url) && !String.IsNullOrEmpty(this.api_key))
@@ -393,8 +392,7 @@ namespace Intrinio
             }
             else if (this.provider == QuoteProvider.CRYPTOQUOTE)
             {
-                //return "wss://crypto.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
-                return "ws://localhost:4000/socket/websocket?vsn=1.0.0&token=" + this.token;
+                return "wss://crypto.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
             }
 
             return null;
