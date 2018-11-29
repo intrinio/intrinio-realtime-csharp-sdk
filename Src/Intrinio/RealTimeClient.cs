@@ -74,6 +74,7 @@ namespace Intrinio
         /// </summary>
         public ILog Logger { get; set; }
 
+        private string api_key;
         private string username;
         private string password;
         private QuoteProvider provider;
@@ -94,23 +95,33 @@ namespace Intrinio
         /// <summary>
         /// Initializes a new real-time client instance.
         /// </summary>
+        /// <param name="api_key">Your Intrinio API Key</param>
         /// <param name="username">Your Intrinio API Username</param>
-        /// <param name="password">Your Intrinio API password</param>
+        /// <param name="password">Your Intrinio API Password</param>
         /// <param name="provider">A QuoteProvider</param>
-        public RealTimeClient(string username, string password, QuoteProvider provider)
+        public RealTimeClient(QuoteProvider provider, string username = null, string password = null, string api_key = null)
         {
+            this.api_key = api_key;
             this.username = username;
             this.password = password;
             this.provider = provider;
 
-            if (this.username.Length == 0)
+            if (String.IsNullOrEmpty(this.api_key))
             {
-                throw new ArgumentException("Must provide a valid username");
-            }
+                if (String.IsNullOrEmpty(this.username) && String.IsNullOrEmpty(this.password))
+                {
+                    throw new ArgumentException("Must provide an API key or username and password");
+                }
 
-            if (this.password.Length == 0)
-            {
-                throw new ArgumentException("Must provide a valid password");
+                if (String.IsNullOrEmpty(this.username))
+                {
+                    throw new ArgumentException("Must provide a valid username");
+                }
+
+                if (String.IsNullOrEmpty(this.password))
+                {
+                    throw new ArgumentException("Must provide a valid password");
+                }
             }
 
             this.Logger = LogManager.GetLogger(this.GetType().FullName);
@@ -292,22 +303,47 @@ namespace Intrinio
 
         private string MakeAuthUrl()
         {
+            string url = null;
             if (this.provider == QuoteProvider.IEX)
             {
-                return "https://realtime.intrinio.com/auth";
+                url = "https://realtime.intrinio.com/auth";
             }
             else if (this.provider == QuoteProvider.QUODD)
             {
-                return "https://api.intrinio.com/token?type=QUODD";
+                url = "https://api.intrinio.com/token?type=QUODD";
             }
-            return null;
+
+            if (!String.IsNullOrEmpty(url) && !String.IsNullOrEmpty(this.api_key))
+            {
+                url = this.MakeUrlAuthUrl(url);
+            }
+
+            return url;
+        }
+
+        private string MakeUrlAuthUrl(string auth_url)
+        {
+            if (auth_url.Contains("?"))
+            {
+                auth_url = auth_url + "&";
+            }
+            else
+            {
+                auth_url = auth_url + "?";
+            }
+
+            return auth_url + "api_key=" + this.api_key;
         }
 
         private void RefreshToken()
         {
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(this.MakeAuthUrl());
-            String encoded = System.Convert.ToBase64String(System.Text.Encoding.GetEncoding("ISO-8859-1").GetBytes(this.username + ":" + this.password));
-            request.Headers.Add("Authorization", "Basic " + encoded);
+
+            if (String.IsNullOrEmpty(this.api_key))
+            {
+                String encoded = System.Convert.ToBase64String(System.Text.Encoding.GetEncoding("ISO-8859-1").GetBytes(this.username + ":" + this.password));
+                request.Headers.Add("Authorization", "Basic " + encoded);
+            }
 
             HttpWebResponse response = (HttpWebResponse)request.GetResponse();
             if (response.StatusCode == HttpStatusCode.OK)
