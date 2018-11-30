@@ -2,18 +2,18 @@
 <package >
   <metadata>
     <id>IntrinioRealTimeClient</id>
-    <version>2.0.0-rc</version>
-    <title>Intrinio SDK for Real-Time Stock Prices</title>
+    <version>2.1.0-rc</version>
+    <title>Intrinio SDK for Real-Time Stock and Crypto Prices</title>
     <authors>Intrinio</authors>
     <owners>Intrinio</owners>
     <licenseUrl>https://github.com/intrinio/intrinio-realtime-csharp-sdk/blob/master/LICENSE</licenseUrl>
     <projectUrl>https://github.com/intrinio/intrinio-realtime-csharp-sdk</projectUrl>
     <iconUrl>https://s3.amazonaws.com/intrinio-production/images/Intrinio+Logo/intrinio-egg-64.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>Intrinio provides real-time stock prices via a two-way WebSocket connection.</description>
+    <description>Intrinio provides real-time stock and crypto prices via a two-way WebSocket connection.</description>
     <releaseNotes>Initial release</releaseNotes>
     <copyright>Copyright 2017 Intrinio</copyright>
-    <tags>fintech stocks prices websocket real-time market finance</tags>
+    <tags>fintech stocks prices websocket real-time market finance crypto cryptocurrency</tags>
     <dependencies>
       <dependency id="log4net" version="2.0.8" />
       <dependency id="Newtonsoft.Json" version="10.0.3" />
