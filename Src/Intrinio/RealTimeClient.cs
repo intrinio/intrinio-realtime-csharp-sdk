@@ -26,6 +26,18 @@ namespace Intrinio
         }
     }
 
+    class CryptoquoteMessage
+    {
+        public String Event { get; }
+        public JObject Payload { get; }
+
+        public CryptoquoteMessage(String Event, JObject Payload)
+        {
+            this.Event = Event;
+            this.Payload = Payload;
+        }
+    }
+
     class QuoddMessage
     {
         public String Event { get; }
@@ -62,6 +74,8 @@ namespace Intrinio
         /// QUODD http://home.quodd.com/
         /// </summary>
         QUODD,
+        /// <summary> Cryptoquote https://cryptoquote.io </summary>
+        CRYPTOQUOTE
     };
 
     /// <summary>
@@ -89,6 +103,7 @@ namespace Intrinio
         private readonly int SELF_HEAL_TIME = 1000;
         private readonly int HEARTBEAT_INTERVAL = 1000;
         private readonly string IEX_HEARTBEAT_MSG = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
+        private readonly string CRYPTOQUOTE_HEARTBEAT_MSG = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
 
         #region Public Methods
 
@@ -312,6 +327,10 @@ namespace Intrinio
             {
                 url = "https://api.intrinio.com/token?type=QUODD";
             }
+            else if (this.provider == QuoteProvider.CRYPTOQUOTE)
+            {
+                url = "https://crypto.intrinio.com/auth";
+            }
 
             if (!String.IsNullOrEmpty(url) && !String.IsNullOrEmpty(this.api_key))
             {
@@ -371,6 +390,11 @@ namespace Intrinio
             {
                 return "wss://www5.quodd.com/websocket/webStreamer/intrinio/" + this.token;
             }
+            else if (this.provider == QuoteProvider.CRYPTOQUOTE)
+            {
+                return "wss://crypto.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
+            }
+
             return null;
         }
 
@@ -380,7 +404,7 @@ namespace Intrinio
 
             this.ws.OnOpen += (sender, e) => {
                 this.Logger.Info("Websocket connected!");
-                if (this.provider == QuoteProvider.IEX)
+                if (this.provider == QuoteProvider.IEX || this.provider == QuoteProvider.CRYPTOQUOTE)
                 {
                     this.ready = true;
                     this.RefreshChannels();
@@ -409,6 +433,22 @@ namespace Intrinio
                     if (message.Event == "quote")
                     {
                         quote = message.Payload;
+                    }
+                }
+                else if (this.provider == QuoteProvider.CRYPTOQUOTE)
+                {
+                    CryptoquoteMessage message = JsonConvert.DeserializeObject<CryptoquoteMessage>(e.Data);
+                    if (message.Event == "book_update")
+                    {
+                        quote = message.Payload.ToObject<CryptoLevel2Message>();
+                    }
+                    if (message.Event == "ticker")
+                    {
+                        quote = message.Payload.ToObject<CryptoLevel1Message>();
+                    }
+                    if (message.Event == "trade")
+                    {
+                        quote = message.Payload.ToObject<CryptoLevel1Message>();
                     }
                 }
                 else if (this.provider == QuoteProvider.QUODD)
@@ -503,6 +543,10 @@ namespace Intrinio
             {
                 message = "{\"topic\":\"" + this.ParseIexTopic(channel) + "\",\"event\":\"phx_leave\",\"payload\":{},\"ref\":null}";
             }
+            else if (this.provider == QuoteProvider.CRYPTOQUOTE)
+            {
+                message = "{\"topic\":\"" + channel + "\",\"event\":\"phx_leave\",\"payload\":{},\"ref\":null}";
+            }
             else if (this.provider == QuoteProvider.QUODD)
             {
                 message = "{\"event\": \"unsubscribe\", \"data\": { \"ticker\": " + channel + ", \"action\": \"unsubscribe\"}}";
@@ -518,6 +562,10 @@ namespace Intrinio
             if (this.provider == QuoteProvider.IEX)
             {
                 message = "{\"topic\":\"" + this.ParseIexTopic(channel) + "\",\"event\":\"phx_join\",\"payload\":{},\"ref\":null}";
+            }
+            else if (this.provider == QuoteProvider.CRYPTOQUOTE)
+            {
+                message = "{\"topic\":\"" + channel + "\",\"event\":\"phx_join\",\"payload\":{},\"ref\":null}";
             }
             else if (this.provider == QuoteProvider.QUODD)
             {
@@ -550,7 +598,7 @@ namespace Intrinio
                     if (this.ws != null && this.ws.IsAlive)
                     {
                         this.Logger.Debug("Sending heartbeat");
-                        if (this.provider == QuoteProvider.IEX)
+                        if (this.provider == QuoteProvider.IEX || this.provider == QuoteProvider.CRYPTOQUOTE)
                         {
                             this.ws.Send("{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}");
                         }
