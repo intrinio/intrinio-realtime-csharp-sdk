@@ -4,9 +4,9 @@ using System;
 namespace Intrinio
 {
     /// <summary>
-    /// A book_update message from Cryptoquote
+    /// A Level 2 (book update) message from Cryptoquote
     /// </summary>
-    public class CryptoBookUpdate : IQuote
+    public class CryptoLevel2Message : IQuote
     {
         /// <summary>
         /// The code of the crypto currency pair
@@ -67,7 +67,7 @@ namespace Intrinio
         /// <param name="Side">The side of the book update, either "buy" or "sell"</param>
         /// <param name="Size">The size of the book update</param>
         /// <param name="Type">The type of quote, either "book_update", "ticker", or "trade"</param>
-        public CryptoBookUpdate(String PairCode, String PairName, String ExchangeCode, String ExchangeName, float Price, String Side, float Size, String Type)
+        public CryptoLevel2Message(String PairCode, String PairName, String ExchangeCode, String ExchangeName, float Price, String Side, float Size, String Type)
         {
             this.PairCode = PairCode;
             this.PairName = PairName;

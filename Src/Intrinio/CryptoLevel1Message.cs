@@ -4,12 +4,12 @@ using System;
 namespace Intrinio
 {
     /// <summary>
-    /// A ticker message from Cryptoquote
+    /// A Level 1 (price update) message from Cryptoquote
     /// </summary>
-    public class CryptoTicker : IQuote
+    public class CryptoLevel1Message : IQuote
     {
         /// <summary>
-        /// The UTC timestamp of when the ticker data was last updated
+        /// The UTC timestamp of when the data was last updated
         /// </summary>
         [JsonProperty("last_updated")]
         public String LastUpdated { get; }
@@ -151,7 +151,7 @@ namespace Intrinio
         /// <param name="LastTradePrice">The last trade price of the crypto currency pair on the exchange</param>
         /// <param name="LastTradeSize">The last trade size of the crypto currency pair on the exchange</param>
         /// <param name="Type">The type of quote, either "book_update", "ticker", or "trade"</param>
-        public CryptoTicker(String LastUpdated, String PairCode, String PairName, String ExchangeCode, String ExchangeName, float? Bid, float? BidSize, float? Ask, float? AskSize, float? Change, float? ChangePercent, float? Volume, float? Open, float? High, float? Low, String LastTradeTime, String LastTradeSide, float? LastTradePrice, float? LastTradeSize, String Type)
+        public CryptoLevel1Message(String LastUpdated, String PairCode, String PairName, String ExchangeCode, String ExchangeName, float? Bid, float? BidSize, float? Ask, float? AskSize, float? Change, float? ChangePercent, float? Volume, float? Open, float? High, float? Low, String LastTradeTime, String LastTradeSide, float? LastTradePrice, float? LastTradeSize, String Type)
         {
             this.PairCode = PairCode;
             this.PairName = PairName;

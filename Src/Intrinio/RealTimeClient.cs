@@ -440,15 +440,15 @@ namespace Intrinio
                     CryptoquoteMessage message = JsonConvert.DeserializeObject<CryptoquoteMessage>(e.Data);
                     if (message.Event == "book_update")
                     {
-                        quote = message.Payload.ToObject<CryptoBookUpdate>();
+                        quote = message.Payload.ToObject<CryptoLevel2Message>();
                     }
                     if (message.Event == "ticker")
                     {
-                        quote = message.Payload.ToObject<CryptoTicker>();
+                        quote = message.Payload.ToObject<CryptoLevel1Message>();
                     }
                     if (message.Event == "trade")
                     {
-                        quote = message.Payload.ToObject<CryptoTrade>();
+                        quote = message.Payload.ToObject<CryptoLevel1Message>();
                     }
                 }
                 else if (this.provider == QuoteProvider.QUODD)
