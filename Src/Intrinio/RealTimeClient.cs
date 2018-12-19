@@ -38,6 +38,18 @@ namespace Intrinio
         }
     }
 
+    class FxcmMessage
+    {
+        public String Event { get; }
+        public JObject Payload { get; }
+
+        public FxcmMessage(String Event, JObject Payload)
+        {
+            this.Event = Event;
+            this.Payload = Payload;
+        }
+    }
+
     class QuoddMessage
     {
         public String Event { get; }
@@ -75,7 +87,9 @@ namespace Intrinio
         /// </summary>
         QUODD,
         /// <summary> Cryptoquote https://cryptoquote.io </summary>
-        CRYPTOQUOTE
+        CRYPTOQUOTE,
+        /// <summary> FXCM https://www.fxcm.com/ </summary>
+        FXCM
     };
 
     /// <summary>
@@ -104,6 +118,7 @@ namespace Intrinio
         private readonly int HEARTBEAT_INTERVAL = 1000;
         private readonly string IEX_HEARTBEAT_MSG = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
         private readonly string CRYPTOQUOTE_HEARTBEAT_MSG = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
+        private readonly string FXCM_HEARTBEAT_MSG = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}";
 
         #region Public Methods
 
@@ -331,6 +346,10 @@ namespace Intrinio
             {
                 url = "https://crypto.intrinio.com/auth";
             }
+            else if (this.provider == QuoteProvider.FXCM)
+            {
+                url = "https://fxcm.intrinio.com/auth";
+            }
 
             if (!String.IsNullOrEmpty(url) && !String.IsNullOrEmpty(this.api_key))
             {
@@ -394,6 +413,10 @@ namespace Intrinio
             {
                 return "wss://crypto.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
             }
+            else if (this.provider == QuoteProvider.FXCM)
+            {
+                return "wss://fxcm.intrinio.com/socket/websocket?vsn=1.0.0&token=" + this.token;
+            }
 
             return null;
         }
@@ -404,7 +427,12 @@ namespace Intrinio
 
             this.ws.OnOpen += (sender, e) => {
                 this.Logger.Info("Websocket connected!");
-                if (this.provider == QuoteProvider.IEX || this.provider == QuoteProvider.CRYPTOQUOTE)
+                if (
+                    this.provider == QuoteProvider.IEX ||
+                    this.provider == QuoteProvider.CRYPTOQUOTE ||
+                    this.provider == QuoteProvider.FXCM
+                )
+
                 {
                     this.ready = true;
                     this.RefreshChannels();
@@ -449,6 +477,15 @@ namespace Intrinio
                     if (message.Event == "trade")
                     {
                         quote = message.Payload.ToObject<CryptoLevel1Message>();
+                    }
+                }
+                else if (this.provider == QuoteProvider.FXCM)
+                {
+                    FxcmMessage message = JsonConvert.DeserializeObject<FxcmMessage>(e.Data);
+                    if (message.Event == "price_update")
+                    {
+                        //quote = message.Payload;
+                        quote = message.Payload.ToObject<FxcmPrice>();
                     }
                 }
                 else if (this.provider == QuoteProvider.QUODD)
@@ -567,6 +604,10 @@ namespace Intrinio
             {
                 message = "{\"topic\":\"" + channel + "\",\"event\":\"phx_join\",\"payload\":{},\"ref\":null}";
             }
+            else if (this.provider == QuoteProvider.FXCM)
+            {
+                message = "{\"topic\":\"" + channel + "\",\"event\":\"phx_join\",\"payload\":{},\"ref\":null}";
+            }
             else if (this.provider == QuoteProvider.QUODD)
             {
                 message = "{\"event\": \"subscribe\", \"data\": { \"ticker\": " + channel + ", \"action\": \"subscribe\"}}";
@@ -598,7 +639,11 @@ namespace Intrinio
                     if (this.ws != null && this.ws.IsAlive)
                     {
                         this.Logger.Debug("Sending heartbeat");
-                        if (this.provider == QuoteProvider.IEX || this.provider == QuoteProvider.CRYPTOQUOTE)
+                        if (
+                            this.provider == QuoteProvider.IEX ||
+                            this.provider == QuoteProvider.CRYPTOQUOTE ||
+                            this.provider == QuoteProvider.FXCM
+                        )
                         {
                             this.ws.Send("{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}");
                         }
