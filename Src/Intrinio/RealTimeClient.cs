@@ -455,7 +455,20 @@ namespace Intrinio
                 IQuote quote = null;
                 this.Logger.Info(e.Data);
 
-                if (this.provider == QuoteProvider.IEX)
+                JObject reply_message = JObject.Parse(e.Data);
+                string reply_event = reply_message["event"].ToString();
+                if (reply_event == "phx_reply")
+                {
+                    string payload_status = reply_message["payload"]["status"].ToString();
+                    string payload_response = reply_message["payload"]["response"].ToString();
+                    if (payload_status == "error")
+                    {
+                        Console.WriteLine(payload_response);
+                        this.Logger.Error("Websocket error! " + payload_response);
+                    }
+
+                }
+                else if (this.provider == QuoteProvider.IEX)
                 {
                     IexMessage message = JsonConvert.DeserializeObject<IexMessage>(e.Data);
                     if (message.Event == "quote")
