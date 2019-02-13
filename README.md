@@ -1,6 +1,6 @@
-# Intrinio C# SDK for Real-Time Stock & Crypto Prices
+# Intrinio C# SDK for Real-Time Stock, Forex, and Crypto Prices
 
-[Intrinio](https://intrinio.com/) provides real-time stock & crypto prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://intrinio.com/marketplace/data/prices/realtime) and follow the instructions below.
+[Intrinio](https://intrinio.com/) provides real-time stock, forex, and crypto prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://intrinio.com/marketplace/data/prices/realtime) and follow the instructions below.
 
 ## Requirements
 
@@ -9,8 +9,8 @@
 ## Features
 
 * Receive streaming, real-time price quotes (last trade, bid, ask)
-* Subscribe to updates from individual securities & cryptos
-* Subscribe to updates for all securities & cryptos (contact us for special access)
+* Subscribe to updates from individual securities, forex pairs, or cryptos
+* Subscribe to updates for all securities, forex pairs, or cryptos (contact us for special access)
 
 ### Installation
 
@@ -315,8 +315,8 @@ To receive price quotes from Cryptoquote, you need to instruct the client to "jo
 
 The Intrinio REST API provides a listing of pairs, exchanges, and their corresponding codes:
 
-* [Crypto Currency Pairs](https://intrinio.com/documentation/download#crypto_currency_pairs)
-* [Crypto Exchanges](https://intrinio.com/documentation/download#crypto_exchanges)
+* [Crypto Currency Pairs](https://docs.intrinio.com/documentation/download/crypto_pairs)
+* [Crypto Exchanges](https://docs.intrinio.com/documentation/download/crypto_exchanges)
 
 ### FXCM
 
@@ -328,8 +328,8 @@ To receive price quotes from FXCM, you need to instruct the client to "join" a c
 
 The Intrinio REST API provides a listing of pairs, currencies, and their corresponding codes:
 
-* [FX Currencies](https://intrinio.com/documentation/api/currencies)
-* [FX Currency Pairs](https://intrinio.com/documentation/api/currency_pairs)
+* [FX Currencies](https://docs.intrinio.com/documentation/download/currencies)
+* [FX Currency Pairs](https://docs.intrinio.com/documentation/download/currency_pairs)
 
 ## API Keys
 
