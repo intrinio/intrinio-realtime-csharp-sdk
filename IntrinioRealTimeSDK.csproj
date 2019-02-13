@@ -54,6 +54,7 @@
   <ItemGroup>
     <Compile Include="Src\Intrinio\CryptoLevel2Message.cs" />
     <Compile Include="Src\Intrinio\CryptoLevel1Message.cs" />
+    <Compile Include="Src\Intrinio\FxcmPrice.cs" />
     <Compile Include="Src\Intrinio\QuoddBookQuote.cs" />
     <Compile Include="Src\Intrinio\QuoddTradeQuote.cs" />
     <Compile Include="Src\Intrinio\QuoteHandler.cs" />
