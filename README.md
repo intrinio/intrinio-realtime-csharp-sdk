@@ -1,6 +1,6 @@
-# Intrinio C# SDK for Real-Time Stock, and Forex Prices
+# Intrinio C# SDK for Real-Time Stock Prices
 
-[Intrinio](https://intrinio.com/) provides real-time stock and forex prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://intrinio.com/marketplace/data/prices/realtime) and follow the instructions below.
+[Intrinio](https://intrinio.com/) provides real-time stock prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://intrinio.com/marketplace/data/prices/realtime) and follow the instructions below.
 
 ## Requirements
 
@@ -9,8 +9,8 @@
 ## Features
 
 * Receive streaming, real-time price quotes (last trade, bid, ask)
-* Subscribe to updates from individual securities or forex pairs
-* Subscribe to updates for all securities or forex pairs
+* Subscribe to updates from individual securities
+* Subscribe to updates for all securities
 
 ### Installation
 
@@ -65,7 +65,6 @@ Currently, Intrinio offers real-time data for this SDK from the following provid
 
 * IEX - [Homepage](https://iextrading.com/)
 * QUODD [Homepage](http://home.quodd.com/)
-* FXCM - [Homepage](https://www.fxcm.com/)
 
 Each has distinct price channels and quote formats, but a very similar API.
 
@@ -192,21 +191,6 @@ NOTE: Messages from QUOOD reflect _changes_ in market data. Not all fields will 
 *   **size** - the size of the `last` trade, or total volume of orders at the top-of-book `bid` or `ask` price
 *   **price** - the price in USD
 
-### FXCM
-
-#### Price update
-```csharp
-{ code: "EUR/USD",
-  bid_price: 1.13685,
-  ask_price: 1.13711,
-  time: "2018-12-18 22:38:06.964Z" }
-```
-
-*   **code** - the code of the fx currency pair
-*   **bid_price** - the bid price is the price a buyer is willing to pay
-*   **ask_price** - the ask price is the price a seller is willing to accept
-*   **time** - the UTC timestamp of the price update
-
 ## Channels
 
 ### QUODD
@@ -222,19 +206,6 @@ To receive price quotes from IEX, you need to instruct the client to "join" a ch
 * The security last price lobby (`$lobby_last_price`) where only last price quotes for all securities are posted
 
 Special access is required for both lobby channels. [Contact us](mailto:sales@intrinio.com) for more information.
-
-### FXCM
-
-To receive price quotes from FXCM, you need to instruct the client to "join" a channel. A channel can be
-
-* `fxcm:pair:{pair_code}` - the fx currency pair channel where price updates for the provided currency pair are posted (i.e. `fxcm:pair:EUR/USD`)
-* `fxcm:base:{currency_code}` - the fx currency channel where prices updates for any fx currency pair that has the provided currency as the base currency (i.e. `fxcm:base:EUR` would post prices from EUR/USD, EUR/JPY, etc.)
-* `fxcm:quote:{currency_code}` - the fx currency channel where prices updates for any fx currency pair that has the provided currency as the quote currency (i.e. `fxcm:quote:USD` would post prices from EUR/USD, JPY/USD, etc.)
-
-The Intrinio REST API provides a listing of pairs, currencies, and their corresponding codes:
-
-* [FX Currencies](https://docs.intrinio.com/documentation/download/currencies)
-* [FX Currency Pairs](https://docs.intrinio.com/documentation/download/currency_pairs)
 
 ## API Keys
 
