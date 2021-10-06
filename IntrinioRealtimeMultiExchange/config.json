@@ -1,0 +1,36 @@
+{
+	"Config": {
+		"ApiKey": "",
+
+		"Provider": "REALTIME",
+		"Symbols": [ "AAPL__220916C00067500" ]
+
+		//"Provider": "MANUAL",
+		//"Symbols": [ "AAPL__220916C00067500" ],
+		//"IPAddress": ""
+
+		//"Provider": "REALTIME_FIREHOSE",
+		////"Symbols": [ "lobby" ],
+		//"NumThreads": 8,
+		//"TradesOnly": true
+
+		//"Provider": "MANUAL_FIREHOSE",
+		////"Symbols": [ "lobby" ],
+		//"IPAddress": "",
+		//"NumThreads": 8,
+		//"TradesOnly": true
+	},
+	"Serilog": {
+		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
+		"MinimumLevel": {
+			"Default": "Information",
+			"Override": {
+				"Microsoft": "Warning",
+				"System": "Warning"
+			}
+		},
+		"WriteTo": [
+			{ "Name": "Console" }
+		]
+	}
+}
