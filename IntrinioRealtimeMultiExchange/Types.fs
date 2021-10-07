@@ -85,10 +85,3 @@ type [<Struct>] Trade =
         ", TotalVolume: " + this.TotalVolume.ToString() +
         ", Timestamp: " + this.Timestamp.ToString("f") +
         ")"
-
-type [<Struct>] OpenInterest =
-    {
-        Symbol : string
-        OpenInterest : int32
-        Timestamp : float
-    }

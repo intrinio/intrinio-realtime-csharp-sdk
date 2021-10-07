@@ -13,10 +13,8 @@ namespace SampleApp
 		private static readonly ConcurrentDictionary<string, int> quotes = new ConcurrentDictionary<string, int>(5, 1_500_000);
 		private static int maxTradeCount = 0;
 		private static int maxQuoteCount = 0;
-		private static int openInterestCount = 0;
 		private static Trade maxCountTrade;
 		private static Quote maxCountQuote;
-		private static OpenInterest maxOpenInterest;
 
 		private static readonly object obj = new object();
 
@@ -62,15 +60,6 @@ namespace SampleApp
 			}
 		}
 
-		static void OnOpenInterest(OpenInterest openInterest)
-		{
-			openInterestCount++;
-			if (openInterest.OpenInterest > maxOpenInterest.OpenInterest)
-			{
-				maxOpenInterest = openInterest;
-			}
-		}
-
 		static void TimerCallback(object obj)
 		{
 			Client client = (Client) obj;
@@ -83,10 +72,6 @@ namespace SampleApp
 			if (maxQuoteCount > 0)
 			{
 				Client.Log("Most active quote symbol: {0:l}:{1} ({2} updates)", maxCountQuote.Symbol, maxCountQuote.Type, maxQuoteCount);
-			}
-			if (openInterestCount > 0)
-			{
-				Client.Log("{0} open interest updates. Highest open interest symbol: {1:l} ({2})", openInterestCount, maxOpenInterest.Symbol, maxOpenInterest.OpenInterest);
 			}
 		}
 
@@ -101,7 +86,7 @@ namespace SampleApp
 		static void Main(string[] args)
 		{
 			Client.Log("Starting sample app");
-			client = new Client(OnTrade, OnQuote, OnOpenInterest);
+			client = new Client(OnTrade, OnQuote);
 			timer = new Timer(TimerCallback, client, 10000, 10000);
 			client.Join();
 			Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);

@@ -5,7 +5,7 @@
 Open the Package Manager Console window in Visual Studio, then run:
 
 ```
-nuget pack IntrinioRealtimeClient.csproj
+nuget pack IntrinioRealTimeClient.nuspec -IncludeReferencedProjects
 ```
 
 This will create a `IntrinioRealTimeClient.{version}-rc.nupkg` file. To publish the file to NuGet, run:

@@ -39,6 +39,5 @@
 	<file src="IntrinioRealTimeSDK\bin\Release\net5.0\IntrinioRealTimeSDK.pdb" target="lib\net5.0" />
 	<file src="IntrinioRealTimeSDK\bin\Release\net5.0\IntrinioRealTimeSDK.runtimeconfig.json" target="lib\net5.0" />
 	<file src="IntrinioRealTimeSDK\bin\Release\net5.0\IntrinioRealTimeSDK.xml" target="lib\net5.0" />
-	<file src="IntrinioRealTimeSDK\bin\Release\net5.0\config.json" target="lib\net5.0" />
   </files>
 </package>

@@ -36,9 +36,7 @@ type internal WebSocketState(ws: WebSocket) =
 
     member _.Reset() : unit = lastReset <- DateTime.Now
 
-type Client(onTrade : Action<Trade>, onQuote : Action<Quote>, onOpenInterest : Action<OpenInterest>) =
-    //let [<Literal>] heartbeatMessage : string = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":null}"
-    //let [<Literal>] heartbeatResponse : string = "{\"topic\":\"phoenix\",\"ref\":null,\"payload\":{\"status\":\"ok\",\"response\":{}},\"event\":\"phx_reply\"}"
+type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
     let [<Literal>] errorResponse : string = "\"status\":\"error\""
     let selfHealBackoffs : int[] = [| 10_000; 30_000; 60_000; 300_000; 600_000 |]
 
@@ -364,11 +362,8 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>, onOpenInterest : A
         let _token : string = getToken()
         initializeWebSockets(_token)
 
-    new (onTrade : Action<Trade>, onQuote : Action<Quote>) =
-        Client(onTrade, onQuote, Action<OpenInterest>(fun (_:OpenInterest) -> ()))
-
     new (onTrade : Action<Trade>) =
-        Client(onTrade, Action<Quote>(fun (_:Quote) -> ()), Action<OpenInterest>(fun (_:OpenInterest) -> ()))
+        Client(onTrade, Action<Quote>(fun (_:Quote) -> ()))
 
     member _.Join() : unit =
         while not(allReady()) do Thread.Sleep(1000)
