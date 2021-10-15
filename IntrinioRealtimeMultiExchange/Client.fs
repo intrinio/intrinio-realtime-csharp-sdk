@@ -81,36 +81,37 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
         | Provider.MANUAL_FIREHOSE -> 6
         | _ -> failwith "Provider not specified!"
 
-    let parseTrade (bytes: ReadOnlySpan<byte>) : Trade =
+    let parseTrade (bytes: ReadOnlySpan<byte>, symbolLength : int) : Trade =
         {
-            Symbol = Encoding.ASCII.GetString(bytes.Slice(0, 8))
-            Price = (float (BitConverter.ToInt32(bytes.Slice(9, 4)))) / 10_000.0
-            Size = BitConverter.ToUInt32(bytes.Slice(13, 4))
-            Timestamp = DateTime.FromBinary(System.Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(17, 8))))
-            TotalVolume = System.Convert.ToUInt64(BitConverter.ToUInt32(bytes.Slice(25, 4)))
+            Symbol = Encoding.ASCII.GetString(bytes.Slice(2, symbolLength))
+            Price = (float (BitConverter.ToInt32(bytes.Slice(2 + symbolLength, 4)))) / 10_000.0
+            Size = BitConverter.ToUInt32(bytes.Slice(6 + symbolLength, 4))
+            Timestamp = DateTime.FromBinary(System.Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(10 + symbolLength, 8))))
+            TotalVolume = System.Convert.ToUInt64(BitConverter.ToUInt32(bytes.Slice(18 + symbolLength, 4)))
         }
 
-    let parseQuote (bytes: ReadOnlySpan<byte>) : Quote =
+    let parseQuote (bytes: ReadOnlySpan<byte>, symbolLength : int) : Quote =
         {
-            Symbol = Encoding.ASCII.GetString(bytes.Slice(0, 8))
-            Type = enum<QuoteType> (int32 (bytes.Item(8)))
-            Price = (float (BitConverter.ToInt32(bytes.Slice(9, 4)))) / 10_000.0
-            Size = BitConverter.ToUInt32(bytes.Slice(13, 4))
-            Timestamp = DateTime.FromBinary(System.Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(17, 8))))
+            Type = enum<QuoteType> (int32 (bytes.Item(0)))
+            Symbol = Encoding.ASCII.GetString(bytes.Slice(2, symbolLength))
+            Price = (float (BitConverter.ToInt32(bytes.Slice(2 + symbolLength, 4)))) / 10_000.0
+            Size = BitConverter.ToUInt32(bytes.Slice(6 + symbolLength, 4))
+            Timestamp = DateTime.FromBinary(System.Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(10 + symbolLength, 8))))
         }
 
     let parseSocketMessage (bytes: byte[], startIndex: byref<int>) : unit =
-        let msgType = enum<MessageType> (int32 bytes.[startIndex + 8])
+        let msgType : MessageType = enum<MessageType> (int32 bytes.[startIndex])
+        let symbolLength : int = int32 bytes.[startIndex + 1]
         match msgType with
         | MessageType.Trade -> 
-            let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 29)
-            let trade: Trade = parseTrade(chunk)
-            startIndex <- startIndex + 29
+            let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 18 + symbolLength)
+            let trade: Trade = parseTrade(chunk, symbolLength)
+            startIndex <- startIndex + 18 + symbolLength
             trade |> onTrade.Invoke
         | MessageType.Ask | MessageType.Bid -> 
-            let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 25)
-            let quote: Quote = parseQuote(chunk)
-            startIndex <- startIndex + 25
+            let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 22 + symbolLength)
+            let quote: Quote = parseQuote(chunk, symbolLength)
+            startIndex <- startIndex + 22 + symbolLength
             quote |> onQuote.Invoke
         | _ -> Log.Warning("Invalid MessageType: {0}", (int32 bytes.[startIndex + 8]))
 
