@@ -9,14 +9,14 @@ namespace SampleApp
 	{
 		private static Client client = null;
 		private static Timer timer = null;
-		private static readonly ConcurrentDictionary<string, int> trades = new ConcurrentDictionary<string, int>(5, 1_500_000);
-		private static readonly ConcurrentDictionary<string, int> quotes = new ConcurrentDictionary<string, int>(5, 1_500_000);
+		private static readonly ConcurrentDictionary<string, int> trades = new(5, 15_000);
+		private static readonly ConcurrentDictionary<string, int> quotes = new(5, 15_000);
 		private static int maxTradeCount = 0;
 		private static int maxQuoteCount = 0;
 		private static Trade maxCountTrade;
 		private static Quote maxCountQuote;
 
-		private static readonly object obj = new object();
+		private static readonly object obj = new();
 
 		static void OnQuote(Quote quote)
 		{
@@ -83,7 +83,7 @@ namespace SampleApp
 			Environment.Exit(0);
 		}
 
-		static void Main(string[] args)
+		static void Main(string[] _)
 		{
 			Client.Log("Starting sample app");
 			client = new Client(OnTrade, OnQuote);
