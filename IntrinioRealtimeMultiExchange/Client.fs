@@ -59,24 +59,22 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
 
     let getAuthUrl () : string =
         match config.Provider with
-        | Provider.REALTIME -> "https://realtime-mx.intrinio.com/auth?api_key=" + config.ApiKey
-        | Provider.REALTIME_FIREHOSE -> "https://realtime-mx-firehose.intrinio.com:8000/auth?api_key=" + config.ApiKey
+        | Provider.REALTIME | Provider.REALTIME_FIREHOSE -> "https://realtime-mx.intrinio.com/auth?api_key=" + config.ApiKey
         | Provider.MANUAL | Provider.MANUAL_FIREHOSE -> "http://" + config.IPAddress + "/auth?api_key=" + config.ApiKey
         | _ -> failwith "Provider not specified!"
 
     let getWebSocketUrl (token: string, index: int) : string =
         match config.Provider with
-        | Provider.REALTIME -> "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token
-        | Provider.REALTIME_FIREHOSE -> "wss://realtime-mx-firehose.intrinio.com:800" + index.ToString() + "/socket/websocket?vsn=1.0.0&token=" + token
+        | Provider.REALTIME | Provider.REALTIME_FIREHOSE -> "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token
         | Provider.MANUAL | Provider.MANUAL_FIREHOSE -> "ws://" + config.IPAddress + "/socket/websocket?vsn=1.0.0&token=" + token
         | _ -> failwith "Provider not specified!"
 
     let getWebSocketCount () : int =
         match config.Provider with
         | Provider.REALTIME -> 1
-        | Provider.REALTIME_FIREHOSE -> 6
+        | Provider.REALTIME_FIREHOSE -> 1
         | Provider.MANUAL -> 1
-        | Provider.MANUAL_FIREHOSE -> 6
+        | Provider.MANUAL_FIREHOSE -> 1
         | _ -> failwith "Provider not specified!"
 
     let parseTrade (bytes: ReadOnlySpan<byte>, symbolLength : int) : Trade =
