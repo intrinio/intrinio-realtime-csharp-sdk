@@ -1,7 +1,7 @@
 {
 	"Config": {
 		"ApiKey": "",
-		"NumThreads": 8,
+		"NumThreads": 2,
 
 		"Provider": "REALTIME",
 		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
@@ -9,15 +9,6 @@
 		//"Provider": "MANUAL",
 		//"Symbols": [ "AAPL", "MSFT", "GOOG" ],
 		//"IPAddress": ""
-
-		//"Provider": "REALTIME_FIREHOSE",
-		//"Symbols": [ "lobby" ],
-		//"TradesOnly": true
-
-		//"Provider": "MANUAL_FIREHOSE",
-		//"Symbols": [ "lobby" ],
-		//"IPAddress": "",
-		//"TradesOnly": false
 	},
 	"Serilog": {
 		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
