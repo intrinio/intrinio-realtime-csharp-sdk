@@ -1,24 +1,23 @@
 {
 	"Config": {
 		"ApiKey": "",
+		"NumThreads": 8,
 
 		"Provider": "REALTIME",
-		"Symbols": [ "AAPL__220916C00067500" ]
+		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
 
 		//"Provider": "MANUAL",
-		//"Symbols": [ "AAPL__220916C00067500" ],
+		//"Symbols": [ "AAPL", "MSFT", "GOOG" ],
 		//"IPAddress": ""
 
 		//"Provider": "REALTIME_FIREHOSE",
-		////"Symbols": [ "lobby" ],
-		//"NumThreads": 8,
+		//"Symbols": [ "lobby" ],
 		//"TradesOnly": true
 
 		//"Provider": "MANUAL_FIREHOSE",
-		////"Symbols": [ "lobby" ],
+		//"Symbols": [ "lobby" ],
 		//"IPAddress": "",
-		//"NumThreads": 8,
-		//"TradesOnly": true
+		//"TradesOnly": false
 	},
 	"Serilog": {
 		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],

@@ -61,16 +61,14 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
         match config.Provider with
         | Provider.REALTIME -> "https://realtime-mx.intrinio.com/auth?api_key=" + config.ApiKey
         | Provider.REALTIME_FIREHOSE -> "https://realtime-mx-firehose.intrinio.com:8000/auth?api_key=" + config.ApiKey
-        | Provider.MANUAL -> "http://" + config.IPAddress + "/auth?api_key=" + config.ApiKey
-        | Provider.MANUAL_FIREHOSE -> "http://" + config.IPAddress + ":8000/auth?api_key=" + config.ApiKey
+        | Provider.MANUAL | Provider.MANUAL_FIREHOSE -> "http://" + config.IPAddress + "/auth?api_key=" + config.ApiKey
         | _ -> failwith "Provider not specified!"
 
     let getWebSocketUrl (token: string, index: int) : string =
         match config.Provider with
         | Provider.REALTIME -> "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token
         | Provider.REALTIME_FIREHOSE -> "wss://realtime-mx-firehose.intrinio.com:800" + index.ToString() + "/socket/websocket?vsn=1.0.0&token=" + token
-        | Provider.MANUAL -> "ws://" + config.IPAddress + "/socket/websocket?vsn=1.0.0&token=" + token
-        | Provider.MANUAL_FIREHOSE -> "ws://" + config.IPAddress + ":800" + index.ToString() + "/socket/websocket?vsn=1.0.0&token=" + token
+        | Provider.MANUAL | Provider.MANUAL_FIREHOSE -> "ws://" + config.IPAddress + "/socket/websocket?vsn=1.0.0&token=" + token
         | _ -> failwith "Provider not specified!"
 
     let getWebSocketCount () : int =
@@ -104,16 +102,16 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
         let symbolLength : int = int32 bytes.[startIndex + 1]
         match msgType with
         | MessageType.Trade -> 
-            let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 18 + symbolLength)
+            let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 22 + symbolLength)
             let trade: Trade = parseTrade(chunk, symbolLength)
-            startIndex <- startIndex + 18 + symbolLength
+            startIndex <- startIndex + 22 + symbolLength
             trade |> onTrade.Invoke
         | MessageType.Ask | MessageType.Bid -> 
-            let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 22 + symbolLength)
+            let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 18 + symbolLength)
             let quote: Quote = parseQuote(chunk, symbolLength)
-            startIndex <- startIndex + 22 + symbolLength
+            startIndex <- startIndex + 18 + symbolLength
             quote |> onQuote.Invoke
-        | _ -> Log.Warning("Invalid MessageType: {0}", (int32 bytes.[startIndex + 8]))
+        | _ -> Log.Warning("Invalid MessageType: {0}", (int32 bytes.[startIndex]))
 
     let heartbeatFn () =
         let ct = ctSource.Token
@@ -138,7 +136,7 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
                 if data.TryTake(&datum,1000) then
                     // These are grouped (many) messages.
                     // The first byte tells us how many there are.
-                    // From there, check the type at index 8 to know how many bytes each message has.
+                    // From there, check the type at index 0 of each chunk to know how many bytes each message has.
                     let cnt = datum.[0] |> int
                     let mutable startIndex = 1
                     for _ in 1 .. cnt do
@@ -198,25 +196,32 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
         finally tLock.ExitUpgradeableReadLock()
 
     let makeJoinMessage(tradesOnly: bool, symbol: string) : byte[] = 
-        let message : byte[] = Array.zeroCreate 10
-        message.[0] <- 74uy //type: join (74uy) or leave (76uy)
-        message.[1] <- (if tradesOnly then 1uy else 0uy)
-        let symbolCode: uint64 = 
-            match symbol with
-            | "lobby" -> 0xffffffffUL
-            | _ -> BitConverter.ToUInt64(Encoding.UTF8.GetBytes(symbol.PadRight(8, char 0x0), 0, 8), 0)
-        BitConverter.GetBytes(symbolCode).CopyTo(message, 2)
-        message
+        match symbol with
+            | "lobby" -> 
+                let message : byte[] = Array.zeroCreate 11 //1 + 1 + 9
+                message.[0] <- 74uy //type: join (74uy) or leave (76uy)
+                message.[1] <- (if tradesOnly then 1uy else 0uy)
+                Encoding.ASCII.GetBytes("$FIREHOSE").CopyTo(message, 2)
+                message
+            | _ -> 
+                let message : byte[] = Array.zeroCreate (2 + symbol.Length) //1 + 1 + symbol.Length
+                message.[0] <- 74uy //type: join (74uy) or leave (76uy)
+                message.[1] <- (if tradesOnly then 1uy else 0uy)
+                Encoding.ASCII.GetBytes(symbol).CopyTo(message, 2)
+                message
 
     let makeLeaveMessage(tradesOnly: bool, symbol: string) : byte[] = 
-        let message : byte[] = Array.zeroCreate 9
-        message.[0] <- 76uy //type: join (74uy) or leave (76uy)
-        let symbolCode: uint64 = 
-            match symbol with
-            | "lobby" -> 0xffffffffUL
-            | _ -> BitConverter.ToUInt64(Encoding.UTF8.GetBytes(symbol.PadRight(8, char 0x0), 0, 8), 0)
-        BitConverter.GetBytes(symbolCode).CopyTo(message, 1)
-        message
+        match symbol with
+        | "lobby" -> 
+            let message : byte[] = Array.zeroCreate 10 //1 + 9
+            message.[0] <- 76uy //type: join (74uy) or leave (76uy)
+            Encoding.ASCII.GetBytes("$FIREHOSE").CopyTo(message, 1)
+            message
+        | _ -> 
+            let message : byte[] = Array.zeroCreate (1 + symbol.Length) //1 + symbol.Length
+            message.[0] <- 76uy //type: join (74uy) or leave (76uy)
+            Encoding.ASCII.GetBytes(symbol).CopyTo(message, 1)
+            message
 
     let onOpen (index : int) (_ : EventArgs) : unit =
         Log.Information("Websocket {0} - Connected", index)
@@ -328,7 +333,7 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
             let message : byte[] = makeJoinMessage(tradesOnly, symbol)
             wsStates |> Array.iteri (fun (index:int) (wss:WebSocketState) ->
                 Log.Information("Websocket {0} - Joining channel: {1:l} (trades only = {2:l})", index, symbol, lastOnly)
-                try wss.WebSocket.Send(message, 0, 10)
+                try wss.WebSocket.Send(message, 0, message.Length)
                 with _ -> channels.Remove((symbol, tradesOnly)) |> ignore )
 
     let leave(symbol: string, tradesOnly: bool) : unit =
@@ -338,7 +343,7 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
             let message : byte[] = makeLeaveMessage(tradesOnly, symbol)
             wsStates |> Array.iteri (fun (index:int) (wss:WebSocketState) ->
                 Log.Information("Websocket {0} - Leaving channel: {1:l} (trades only = {2})", index, symbol, lastOnly)
-                try wss.WebSocket.Send(message, 0, 10)
+                try wss.WebSocket.Send(message, 0, message.Length)
                 with _ -> () )
 
     do
