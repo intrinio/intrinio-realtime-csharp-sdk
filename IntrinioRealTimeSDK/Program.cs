@@ -67,11 +67,11 @@ namespace SampleApp
 			Client.Log("Data Messages = {0}, Text Messages = {1}, Queue Depth = {2}", stats.Item1, stats.Item2, stats.Item3);
 			if (maxTradeCount > 0)
 			{
-				Client.Log("Most active trade symbol: {0:l} ({1} updates)", maxCountTrade.Symbol, maxTradeCount);
+				Client.Log("Most active trade: {0} ({1} updates)", maxCountTrade, maxTradeCount);
 			}
 			if (maxQuoteCount > 0)
 			{
-				Client.Log("Most active quote symbol: {0:l}:{1} ({2} updates)", maxCountQuote.Symbol, maxCountQuote.Type, maxQuoteCount);
+				Client.Log("Most active quote: {0} ({1} updates)", maxCountQuote, maxQuoteCount);
 			}
 		}
 

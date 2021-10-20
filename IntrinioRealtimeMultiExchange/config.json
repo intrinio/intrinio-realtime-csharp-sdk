@@ -1,6 +1,6 @@
 {
 	"Config": {
-		"ApiKey": "",
+		"ApiKey": "OjEyOTk1MzNkMjEwZmY4MmYxNTRiMzhhYmY3NWIwOGYy",
 		"NumThreads": 2,
 
 		"Provider": "REALTIME",
@@ -8,7 +8,7 @@
 
 		//"Provider": "MANUAL",
 		//"Symbols": [ "AAPL", "MSFT", "GOOG" ],
-		//"IPAddress": ""
+		//"IPAddress": "3.231.206.104"
 	},
 	"Serilog": {
 		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],

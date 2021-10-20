@@ -75,8 +75,8 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
             Symbol = Encoding.ASCII.GetString(bytes.Slice(2, symbolLength))
             Price = (float (BitConverter.ToInt32(bytes.Slice(2 + symbolLength, 4)))) / 10_000.0
             Size = BitConverter.ToUInt32(bytes.Slice(6 + symbolLength, 4))
-            Timestamp = DateTime.FromBinary(System.Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(10 + symbolLength, 8))))
-            TotalVolume = System.Convert.ToUInt64(BitConverter.ToUInt32(bytes.Slice(18 + symbolLength, 4)))
+            Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(10 + symbolLength, 8)) / 100UL))
+            TotalVolume = BitConverter.ToUInt32(bytes.Slice(18 + symbolLength, 4))
         }
 
     let parseQuote (bytes: ReadOnlySpan<byte>, symbolLength : int) : Quote =
@@ -85,7 +85,7 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
             Symbol = Encoding.ASCII.GetString(bytes.Slice(2, symbolLength))
             Price = (float (BitConverter.ToInt32(bytes.Slice(2 + symbolLength, 4)))) / 10_000.0
             Size = BitConverter.ToUInt32(bytes.Slice(6 + symbolLength, 4))
-            Timestamp = DateTime.FromBinary(System.Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(10 + symbolLength, 8))))
+            Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(10 + symbolLength, 8)) / 100UL))
         }
 
     let parseSocketMessage (bytes: byte[], startIndex: byref<int>) : unit =
