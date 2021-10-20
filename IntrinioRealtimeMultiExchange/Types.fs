@@ -49,7 +49,7 @@ type [<Struct>] Trade =
         Symbol : string
         Price : float
         Size : uint32
-        TotalVolume : uint64
+        TotalVolume : uint32
         Timestamp : DateTime
     }
 
