@@ -5,6 +5,8 @@ SDK for working with Intrinio's realtime Multi-Exchange prices feed.  Intrinioâ€
 
 [Documentation for our legacy realtime client](https://github.com/intrinio/intrinio-realtime-csharp-sdk/tree/v2.2.0)
 
+[Documentation for our legacy realtime client](https://github.com/intrinio/intrinio-realtime-csharp-sdk/tree/v2.2.0)
+
 ## Requirements
 
 - .NET 5+
