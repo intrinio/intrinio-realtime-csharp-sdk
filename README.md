@@ -38,14 +38,6 @@ static void Main(string[] _)
 
 There are thousands of securities, each with their own feed of activity.  We highly encourage you to make your trade and quote handlers has short as possible and follow a queue pattern so your app can handle the volume of activity.
 
-## Providers
-
-Currently, Intrinio offers realtime data for this SDK from the following providers:
-
-* IEX  - [Homepage](https://iex.io)
-* MEMX - [Homepage](https://memx.com)
-
-
 ## Data Format
 
 ### Trade Message
