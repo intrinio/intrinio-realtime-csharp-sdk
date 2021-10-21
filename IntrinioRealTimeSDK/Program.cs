@@ -88,7 +88,8 @@ namespace SampleApp
 			Client.Log("Starting sample app");
 			client = new Client(OnTrade, OnQuote);
 			timer = new Timer(TimerCallback, client, 10000, 10000);
-			client.Join();
+			client.Join(); //Load symbols from config.json
+			//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 			Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
 		}		
 	}
