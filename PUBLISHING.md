@@ -5,10 +5,10 @@
 Open the Package Manager Console window in Visual Studio, then run:
 
 ```
-nuget pack IntrinioRealtimeClient.csproj
+nuget pack IntrinioRealTimeClient.nuspec -IncludeReferencedProjects
 ```
 
-This will create a `IntrinioRealTimeClient.{version}-rc.nupkg` file. To publish the file to NuGet, run:
+This will create a `IntrinioRealTimeClient.{version}.nupkg` file. To publish the file to NuGet, run:
 
 # Publishing
 
@@ -21,5 +21,5 @@ nuget setApiKey <your_API_key>
 Then publish the generated NuGet package:
 
 ```
-nuget push IntrinioRealTimeClient.{version}-rc.nupkg -Source https://api.nuget.org/v3/index.json
+nuget push IntrinioRealTimeClient.{version}.nupkg -Source https://api.nuget.org/v3/index.json
 ```

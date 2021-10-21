@@ -1,0 +1,27 @@
+{
+	"Config": {
+		"ApiKey": "",
+		"NumThreads": 2,
+
+		"Provider": "REALTIME",
+		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
+		//"Symbols": [ "lobby" ]
+
+		//"Provider": "MANUAL",
+		//"Symbols": [ "AAPL", "MSFT", "GOOG" ],
+		//"IPAddress": "3.231.206.104"
+	},
+	"Serilog": {
+		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
+		"MinimumLevel": {
+			"Default": "Information",
+			"Override": {
+				"Microsoft": "Warning",
+				"System": "Warning"
+			}
+		},
+		"WriteTo": [
+			{ "Name": "Console" }
+		]
+	}
+}
