@@ -21,43 +21,31 @@ namespace SampleApp
 		static void OnQuote(Quote quote)
 		{
 			string key = quote.Symbol + ":" + quote.Type;
-			if (!quotes.ContainsKey(key))
+			int updateFunc(string _, int prevValue)
 			{
-				quotes[key] = 1;
-			}
-			else
-			{
-				quotes[key]++;
-			}
-			if (quotes[key] > maxQuoteCount)
-			{
-				lock (obj)
+				if (prevValue + 1 > maxQuoteCount)
 				{
-					maxQuoteCount++;
+					maxQuoteCount = prevValue + 1;
 					maxCountQuote = quote;
 				}
+				return (prevValue + 1);
 			}
+			quotes.AddOrUpdate(key, 1, updateFunc);
 		}
 
 		static void OnTrade(Trade trade)
 		{
-			string key = trade.Symbol + ":trade";
-			if (!trades.ContainsKey(key))
+			string key = trade.Symbol;
+			int updateFunc(string _, int prevValue)
 			{
-				trades[key] = 1;
-			}
-			else
-			{
-				trades[key]++;
-			}
-			if (trades[key] > maxTradeCount)
-			{
-				lock (obj)
+				if (prevValue + 1 > maxTradeCount)
 				{
-					maxTradeCount++;
+					maxTradeCount = prevValue + 1;
 					maxCountTrade = trade;
 				}
+				return (prevValue + 1);
 			}
+			trades.AddOrUpdate(key, 1, updateFunc);
 		}
 
 		static void TimerCallback(object obj)

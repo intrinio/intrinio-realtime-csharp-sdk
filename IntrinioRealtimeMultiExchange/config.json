@@ -1,10 +1,11 @@
 {
 	"Config": {
-		"ApiKey": "OjEyOTk1MzNkMjEwZmY4MmYxNTRiMzhhYmY3NWIwOGYy",
+		"ApiKey": "",
 		"NumThreads": 2,
 
 		"Provider": "REALTIME",
 		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
+		//"Symbols": [ "lobby" ]
 
 		//"Provider": "MANUAL",
 		//"Symbols": [ "AAPL", "MSFT", "GOOG" ],

@@ -36,7 +36,7 @@ type [<Struct>] Quote =
         ", Symbol: " + this.Symbol +
         ", Price: " + this.Price.ToString("F2") +
         ", Size: " + this.Size.ToString() +
-        ", Timestamp: " + this.Timestamp.ToString("f") +
+        ", Timestamp: " + this.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffff") +
         ")"
 
 /// Symbol: the 'ticker' symbol </para>
@@ -59,5 +59,5 @@ type [<Struct>] Trade =
         ", Price: " + this.Price.ToString("F2") +
         ", Size: " + this.Size.ToString() +
         ", TotalVolume: " + this.TotalVolume.ToString() +
-        ", Timestamp: " + this.Timestamp.ToString("f") +
+        ", Timestamp: " + this.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffff") +
         ")"
