@@ -3,6 +3,8 @@ SDK for working with Intrinio's realtime Multi-Exchange prices feed.  Intrinioâ€
 
 [Intrinio](https://intrinio.com/) provides real-time stock prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://intrinio.com/real-time-multi-exchange) and follow the instructions below.
 
+[Documentation for our legacy realtime client](https://github.com/intrinio/intrinio-realtime-csharp-sdk/tree/v2.2.0)
+
 ## Requirements
 
 - .NET 5+
