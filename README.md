@@ -24,14 +24,14 @@ For a sample .NET project see: [intrinio-realtime-options-dotnet-sdk](https://gi
 ## Example Usage
 ```csharp
 static void Main(string[] _)
-		{
-			Client.Log("Starting sample app");
-			client = new Client(OnTrade, OnQuote);
-			timer = new Timer(TimerCallback, client, 10000, 10000);
-			client.Join(); //Load symbols from config.json
-			//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
-			Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
-		}
+{
+	Client.Log("Starting sample app");
+	client = new Client(OnTrade, OnQuote);
+	timer = new Timer(TimerCallback, client, 10000, 10000);
+	client.Join(); //Load symbols from config.json
+	//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+	Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
+}
 ```
 
 ## Handling Quotes
