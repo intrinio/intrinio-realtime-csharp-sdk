@@ -149,7 +149,9 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
         Log.Information("Authorizing...")
         try
             let authUrl : string = getAuthUrl()
-            HttpWebRequest.Create(authUrl).GetResponse() :?> HttpWebResponse
+            let request : WebRequest = HttpWebRequest.Create(authUrl)
+            request.Headers.Set("Client-Information", "IntrinioDotNetSDKv3.1")
+            request.GetResponse() :?> HttpWebResponse
             |> fun response ->
                 match response.StatusCode with
                 | HttpStatusCode.OK ->
