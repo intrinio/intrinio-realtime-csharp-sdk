@@ -88,8 +88,6 @@ type [<Struct>] Quote =
 
 You will receive your Intrinio API Key after [creating an account](https://intrinio.com/signup). You will need a subscription to a [realtime data feed](https://intrinio.com/real-time-multi-exchange) as well.
 
-## Documentation
-
 ## Methods
 
 `Client client = new Client(OnTrade, OnQuote);` - Creates a new instance of the Intrinio Real-Time client. The provided actions implement OnTrade and OnQuote, which handle what happens when the associated event happens.
