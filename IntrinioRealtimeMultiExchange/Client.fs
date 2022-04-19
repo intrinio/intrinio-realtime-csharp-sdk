@@ -3,7 +3,7 @@
 open Serilog
 open System
 open System.IO
-open System.Net
+open System.Net.Http
 open System.Text
 open System.Collections.Concurrent
 open System.Collections.Generic
@@ -49,6 +49,7 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
     let ctSource : CancellationTokenSource = new CancellationTokenSource()
     let data : BlockingCollection<byte[]> = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>())
     let mutable tryReconnect : (unit -> unit) = fun () -> ()
+    let httpClient : HttpClient = new HttpClient()
 
     let isReady() : bool = 
         wsLock.EnterReadLock()
@@ -73,7 +74,7 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
     let parseTrade (bytes: ReadOnlySpan<byte>, symbolLength : int) : Trade =
         {
             Symbol = Encoding.ASCII.GetString(bytes.Slice(2, symbolLength))
-            Price = (float (BitConverter.ToInt32(bytes.Slice(2 + symbolLength, 4)))) / 10_000.0
+            Price = (float (BitConverter.ToSingle(bytes.Slice(2 + symbolLength, 4))))
             Size = BitConverter.ToUInt32(bytes.Slice(6 + symbolLength, 4))
             Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(10 + symbolLength, 8)) / 100UL))
             TotalVolume = BitConverter.ToUInt32(bytes.Slice(18 + symbolLength, 4))
@@ -83,7 +84,7 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
         {
             Type = enum<QuoteType> (int32 (bytes.Item(0)))
             Symbol = Encoding.ASCII.GetString(bytes.Slice(2, symbolLength))
-            Price = (float (BitConverter.ToInt32(bytes.Slice(2 + symbolLength, 4)))) / 10_000.0
+            Price = (float (BitConverter.ToSingle(bytes.Slice(2 + symbolLength, 4))))
             Size = BitConverter.ToUInt32(bytes.Slice(6 + symbolLength, 4))
             Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(10 + symbolLength, 8)) / 100UL))
         }
@@ -147,31 +148,29 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
 
     let trySetToken() : bool =
         Log.Information("Authorizing...")
-        try
-            let authUrl : string = getAuthUrl()
-            HttpWebRequest.Create(authUrl).GetResponse() :?> HttpWebResponse
-            |> fun response ->
-                match response.StatusCode with
-                | HttpStatusCode.OK ->
-                    let stream : Stream = response.GetResponseStream()
-                    let reader : StreamReader = new StreamReader(stream, Encoding.UTF8)
-                    let _token : string = reader.ReadToEnd()
+        let authUrl : string = getAuthUrl()
+        async {
+            try
+                let! response = httpClient.GetAsync(authUrl) |> Async.AwaitTask
+                if (response.IsSuccessStatusCode)
+                then
+                    let! _token = response.Content.ReadAsStringAsync() |> Async.AwaitTask
                     Interlocked.Exchange(&token, (_token, DateTime.Now)) |> ignore
-                    Log.Information("Authorization successful")
-                    true
-                | _ ->
-                    Log.Warning("Authorization Failure {0}: The authorization key you provided is likely incorrect.", response.StatusCode.ToString())
-                    false
-        with
-        | :? WebException ->
-            Log.Error("Authorization Failure. The authorization server is likey offline.")
-            false
-        | :? IOException ->
-            Log.Error("Authorization Failure. Please check your network connection.")
-            false
-        | _ as exn ->
-            Log.Error("Unidentified Authorization Failure: {0}:{1}", exn.GetType(), exn.Message)
-            false
+                    return true
+                else
+                    Log.Warning("Authorization Failure. Authorization server status code = {0}", response.StatusCode) 
+                    return false
+            with
+            | :? System.InvalidOperationException as exn ->
+                Log.Error("Authorization Failure (bad URI): {0:l}", exn.Message)
+                return false
+            | :? System.Net.Http.HttpRequestException as exn ->
+                Log.Error("Authoriztion Failure (bad network connection): {0:l}", exn.Message)
+                return false
+            | :? System.Threading.Tasks.TaskCanceledException as exn ->
+                Log.Error("Authorization Failure (timeout): {0:l}", exn.Message)
+                return false
+        } |> Async.RunSynchronously
 
     let getToken() : string =
         tLock.EnterUpgradeableReadLock()
@@ -325,6 +324,8 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
             with _ -> ()
 
     do
+        httpClient.Timeout <- TimeSpan.FromSeconds(5.0)
+        httpClient.DefaultRequestHeaders.Add("Client-Information", "IntrinioDotNetSDKv3.2")
         tryReconnect <- fun () ->
             let reconnectFn () : bool =
                 Log.Information("Websocket - Reconnecting...")
