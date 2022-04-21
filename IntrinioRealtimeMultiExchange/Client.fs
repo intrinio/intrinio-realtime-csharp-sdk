@@ -262,7 +262,7 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
         | Closed -> Log.Warning("Websocket - Error - Connection failed")
         | Refused -> Log.Warning("Websocket - Error - Connection refused")
         | Unavailable -> Log.Warning("Websocket - Error - Server unavailable")
-        | _ -> Log.Error("Websocket - Error - {1}:{2}", exn.GetType(), exn.Message)
+        | _ -> Log.Error("Websocket - Error - {0}:{1}", exn.GetType(), exn.Message)
 
     let onDataReceived (args: DataReceivedEventArgs) : unit =
         Log.Debug("Websocket - Data received")
@@ -325,7 +325,7 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
 
     do
         httpClient.Timeout <- TimeSpan.FromSeconds(5.0)
-        httpClient.DefaultRequestHeaders.Add("Client-Information", "IntrinioDotNetSDKv3.2")
+        httpClient.DefaultRequestHeaders.Add("Client-Information", "IntrinioDotNetSDKv4.0")
         tryReconnect <- fun () ->
             let reconnectFn () : bool =
                 Log.Information("Websocket - Reconnecting...")
