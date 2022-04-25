@@ -2,24 +2,27 @@
 
 # Building
 
-Open the Package Manager Console window in Visual Studio, then run:
+Open a powershell window. Navigate to the ...\intrinio-realtime-csharp-sdk\IntrinioRealTimeSDK folder. Run:
 
 ```
-nuget pack IntrinioRealTimeClient.nuspec -IncludeReferencedProjects
+dotnet pack IntrinioRealTimeSDK.csproj -p:NuspecFile=IntrinioRealTimeClient.nuspec
 ```
 
-This will create a `IntrinioRealTimeClient.{version}.nupkg` file. To publish the file to NuGet, run:
+This will create a `IntrinioRealTimeClient.{version}.nupkg` file. The path to this file will be output by the 'pack' command but is likely in:
+'...\intrinio-realtime-csharp-sdk\IntrinioRealTimeSDK\bin\Debug\'
+To publish the file to NuGet, run:
 
 # Publishing
 
-For first-time setup, specify your NuGet API key:
+## Nuget Website
+Log in to www.nuget.org. Navigate to https://www.nuget.org/packages/manage/upload. Browse to the package. Upload.
+*Note:* your nuget account must be authorized to perform this operation.
 
-```
-nuget setApiKey <your_API_key>
-```
+## CLI
+For first-time setup, generate (or obtain) your NuGet API key (https://docs.microsoft.com/en-us/nuget/nuget-org/publish-a-package):
 
 Then publish the generated NuGet package:
 
 ```
-nuget push IntrinioRealTimeClient.{version}.nupkg -Source https://api.nuget.org/v3/index.json
+dotnet nuget push IntrinioRealTimeClient.{version}.nupkg --api-key qz2jga8pl3dvn2akksyquwcs9ygggg4exypy3bhxy6w6x6 --source https://api.nuget.org/v3/index.json
 ```
