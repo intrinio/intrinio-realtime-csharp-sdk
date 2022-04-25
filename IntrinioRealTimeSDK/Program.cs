@@ -16,8 +16,6 @@ namespace SampleApp
 		private static Trade maxCountTrade;
 		private static Quote maxCountQuote;
 
-		private static readonly object obj = new();
-
 		static void OnQuote(Quote quote)
 		{
 			string key = quote.Symbol + ":" + quote.Type;
