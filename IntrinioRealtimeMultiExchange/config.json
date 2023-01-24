@@ -2,14 +2,12 @@
 	"Config": {
 		"ApiKey": "",
 		"NumThreads": 2,
-
 		"Provider": "REALTIME",
-		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
-		//"Symbols": [ "lobby" ]
-
+		//"Provider": "DELAYED_SIP",
 		//"Provider": "MANUAL",
-		//"Symbols": [ "AAPL", "MSFT", "GOOG" ],
-		//"IPAddress": "3.231.206.104"
+		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
+		//"Symbols": [ "lobby" ]		
+		//"IPAddress": "1.2.3.4"
 	},
 	"Serilog": {
 		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],

@@ -6,6 +6,7 @@ type Provider =
     | NONE = 0
     | REALTIME = 1
     | MANUAL = 2
+    | DELAYED_SIP = 3
 
 type MessageType =
     | Trade = 0

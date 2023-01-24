@@ -62,12 +62,14 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
     let getAuthUrl () : string =
         match config.Provider with
         | Provider.REALTIME -> "https://realtime-mx.intrinio.com/auth?api_key=" + config.ApiKey
+        | Provider.DELAYED_SIP -> "https://realtime-delayed-sip.intrinio.com/auth?api_key=" + config.ApiKey
         | Provider.MANUAL -> "http://" + config.IPAddress + "/auth?api_key=" + config.ApiKey
         | _ -> failwith "Provider not specified!"
 
     let getWebSocketUrl (token: string) : string =
         match config.Provider with
         | Provider.REALTIME -> "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token
+        | Provider.DELAYED_SIP -> "wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token
         | Provider.MANUAL -> "ws://" + config.IPAddress + "/socket/websocket?vsn=1.0.0&token=" + token
         | _ -> failwith "Provider not specified!"
 
