@@ -1,0 +1,27 @@
+{
+  //This file is not used and is only here for example purposes
+  //Please edit or make a config.json file.  By default, a config.json is copied over on build from the IntrinioRealtimeMultiExchange project, so you can edit that one.
+  "Config": {
+    "ApiKey": "",
+    "NumThreads": 2,
+    "Provider": "REALTIME",
+    //"Provider": "DELAYED_SIP",
+    //"Provider": "MANUAL",
+    "Symbols": [ "AAPL", "MSFT", "GOOG" ]
+    //"Symbols": [ "lobby" ]		
+    //"IPAddress": "1.2.3.4"
+  },
+  "Serilog": {
+    "Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "System": "Warning"
+      }
+    },
+    "WriteTo": [
+      { "Name": "Console" }
+    ]
+  }
+}
