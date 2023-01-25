@@ -16,7 +16,8 @@ Go to [Release](https://github.com/intrinio/intrinio-realtime-csharp-sdk/release
 
 ## Sample Project
 
-For a sample .NET project see: [intrinio-realtime-options-dotnet-sdk](https://github.com/intrinio/intrinio-realtime-csharp-sdk)
+For a sample .NET project see: [intrinio-realtime-options-dotnet-sdk](https://github.com/intrinio/intrinio-realtime-csharp-sdk/blob/master/IntrinioRealTimeSDK/Program.cs)
+Be sure to update [config.json](https://github.com/intrinio/intrinio-realtime-csharp-sdk/blob/master/IntrinioRealtimeMultiExchange/config.json)
 
 ## Features
 
@@ -117,6 +118,7 @@ client.Leave()
 ## Configuration
 
 ### config.json
+[config.json](https://github.com/intrinio/intrinio-realtime-csharp-sdk/blob/master/IntrinioRealtimeMultiExchange/config.json)
 ```json
 {
 	"Config": {
