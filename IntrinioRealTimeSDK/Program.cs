@@ -8,6 +8,7 @@ namespace SampleApp
 	class Program
 	{
 		private static Client client = null;
+		private static CandleStickClient _candleStickClient = null;
 		private static Timer timer = null;
 		private static readonly ConcurrentDictionary<string, int> trades = new(5, 15_000);
 		private static readonly ConcurrentDictionary<string, int> quotes = new(5, 15_000);
@@ -15,6 +16,14 @@ namespace SampleApp
 		private static int maxQuoteCount = 0;
 		private static Trade maxCountTrade;
 		private static Quote maxCountQuote;
+		private static UInt64 _tradeCandleStickCount = 0UL;
+		private static UInt64 _tradeCandleStickCountIncomplete = 0UL;
+		private static UInt64 _AskCandleStickCount = 0UL;
+		private static UInt64 _AskCandleStickCountIncomplete = 0UL;
+		private static UInt64 _BidCandleStickCount = 0UL;
+		private static UInt64 _BidCandleStickCountIncomplete = 0UL;
+		private static bool _useTradeCandleSticks = false;
+		private static bool _useQuoteCandleSticks = false;
 
 		static void OnQuote(Quote quote)
 		{
@@ -45,6 +54,32 @@ namespace SampleApp
 			}
 			trades.AddOrUpdate(key, 1, updateFunc);
 		}
+		
+		static void OnTradeCandleStick(TradeCandleStick tradeCandleStick)
+		{
+			if (tradeCandleStick.Complete)
+			{
+				Interlocked.Increment(ref _tradeCandleStickCount);
+			}
+			else
+			{
+				Interlocked.Increment(ref _tradeCandleStickCountIncomplete);
+			}
+		}
+		
+		static void OnQuoteCandleStick(QuoteCandleStick quoteCandleStick)
+		{
+			if (quoteCandleStick.QuoteType == QuoteType.Ask)
+				if (quoteCandleStick.Complete)
+					Interlocked.Increment(ref _AskCandleStickCount);
+				else
+					Interlocked.Increment(ref _AskCandleStickCountIncomplete);
+			else
+				if (quoteCandleStick.Complete)
+					Interlocked.Increment(ref _BidCandleStickCount);
+				else
+					Interlocked.Increment(ref _BidCandleStickCountIncomplete);
+		}
 
 		static void TimerCallback(object obj)
 		{
@@ -59,6 +94,10 @@ namespace SampleApp
 			{
 				Client.Log("Most active quote: {0} ({1} updates)", maxCountQuote, maxQuoteCount);
 			}
+			if (_useTradeCandleSticks)
+				Client.Log("TRADE CANDLESTICK STATS - TradeCandleSticks = {0}, TradeCandleSticksIncomplete = {1}", _tradeCandleStickCount, _tradeCandleStickCountIncomplete);
+			if (_useQuoteCandleSticks)
+				Client.Log("QUOTE CANDLESTICK STATS - Asks = {0}, Bids = {1}, AsksIncomplete = {2}, BidsIncomplete = {3}", _AskCandleStickCount, _BidCandleStickCount, _AskCandleStickCountIncomplete, _BidCandleStickCountIncomplete);
 		}
 
 		static void Cancel(object sender, ConsoleCancelEventArgs args)
@@ -66,13 +105,28 @@ namespace SampleApp
 			Client.Log("Stopping sample app");
 			timer.Dispose();
 			client.Stop();
+			if (_useTradeCandleSticks || _useQuoteCandleSticks)
+			{
+				_candleStickClient.Stop();
+			}
 			Environment.Exit(0);
 		}
 
 		static void Main(string[] _)
 		{
 			Client.Log("Starting sample app");
-			client = new Client(OnTrade, OnQuote);
+			Action<Trade> onTrade = OnTrade;
+			Action<Quote> onQuote = OnQuote;
+			
+			// Subscribe the candlestick client to trade and/or quote events as well.  It's important any method subscribed this way handles exceptions so as to not cause issues for other subscribers!
+			// _useTradeCandleSticks = true;
+			// _useQuoteCandleSticks = true;
+			// _candleStickClient = new CandleStickClient(OnTradeCandleStick, OnQuoteCandleStick, IntervalType.OneMinute, true);
+			// onTrade += _candleStickClient.OnTrade;
+			// onQuote += _candleStickClient.OnQuote;
+			// _candleStickClient.Start();
+			
+			client = new Client(onTrade, onQuote);
 			timer = new Timer(TimerCallback, client, 10000, 10000);
 			client.Join(); //Load symbols from config.json
 			//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
