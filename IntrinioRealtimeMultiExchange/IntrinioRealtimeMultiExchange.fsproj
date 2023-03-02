@@ -19,6 +19,7 @@
     <Content Include="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Compile Include="CandleStickClient.fs" />
   </ItemGroup>
 
   <ItemGroup>
