@@ -2,6 +2,7 @@
 
 open Serilog
 open System
+open System.Runtime.InteropServices
 open System.IO
 open System.Net.Http
 open System.Text
@@ -35,10 +36,12 @@ type internal WebSocketState(ws: WebSocket) =
 
     member _.Reset() : unit = lastReset <- DateTime.Now
 
-type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
+type Client(
+    [<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>,
+    [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>,
+    config : Config) =
     let selfHealBackoffs : int[] = [| 10_000; 30_000; 60_000; 300_000; 600_000 |]
     let empty : byte[] = Array.empty<byte>
-    let config = LoadConfig()
     let tLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
     let wsLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
     let mutable token : (string * DateTime) = (null, DateTime.Now)
@@ -50,6 +53,8 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
     let data : BlockingCollection<byte[]> = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>())
     let mutable tryReconnect : (unit -> unit) = fun () -> ()
     let httpClient : HttpClient = new HttpClient()
+    let useOnTrade : bool = not (obj.ReferenceEquals(onTrade,null))
+    let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
 
     let isReady() : bool = 
         wsLock.EnterReadLock()
@@ -99,12 +104,16 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
             let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 22 + symbolLength)
             let trade: Trade = parseTrade(chunk, symbolLength)
             startIndex <- startIndex + 22 + symbolLength
-            trade |> onTrade.Invoke
+            if useOnTrade
+            then
+                trade |> onTrade.Invoke
         | MessageType.Ask | MessageType.Bid -> 
             let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 18 + symbolLength)
             let quote: Quote = parseQuote(chunk, symbolLength)
             startIndex <- startIndex + 18 + symbolLength
-            quote |> onQuote.Invoke
+            if useOnQuote
+            then
+                quote |> onQuote.Invoke
         | _ -> Log.Warning("Invalid MessageType: {0}", (int32 bytes.[startIndex]))
 
     let heartbeatFn () =
@@ -326,8 +335,9 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
             with _ -> ()
 
     do
+        config.Validate()
         httpClient.Timeout <- TimeSpan.FromSeconds(5.0)
-        httpClient.DefaultRequestHeaders.Add("Client-Information", "IntrinioDotNetSDKv4.2")
+        httpClient.DefaultRequestHeaders.Add("Client-Information", "IntrinioDotNetSDKv4.3")
         tryReconnect <- fun () ->
             let reconnectFn () : bool =
                 Log.Information("Websocket - Reconnecting...")
@@ -348,8 +358,14 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
         let _token : string = getToken()
         initializeWebSockets(_token)
 
-    new (onTrade : Action<Trade>) =
-        Client(onTrade, Action<Quote>(fun (_:Quote) -> ()))
+    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>) =
+        Client(onTrade, null, LoadConfig())
+        
+    new ([<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>) =
+        Client(null, onQuote, LoadConfig())
+        
+    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>) =
+        Client(onTrade, onQuote, LoadConfig())
 
     member _.Join() : unit =
         while not(isReady()) do Thread.Sleep(1000)
@@ -410,5 +426,3 @@ type Client(onTrade : Action<Trade>, onQuote : Action<Quote>) =
     member _.GetStats() : (int64 * int64 * int) = (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count)
 
     static member Log(messageTemplate:string, [<ParamArray>] propertyValues:obj[]) = Log.Information(messageTemplate, propertyValues)
-
-

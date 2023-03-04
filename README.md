@@ -8,7 +8,7 @@ SDK for working with Intrinio's realtime Multi-Exchange or delayed SIP prices fe
 
 ## Requirements
 
-- .NET 5+
+- .NET 6+
 
 ## Installation
 
