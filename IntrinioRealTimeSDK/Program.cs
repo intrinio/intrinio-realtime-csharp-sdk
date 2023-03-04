@@ -125,10 +125,18 @@ namespace SampleApp
 			// onTrade += _candleStickClient.OnTrade;
 			// onQuote += _candleStickClient.OnQuote;
 			// _candleStickClient.Start();
+
+			// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
+			// Config.Config config = new Config.Config();
+			// config.Provider = Provider.REALTIME;
+			// config.ApiKey = "";
+			// config.Symbols = new[] { "AAPL", "MSFT" };
+			// config.NumThreads = 2;
+			// client = new Client(onTrade, onQuote, config);
 			
 			client = new Client(onTrade, onQuote);
 			timer = new Timer(TimerCallback, client, 10000, 10000);
-			client.Join(); //Load symbols from config.json
+			client.Join(); //Load symbols from your config or config.json
 			//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 			Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
 		}		

@@ -6,7 +6,7 @@
 		//"Provider": "DELAYED_SIP",
 		//"Provider": "MANUAL",
 		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
-		//"Symbols": [ "lobby" ]		
+		//"Symbols": [ "lobby" ]
 		//"IPAddress": "1.2.3.4"
 	},
 	"Serilog": {
