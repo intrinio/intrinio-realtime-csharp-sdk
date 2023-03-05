@@ -21,8 +21,8 @@ module private CandleStickClientInline =
         let p = NativePtr.stackalloc<'a> length |> NativePtr.toVoidPtr
         Span<'a>(p, length)
         
-    let inline internal getCurrentTimestamp() : float =
-        (DateTime.UtcNow - DateTime.UnixEpoch.ToUniversalTime()).TotalSeconds
+    let inline internal getCurrentTimestamp(delay) : float =
+        (DateTime.UtcNow - DateTime.UnixEpoch.ToUniversalTime()).TotalSeconds - delay
         
     let inline internal getNearestModInterval(timestamp : float, interval: IntervalType) : float =
         System.Convert.ToDouble(System.Convert.ToUInt64(timestamp) / System.Convert.ToUInt64(int interval)) * System.Convert.ToDouble((int interval))
@@ -58,7 +58,8 @@ type CandleStickClient(
     interval : IntervalType,
     broadcastPartialCandles : bool,
     [<Optional; DefaultParameterValue(null:Func<string, float, float, IntervalType, TradeCandleStick>)>] getHistoricalTradeCandleStick : Func<string, float, float, IntervalType, TradeCandleStick>,
-    [<Optional; DefaultParameterValue(null:Func<string, float, float, QuoteType, IntervalType, QuoteCandleStick>)>] getHistoricalQuoteCandleStick : Func<string, float, float, QuoteType, IntervalType, QuoteCandleStick>) =
+    [<Optional; DefaultParameterValue(null:Func<string, float, float, QuoteType, IntervalType, QuoteCandleStick>)>] getHistoricalQuoteCandleStick : Func<string, float, float, QuoteType, IntervalType, QuoteCandleStick>,
+    sourceDelaySeconds : float) =
     
     let ctSource : CancellationTokenSource = new CancellationTokenSource()
     let useOnTradeCandleStick : bool = not (obj.ReferenceEquals(onTradeCandleStick,null))
@@ -213,7 +214,7 @@ type CandleStickClient(
                 contractsLock.ExitReadLock()
                 for key in keys do
                     let bucket : SymbolBucket = getSlot(key, contracts, contractsLock)
-                    let currentTime : float = CandleStickClientInline.getCurrentTimestamp()
+                    let currentTime : float = CandleStickClientInline.getCurrentTimestamp(sourceDelaySeconds)
                     bucket.Locker.EnterWriteLock()
                     try
                         if (useOnTradeCandleStick && bucket.TradeCandleStick.IsSome && (bucket.TradeCandleStick.Value.CloseTimestamp < currentTime))
