@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Collections.Concurrent;
-using Intrinio;
+using Intrinio.Realtime.Equities;
 
 namespace SampleApp
 {
