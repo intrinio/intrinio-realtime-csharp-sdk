@@ -1,4 +1,4 @@
-namespace Intrinio
+namespace Intrinio.Realtime.Equities
 
 open Intrinio
 open Serilog
@@ -10,7 +10,7 @@ open System.Threading
 open System.Threading.Tasks
 open System.Net.Sockets
 open WebSocket4Net
-open Intrinio.Config
+open Intrinio.Realtime.Equities.Config
 open FSharp.NativeInterop
 open System.Runtime.CompilerServices
 

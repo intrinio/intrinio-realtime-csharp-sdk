@@ -1,4 +1,4 @@
-﻿namespace Intrinio
+﻿namespace Intrinio.Realtime.Equities
 
 module Config =
 
