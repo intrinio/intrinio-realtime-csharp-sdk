@@ -127,14 +127,14 @@ namespace SampleApp
 			// _candleStickClient.Start();
 
 			// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
+			// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
+			// Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
 			// Config.Config config = new Config.Config();
 			// config.Provider = Provider.REALTIME;
 			// config.ApiKey = "";
 			// config.Symbols = new[] { "AAPL", "MSFT" };
 			// config.NumThreads = 2;
 			// client = new Client(onTrade, onQuote, config);
-			// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
-			// Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
 			
 			client = new Client(onTrade, onQuote);
 			timer = new Timer(TimerCallback, client, 10000, 10000);
