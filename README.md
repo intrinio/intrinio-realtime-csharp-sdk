@@ -10,6 +10,13 @@ SDK for working with Intrinio's realtime Multi-Exchange or delayed SIP prices fe
 
 - .NET 6+
 
+## Docker
+Add your API key to the config.json file in IntrinioRealTimeSDK, then
+```
+docker compose build
+docker compose run example
+```
+
 ## Installation
 
 Go to [Release](https://github.com/intrinio/intrinio-realtime-csharp-sdk/releases/), download the DLLs, reference it in your project. The DLLs contains dependencies necessary to the SDK.
