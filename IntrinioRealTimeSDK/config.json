@@ -4,6 +4,7 @@
 		"NumThreads": 2,
 		"Provider": "REALTIME",
 		//"Provider": "DELAYED_SIP",
+		//"Provider": "NASDAQ_BASIC",
 		//"Provider": "MANUAL",
 		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
 		//"Symbols": [ "lobby" ]

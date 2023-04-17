@@ -7,6 +7,7 @@ type Provider =
     | REALTIME = 1
     | MANUAL = 2
     | DELAYED_SIP = 3
+    | NASDAQ_BASIC = 4
 
 type MessageType =
     | Trade = 0

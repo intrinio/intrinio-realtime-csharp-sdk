@@ -68,6 +68,7 @@ type Client(
         match config.Provider with
         | Provider.REALTIME -> "https://realtime-mx.intrinio.com/auth?api_key=" + config.ApiKey
         | Provider.DELAYED_SIP -> "https://realtime-delayed-sip.intrinio.com/auth?api_key=" + config.ApiKey
+        | Provider.NASDAQ_BASIC -> "https://realtime-nasdaq-basic.intrinio.com/auth?api_key=" + config.ApiKey
         | Provider.MANUAL -> "http://" + config.IPAddress + "/auth?api_key=" + config.ApiKey
         | _ -> failwith "Provider not specified!"
 
@@ -75,6 +76,7 @@ type Client(
         match config.Provider with
         | Provider.REALTIME -> "wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token
         | Provider.DELAYED_SIP -> "wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token
+        | Provider.NASDAQ_BASIC -> "wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token
         | Provider.MANUAL -> "ws://" + config.IPAddress + "/socket/websocket?vsn=1.0.0&token=" + token
         | _ -> failwith "Provider not specified!"
 
@@ -337,7 +339,7 @@ type Client(
     do
         config.Validate()
         httpClient.Timeout <- TimeSpan.FromSeconds(5.0)
-        httpClient.DefaultRequestHeaders.Add("Client-Information", "IntrinioDotNetSDKv6.0")
+        httpClient.DefaultRequestHeaders.Add("Client-Information", "IntrinioDotNetSDKv6.1")
         tryReconnect <- fun () ->
             let reconnectFn () : bool =
                 Log.Information("Websocket - Reconnecting...")
