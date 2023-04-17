@@ -337,7 +337,7 @@ type Client(
     do
         config.Validate()
         httpClient.Timeout <- TimeSpan.FromSeconds(5.0)
-        httpClient.DefaultRequestHeaders.Add("Client-Information", "IntrinioDotNetSDKv6.0")
+        httpClient.DefaultRequestHeaders.Add("Client-Information", "IntrinioDotNetSDKv6.1")
         tryReconnect <- fun () ->
             let reconnectFn () : bool =
                 Log.Information("Websocket - Reconnecting...")
