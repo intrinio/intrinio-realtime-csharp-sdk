@@ -1,5 +1,6 @@
 ﻿namespace Intrinio.Realtime.Equities
 
+open Intrinio.Realtime.Equities
 open Serilog
 open System
 open System.Runtime.InteropServices
@@ -55,6 +56,15 @@ type Client(
     let httpClient : HttpClient = new HttpClient()
     let useOnTrade : bool = not (obj.ReferenceEquals(onTrade,null))
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
+    let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
+    
+    let logMessage(logLevel:LogLevel, messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =
+        match logLevel with
+        | LogLevel.DEBUG -> Log.Debug(logPrefix + messageTemplate, propertyValues)
+        | LogLevel.INFORMATION -> Log.Information(logPrefix + messageTemplate, propertyValues)
+        | LogLevel.WARNING -> Log.Warning(logPrefix + messageTemplate, propertyValues)
+        | LogLevel.ERROR -> Log.Error(logPrefix + messageTemplate, propertyValues)
+        | _ -> failwith "LogLevel not specified!"
 
     let isReady() : bool = 
         wsLock.EnterReadLock()
@@ -116,14 +126,14 @@ type Client(
             if useOnQuote
             then
                 quote |> onQuote.Invoke
-        | _ -> Log.Warning("Invalid MessageType: {0}", (int32 bytes.[startIndex]))
+        | _ -> logMessage(LogLevel.WARNING, "Invalid MessageType: {0}", [|(int32 bytes.[startIndex])|])
 
     let heartbeatFn () =
         let ct = ctSource.Token
-        Log.Debug("Starting heartbeat")
+        logMessage(LogLevel.DEBUG, "Starting heartbeat", [||])
         while not(ct.IsCancellationRequested) do
             Thread.Sleep(20000) //send heartbeat every 20 sec
-            Log.Debug("Sending heartbeat")
+            logMessage(LogLevel.DEBUG, "Sending heartbeat", [||])
             wsLock.EnterReadLock()
             try
                 if not (ct.IsCancellationRequested) && not (obj.ReferenceEquals(null, wsState)) && (wsState.IsReady)
@@ -160,7 +170,7 @@ type Client(
             success <- fn()
 
     let trySetToken() : bool =
-        Log.Information("Authorizing...")
+        logMessage(LogLevel.INFORMATION, "Authorizing...", [||])
         let authUrl : string = getAuthUrl()
         async {
             try
@@ -171,17 +181,17 @@ type Client(
                     Interlocked.Exchange(&token, (_token, DateTime.Now)) |> ignore
                     return true
                 else
-                    Log.Warning("Authorization Failure. Authorization server status code = {0}", response.StatusCode) 
+                    logMessage(LogLevel.WARNING, "Authorization Failure. Authorization server status code = {0}", [|response.StatusCode|])
                     return false
             with
             | :? System.InvalidOperationException as exn ->
-                Log.Error("Authorization Failure (bad URI): {0:l}", exn.Message)
+                logMessage(LogLevel.ERROR, "Authorization Failure (bad URI): {0:l}", [|exn.Message|])
                 return false
             | :? System.Net.Http.HttpRequestException as exn ->
-                Log.Error("Authoriztion Failure (bad network connection): {0:l}", exn.Message)
+                logMessage(LogLevel.ERROR, "Authoriztion Failure (bad network connection): {0:l}", [|exn.Message|])
                 return false
             | :? System.Threading.Tasks.TaskCanceledException as exn ->
-                Log.Error("Authorization Failure (timeout): {0:l}", exn.Message)
+                logMessage(LogLevel.ERROR, "Authorization Failure (timeout): {0:l}", [|exn.Message|])
                 return false
         } |> Async.RunSynchronously
 
@@ -226,7 +236,7 @@ type Client(
             message
 
     let onOpen (_ : EventArgs) : unit =
-        Log.Information("Websocket - Connected")
+        logMessage(LogLevel.INFORMATION, "Websocket - Connected", [||])
         wsLock.EnterWriteLock()
         try
             wsState.IsReady <- true
@@ -242,7 +252,7 @@ type Client(
             channels |> Seq.iter (fun (symbol: string, tradesOnly:bool) ->
                 let lastOnly : string = if tradesOnly then "true" else "false"
                 let message : byte[] = makeJoinMessage(tradesOnly, symbol)
-                Log.Information("Websocket - Joining channel: {0:l} (trades only = {1:l})", symbol, lastOnly)
+                logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0:l} (trades only = {1:l})", [|symbol, lastOnly|])
                 wsState.WebSocket.Send(message, 0, message.Length) )
 
     let onClose (_ : EventArgs) : unit =
@@ -250,7 +260,7 @@ type Client(
         try 
             if not wsState.IsReconnecting
             then
-                Log.Information("Websocket - Closed")
+                logMessage(LogLevel.INFORMATION, "Websocket - Closed", [||])
                 wsLock.EnterWriteLock()
                 try wsState.IsReady <- false
                 finally wsLock.ExitWriteLock()
@@ -272,23 +282,23 @@ type Client(
     let onError (args : SuperSocket.ClientEngine.ErrorEventArgs) : unit =
         let exn = args.Exception
         match exn with
-        | Closed -> Log.Warning("Websocket - Error - Connection failed")
-        | Refused -> Log.Warning("Websocket - Error - Connection refused")
-        | Unavailable -> Log.Warning("Websocket - Error - Server unavailable")
-        | _ -> Log.Error("Websocket - Error - {0}:{1}", exn.GetType(), exn.Message)
+        | Closed -> logMessage(LogLevel.WARNING, "Websocket - Error - Connection failed", [||])
+        | Refused -> logMessage(LogLevel.WARNING, "Websocket - Error - Connection refused", [||])
+        | Unavailable -> logMessage(LogLevel.WARNING, "Websocket - Error - Server unavailable", [||])
+        | _ -> logMessage(LogLevel.ERROR, "Websocket - Error - {0}:{1}", [|exn.GetType(), exn.Message|])
 
     let onDataReceived (args: DataReceivedEventArgs) : unit =
-        Log.Debug("Websocket - Data received")
+        logMessage(LogLevel.DEBUG, "Websocket - Data received", [||])
         Interlocked.Increment(&dataMsgCount) |> ignore
         data.Add(args.Data)
 
     let onMessageReceived (args : MessageReceivedEventArgs) : unit =
-        Log.Debug("Websocket - Message received")
+        logMessage(LogLevel.DEBUG, "Websocket - Message received", [||])
         Interlocked.Increment(&textMsgCount) |> ignore
-        Log.Error("Error received: {0:l}", args.Message)
+        logMessage(LogLevel.ERROR, "Error received: {0:l}", [|args.Message|])
 
     let resetWebSocket(token: string) : unit =
-        Log.Information("Websocket - Resetting")
+        logMessage(LogLevel.INFORMATION, "Websocket - Resetting", [||])
         let wsUrl : string = getWebSocketUrl(token)
         let ws : WebSocket = new WebSocket(wsUrl)
         ws.Opened.Add(onOpen)
@@ -306,7 +316,7 @@ type Client(
     let initializeWebSockets(token: string) : unit =
         wsLock.EnterWriteLock()
         try
-            Log.Information("Websocket - Connecting...")
+            logMessage(LogLevel.INFORMATION, "Websocket - Connecting...", [||])
             let wsUrl : string = getWebSocketUrl(token)
             let ws: WebSocket = new WebSocket(wsUrl)
             ws.Opened.Add(onOpen)
@@ -323,7 +333,7 @@ type Client(
         if channels.Add((symbol, tradesOnly))
         then 
             let message : byte[] = makeJoinMessage(tradesOnly, symbol)
-            Log.Information("Websocket - Joining channel: {0:l} (trades only = {1:l})", symbol, lastOnly)
+            logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0:l} (trades only = {1:l})", [|symbol, lastOnly|])
             try wsState.WebSocket.Send(message, 0, message.Length)
             with _ -> channels.Remove((symbol, tradesOnly)) |> ignore
 
@@ -332,7 +342,7 @@ type Client(
         if channels.Remove((symbol, tradesOnly))
         then 
             let message : byte[] = makeLeaveMessage(symbol)
-            Log.Information("Websocket - Leaving channel: {0:l} (trades only = {1:l})", symbol, lastOnly)
+            logMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0:l} (trades only = {1:l})", [|symbol, lastOnly|])
             try wsState.WebSocket.Send(message, 0, message.Length)
             with _ -> ()
 
@@ -342,7 +352,7 @@ type Client(
         httpClient.DefaultRequestHeaders.Add("Client-Information", "IntrinioDotNetSDKv6.1")
         tryReconnect <- fun () ->
             let reconnectFn () : bool =
-                Log.Information("Websocket - Reconnecting...")
+                logMessage(LogLevel.INFORMATION, "Websocket - Reconnecting...", [||])
                 if wsState.IsReady then true
                 else
                     wsLock.EnterWriteLock()
@@ -419,12 +429,12 @@ type Client(
         try wsState.IsReady <- false
         finally wsLock.ExitWriteLock()
         ctSource.Cancel ()
-        Log.Information("Websocket - Closing...");
+        logMessage(LogLevel.INFORMATION, "Websocket - Closing...", [||])
         wsState.WebSocket.Close()
         heartbeat.Join()
         for thread in threads do thread.Join()
-        Log.Information("Stopped")
+        logMessage(LogLevel.INFORMATION, "Stopped", [||])
 
     member _.GetStats() : (int64 * int64 * int) = (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count)
 
-    static member Log(messageTemplate:string, [<ParamArray>] propertyValues:obj[]) = Log.Information(messageTemplate, propertyValues)
+    static member Log(messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit = Log.Information(messageTemplate, propertyValues)
