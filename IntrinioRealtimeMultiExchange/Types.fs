@@ -28,6 +28,12 @@ type IntervalType =
     | FifteenMinute = 900
     | ThirtyMinute = 1800
     | SixtyMinute = 3600
+    
+type LogLevel =
+    | DEBUG = 0
+    | INFORMATION = 1
+    | WARNING = 2
+    | ERROR = 3
 
 /// Type: the type of the quote (can be 'ask' or 'bid') </para>
 /// Symbol: the 'ticker' symbol </para>
