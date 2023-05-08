@@ -89,44 +89,60 @@ type Client(
         | Provider.NASDAQ_BASIC -> "wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token=" + token
         | Provider.MANUAL -> "ws://" + config.IPAddress + "/socket/websocket?vsn=1.0.0&token=" + token
         | _ -> failwith "Provider not specified!"
+        
+    let getCustomSocketHeaders() : List<KeyValuePair<string, string>> =
+        let headers : List<KeyValuePair<string, string>> = new List<KeyValuePair<string, string>>()
+        headers.Add(new KeyValuePair<string, string>("UseNewEquitiesFormat", "v2"))
+        headers
 
-    let parseTrade (bytes: ReadOnlySpan<byte>, symbolLength : int) : Trade =
+    let parseTrade (bytes: ReadOnlySpan<byte>) : Trade =
+        let symbolLength : int = int32 (bytes.Item(2))
+        let conditionLength : int = int32 (bytes.Item(25 + symbolLength))
         {
-            Symbol = Encoding.ASCII.GetString(bytes.Slice(2, symbolLength))
-            Price = (float (BitConverter.ToSingle(bytes.Slice(2 + symbolLength, 4))))
-            Size = BitConverter.ToUInt32(bytes.Slice(6 + symbolLength, 4))
-            Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(10 + symbolLength, 8)) / 100UL))
-            TotalVolume = BitConverter.ToUInt32(bytes.Slice(18 + symbolLength, 4))
+            Symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength))
+            Price = (float (BitConverter.ToSingle(bytes.Slice(5 + symbolLength, 4))))
+            Size = BitConverter.ToUInt32(bytes.Slice(9 + symbolLength, 4))
+            Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(13 + symbolLength, 8)) / 100UL))
+            TotalVolume = BitConverter.ToUInt32(bytes.Slice(21 + symbolLength, 4))
+            SubProvider = enum<SubProvider> (int32 (bytes.Item(3 + symbolLength)))
+            MarketCenter = char (bytes.Item(4 + symbolLength))
+            Condition = Encoding.ASCII.GetString(bytes.Slice(25 + symbolLength, conditionLength))
         }
 
-    let parseQuote (bytes: ReadOnlySpan<byte>, symbolLength : int) : Quote =
+    let parseQuote (bytes: ReadOnlySpan<byte>) : Quote =
+        let symbolLength : int = int32 (bytes.Item(2))
+        let conditionLength : int = int32 (bytes.Item(25 + symbolLength))
         {
             Type = enum<QuoteType> (int32 (bytes.Item(0)))
-            Symbol = Encoding.ASCII.GetString(bytes.Slice(2, symbolLength))
-            Price = (float (BitConverter.ToSingle(bytes.Slice(2 + symbolLength, 4))))
-            Size = BitConverter.ToUInt32(bytes.Slice(6 + symbolLength, 4))
-            Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(10 + symbolLength, 8)) / 100UL))
+            Symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength))
+            Price = (float (BitConverter.ToSingle(bytes.Slice(5 + symbolLength, 4))))
+            Size = BitConverter.ToUInt32(bytes.Slice(9 + symbolLength, 4))
+            Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(13 + symbolLength, 8)) / 100UL))
+            SubProvider = enum<SubProvider> (int32 (bytes.Item(3 + symbolLength)))
+            MarketCenter = char (bytes.Item(4 + symbolLength))
+            Condition = Encoding.ASCII.GetString(bytes.Slice(21 + symbolLength, conditionLength))
         }
 
     let parseSocketMessage (bytes: byte[], startIndex: byref<int>) : unit =
-        let msgType : MessageType = enum<MessageType> (int32 bytes.[startIndex])
-        let symbolLength : int = int32 bytes.[startIndex + 1]
-        match msgType with
-        | MessageType.Trade -> 
-            let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 22 + symbolLength)
-            let trade: Trade = parseTrade(chunk, symbolLength)
-            startIndex <- startIndex + 22 + symbolLength
-            if useOnTrade
-            then
-                trade |> onTrade.Invoke
-        | MessageType.Ask | MessageType.Bid -> 
-            let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, 18 + symbolLength)
-            let quote: Quote = parseQuote(chunk, symbolLength)
-            startIndex <- startIndex + 18 + symbolLength
-            if useOnQuote
-            then
-                quote |> onQuote.Invoke
-        | _ -> logMessage(LogLevel.WARNING, "Invalid MessageType: {0}", [|(int32 bytes.[startIndex])|])
+        let mutable msgLength : int = 1 //default value in case corrupt array so we don't reprocess same bytes over and over. 
+        try
+            let msgType : MessageType = enum<MessageType> (int32 bytes.[startIndex])
+            msgLength <- int32 bytes.[startIndex + 1]
+            let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, msgLength)
+            match msgType with
+                | MessageType.Trade ->
+                    if useOnTrade
+                    then
+                        let trade: Trade = parseTrade(chunk)
+                        trade |> onTrade.Invoke
+                | MessageType.Ask | MessageType.Bid ->
+                    if useOnQuote
+                    then
+                        let quote: Quote = parseQuote(chunk)
+                        quote |> onQuote.Invoke
+                | _ -> logMessage(LogLevel.WARNING, "Invalid MessageType: {0}", [|(int32 bytes.[startIndex])|])
+        finally
+            startIndex <- startIndex + msgLength
 
     let heartbeatFn () =
         let ct = ctSource.Token
@@ -155,7 +171,9 @@ type Client(
                     let mutable startIndex = 1
                     for _ in 1 .. cnt do
                         parseSocketMessage(datum, &startIndex)
-            with :? OperationCanceledException -> ()
+            with
+                | :? OperationCanceledException -> ()
+                | exn -> logMessage(LogLevel.ERROR, "Error parsing message: {0:l}; {1:l}", [|exn.Message, exn.StackTrace|])
 
     let threads : Thread[] = Array.init config.NumThreads (fun _ -> new Thread(new ThreadStart(threadFn)))
 
@@ -300,7 +318,8 @@ type Client(
     let resetWebSocket(token: string) : unit =
         logMessage(LogLevel.INFORMATION, "Websocket - Resetting", [||])
         let wsUrl : string = getWebSocketUrl(token)
-        let ws : WebSocket = new WebSocket(wsUrl)
+        let headers : List<KeyValuePair<string, string>> = getCustomSocketHeaders()
+        let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
         ws.Opened.Add(onOpen)
         ws.Closed.Add(onClose)
         ws.Error.Add(onError)
@@ -318,7 +337,8 @@ type Client(
         try
             logMessage(LogLevel.INFORMATION, "Websocket - Connecting...", [||])
             let wsUrl : string = getWebSocketUrl(token)
-            let ws: WebSocket = new WebSocket(wsUrl)
+            let headers : List<KeyValuePair<string, string>> = getCustomSocketHeaders()
+            let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
             ws.Opened.Add(onOpen)
             ws.Closed.Add(onClose)
             ws.Error.Add(onError)
