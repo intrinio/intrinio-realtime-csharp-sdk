@@ -59,8 +59,11 @@ type [<Struct>] Trade =
         Symbol : string
         Price : float
         Size : uint32
-        TotalVolume : uint64
+        TotalVolume : uint32
         Timestamp : DateTime
+        SubProvider: SubProvider
+        MarketCenter: char
+        Condition: string
     }
 ```
 
@@ -69,6 +72,16 @@ type [<Struct>] Trade =
 * **Size** - the size of the last trade.
 * **TotalVolume** - The number of stocks traded so far today for this symbol.
 * **Timestamp** - a Unix timestamp
+* **SubProvider** - Denotes the detailed source within grouped sources.
+  *    **`NONE`** - No subtype specified.
+  *    **`CTA_A`** - CTA_A in the DELAYED_SIP provider.
+  *    **`CTA_B`** - CTA_B in the DELAYED_SIP provider.
+  *    **`UTP`** - UTP in the DELAYED_SIP provider.
+  *    **`OTC`** - OTC in the DELAYED_SIP provider.
+  *    **`NASDAQ_BASIC`** - NASDAQ Basic in the NASDAQ_BASIC provider.
+  *    **`IEX`** - From the IEX exchange in the REALTIME provider.
+* **MarketCenter** - Provides the market center
+* **Condition** - Provides the condition
 
 
 ### Quote Message
@@ -81,6 +94,9 @@ type [<Struct>] Quote =
         Price : float
         Size : uint32
         Timestamp : DateTime
+        SubProvider: SubProvider
+        MarketCenter: char
+        Condition: string
     }
 ```
 
@@ -91,6 +107,16 @@ type [<Struct>] Quote =
 * **Price** - the price in USD
 * **Size** - the size of the last ask or bid.
 * **Timestamp** - a Unix timestamp
+* **SubProvider** - Denotes the detailed source within grouped sources.
+  *    **`NONE`** - No subtype specified.
+  *    **`CTA_A`** - CTA_A in the DELAYED_SIP provider.
+  *    **`CTA_B`** - CTA_B in the DELAYED_SIP provider.
+  *    **`UTP`** - UTP in the DELAYED_SIP provider.
+  *    **`OTC`** - OTC in the DELAYED_SIP provider.
+  *    **`NASDAQ_BASIC`** - NASDAQ Basic in the NASDAQ_BASIC provider.
+  *    **`IEX`** - From the IEX exchange in the REALTIME provider.
+* **MarketCenter** - Provides the market center
+* **Condition** - Provides the condition
 
 ## API Keys
 

@@ -8,7 +8,6 @@
 		<owners>Intrinio</owners>
 		<requireLicenseAcceptance>false</requireLicenseAcceptance>
 		<licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
-		<iconUrl>/intrinio.png</iconUrl>
 		<projectUrl>https://github.com/intrinio/intrinio-realtime-csharp-sdk</projectUrl>
 		<description>Intrinio provides real-time stock prices via a two-way WebSocket connection.</description>
 		<releaseNotes>Version 7.0.0-alpha release.</releaseNotes>
