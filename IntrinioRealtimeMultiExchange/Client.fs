@@ -97,30 +97,30 @@ type Client(
 
     let parseTrade (bytes: ReadOnlySpan<byte>) : Trade =
         let symbolLength : int = int32 (bytes.Item(2))
-        let conditionLength : int = int32 (bytes.Item(25 + symbolLength))
+        let conditionLength : int = int32 (bytes.Item(26 + symbolLength))
         {
             Symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength))
-            Price = (float (BitConverter.ToSingle(bytes.Slice(5 + symbolLength, 4))))
-            Size = BitConverter.ToUInt32(bytes.Slice(9 + symbolLength, 4))
-            Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(13 + symbolLength, 8)) / 100UL))
-            TotalVolume = BitConverter.ToUInt32(bytes.Slice(21 + symbolLength, 4))
+            Price = (float (BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4))))
+            Size = BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4))
+            Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL))
+            TotalVolume = BitConverter.ToUInt32(bytes.Slice(22 + symbolLength, 4))
             SubProvider = enum<SubProvider> (int32 (bytes.Item(3 + symbolLength)))
             MarketCenter = char (bytes.Item(4 + symbolLength))
-            Condition = Encoding.ASCII.GetString(bytes.Slice(25 + symbolLength, conditionLength))
+            Condition = if (conditionLength > 0) then Encoding.ASCII.GetString(bytes.Slice(27 + symbolLength, conditionLength)) else String.Empty
         }
 
     let parseQuote (bytes: ReadOnlySpan<byte>) : Quote =
         let symbolLength : int = int32 (bytes.Item(2))
-        let conditionLength : int = int32 (bytes.Item(25 + symbolLength))
+        let conditionLength : int = int32 (bytes.Item(22 + symbolLength))
         {
             Type = enum<QuoteType> (int32 (bytes.Item(0)))
             Symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength))
-            Price = (float (BitConverter.ToSingle(bytes.Slice(5 + symbolLength, 4))))
-            Size = BitConverter.ToUInt32(bytes.Slice(9 + symbolLength, 4))
-            Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(13 + symbolLength, 8)) / 100UL))
+            Price = (float (BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4))))
+            Size = BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4))
+            Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL))
             SubProvider = enum<SubProvider> (int32 (bytes.Item(3 + symbolLength)))
             MarketCenter = char (bytes.Item(4 + symbolLength))
-            Condition = Encoding.ASCII.GetString(bytes.Slice(21 + symbolLength, conditionLength))
+            Condition = if (conditionLength > 0) then Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) else String.Empty
         }
 
     let parseSocketMessage (bytes: byte[], startIndex: byref<int>) : unit =
@@ -319,7 +319,8 @@ type Client(
         logMessage(LogLevel.INFORMATION, "Websocket - Resetting", [||])
         let wsUrl : string = getWebSocketUrl(token)
         let headers : List<KeyValuePair<string, string>> = getCustomSocketHeaders()
-        let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
+        //let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
+        let ws : WebSocket = new WebSocket(wsUrl, null, null, headers)
         ws.Opened.Add(onOpen)
         ws.Closed.Add(onClose)
         ws.Error.Add(onError)
@@ -338,7 +339,8 @@ type Client(
             logMessage(LogLevel.INFORMATION, "Websocket - Connecting...", [||])
             let wsUrl : string = getWebSocketUrl(token)
             let headers : List<KeyValuePair<string, string>> = getCustomSocketHeaders()
-            let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
+            //let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
+            let ws : WebSocket = new WebSocket(wsUrl, null, null, headers)
             ws.Opened.Add(onOpen)
             ws.Closed.Add(onClose)
             ws.Error.Add(onError)
