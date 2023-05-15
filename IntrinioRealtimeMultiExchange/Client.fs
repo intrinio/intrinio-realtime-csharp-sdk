@@ -105,7 +105,7 @@ type Client(
             Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL))
             TotalVolume = BitConverter.ToUInt32(bytes.Slice(22 + symbolLength, 4))
             SubProvider = enum<SubProvider> (int32 (bytes.Item(3 + symbolLength)))
-            MarketCenter = char (bytes.Item(4 + symbolLength))
+            MarketCenter = BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2))
             Condition = if (conditionLength > 0) then Encoding.ASCII.GetString(bytes.Slice(27 + symbolLength, conditionLength)) else String.Empty
         }
 
@@ -119,7 +119,7 @@ type Client(
             Size = BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4))
             Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL))
             SubProvider = enum<SubProvider> (int32 (bytes.Item(3 + symbolLength)))
-            MarketCenter = char (bytes.Item(4 + symbolLength))
+            MarketCenter = BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2))
             Condition = if (conditionLength > 0) then Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) else String.Empty
         }
 
