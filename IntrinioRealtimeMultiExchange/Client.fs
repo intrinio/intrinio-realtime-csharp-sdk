@@ -57,6 +57,10 @@ type Client(
     let useOnTrade : bool = not (obj.ReferenceEquals(onTrade,null))
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
     let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
+    let clientInfoHeaderKey : string = "Client-Information"
+    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv7.0"
+    let messageVersionHeaderKey : string = "UseNewEquitiesFormat"
+    let messageVersionHeaderValue : string = "v2"
     
     let logMessage(logLevel:LogLevel, messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =
         match logLevel with
@@ -92,7 +96,8 @@ type Client(
         
     let getCustomSocketHeaders() : List<KeyValuePair<string, string>> =
         let headers : List<KeyValuePair<string, string>> = new List<KeyValuePair<string, string>>()
-        headers.Add(new KeyValuePair<string, string>("UseNewEquitiesFormat", "v2"))
+        headers.Add(new KeyValuePair<string, string>(clientInfoHeaderKey, clientInfoHeaderValue))
+        headers.Add(new KeyValuePair<string, string>(messageVersionHeaderKey, messageVersionHeaderValue))
         headers
 
     let parseTrade (bytes: ReadOnlySpan<byte>) : Trade =
@@ -371,7 +376,7 @@ type Client(
     do
         config.Validate()
         httpClient.Timeout <- TimeSpan.FromSeconds(5.0)
-        httpClient.DefaultRequestHeaders.Add("Client-Information", "IntrinioDotNetSDKv7.0")
+        httpClient.DefaultRequestHeaders.Add(clientInfoHeaderKey, clientInfoHeaderValue)
         tryReconnect <- fun () ->
             let reconnectFn () : bool =
                 logMessage(LogLevel.INFORMATION, "Websocket - Reconnecting...", [||])
