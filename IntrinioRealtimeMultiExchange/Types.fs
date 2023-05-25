@@ -8,6 +8,15 @@ type Provider =
     | MANUAL = 2
     | DELAYED_SIP = 3
     | NASDAQ_BASIC = 4
+    
+type SubProvider =
+    | NONE = 0
+    | CTA_A = 1
+    | CTA_B = 2
+    | UTP = 3
+    | OTC = 4
+    | NASDAQ_BASIC = 5
+    | IEX = 6
 
 type MessageType =
     | Trade = 0
@@ -40,6 +49,7 @@ type LogLevel =
 /// Price: the dollar price of the quote </para>
 /// Size: the number of shares that were offered as part of the quote </para>
 /// Timestamp: the time that the quote was placed (a unix timestamp representing the number of milliseconds (or better) since the unix epoch) </para>
+/// SubProvider: the specific provider this trade came from under the parent provider grouping. </para>
 type [<Struct>] Quote =
     {
         Type : QuoteType 
@@ -47,6 +57,9 @@ type [<Struct>] Quote =
         Price : float
         Size : uint32
         Timestamp : DateTime
+        SubProvider: SubProvider
+        MarketCenter: char
+        Condition: string
     }
 
     override this.ToString() : string =
@@ -56,6 +69,9 @@ type [<Struct>] Quote =
         ", Price: " + this.Price.ToString("F2") +
         ", Size: " + this.Size.ToString() +
         ", Timestamp: " + this.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffff") +
+        ", SubProvider: " + this.SubProvider.ToString() +
+        ", MarketCenter: " + this.MarketCenter.ToString() +
+        ", Condition: " + this.Condition.ToString() +
         ")"
 
 /// Symbol: the 'ticker' symbol </para>
@@ -63,6 +79,7 @@ type [<Struct>] Quote =
 /// Size: the number of shares that were exchanged in the last trade </para>
 /// TotalVolume: the total number of shares that have been traded since market open </para>
 /// Timestamp: the time that the trade was executed (a unix timestamp representing the number of milliseconds (or better) since the unix epoch) </para>
+/// SubProvider: the specific provider this trade came from under the parent provider grouping. </para>
 type [<Struct>] Trade =
     {
         Symbol : string
@@ -70,6 +87,9 @@ type [<Struct>] Trade =
         Size : uint32
         TotalVolume : uint32
         Timestamp : DateTime
+        SubProvider: SubProvider
+        MarketCenter: char
+        Condition: string
     }
 
     override this.ToString() : string =
@@ -79,6 +99,9 @@ type [<Struct>] Trade =
         ", Size: " + this.Size.ToString() +
         ", TotalVolume: " + this.TotalVolume.ToString() +
         ", Timestamp: " + this.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffff") +
+        ", SubProvider: " + this.SubProvider.ToString() +
+        ", MarketCenter: " + this.MarketCenter.ToString() +
+        ", Condition: " + this.Condition.ToString() +
         ")"
         
 type TradeCandleStick =
