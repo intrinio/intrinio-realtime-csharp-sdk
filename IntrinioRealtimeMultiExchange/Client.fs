@@ -58,7 +58,7 @@ type Client(
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
     let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
     let clientInfoHeaderKey : string = "Client-Information"
-    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv7.0"
+    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv7.1"
     let messageVersionHeaderKey : string = "UseNewEquitiesFormat"
     let messageVersionHeaderValue : string = "v2"
     
@@ -148,20 +148,6 @@ type Client(
                 | _ -> logMessage(LogLevel.WARNING, "Invalid MessageType: {0}", [|(int32 bytes.[startIndex])|])
         finally
             startIndex <- startIndex + msgLength
-
-    let heartbeatFn () =
-        let ct = ctSource.Token
-        logMessage(LogLevel.DEBUG, "Starting heartbeat", [||])
-        while not(ct.IsCancellationRequested) do
-            Thread.Sleep(20000) //send heartbeat every 20 sec
-            logMessage(LogLevel.DEBUG, "Sending heartbeat", [||])
-            wsLock.EnterReadLock()
-            try
-                if not (ct.IsCancellationRequested) && not (obj.ReferenceEquals(null, wsState)) && (wsState.IsReady)
-                then wsState.WebSocket.Send(empty, 0, 0)
-            finally wsLock.ExitReadLock()
-
-    let heartbeat : Thread = new Thread(new ThreadStart(heartbeatFn))
 
     let threadFn () : unit =
         let ct = ctSource.Token
@@ -264,8 +250,6 @@ type Client(
         try
             wsState.IsReady <- true
             wsState.IsReconnecting <- false
-            if not heartbeat.IsAlive
-            then heartbeat.Start()
             for thread in threads do
                 if not thread.IsAlive
                 then thread.Start()
@@ -458,7 +442,6 @@ type Client(
         ctSource.Cancel ()
         logMessage(LogLevel.INFORMATION, "Websocket - Closing...", [||])
         wsState.WebSocket.Close()
-        heartbeat.Join()
         for thread in threads do thread.Join()
         logMessage(LogLevel.INFORMATION, "Stopped", [||])
 
