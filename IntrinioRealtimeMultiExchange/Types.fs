@@ -1,6 +1,8 @@
 ﻿namespace Intrinio.Realtime.Equities
 
 open System
+open System.Text
+open System.Runtime.InteropServices
 
 type Provider =
     | NONE = 0
@@ -71,7 +73,7 @@ type [<Struct>] Quote =
         ", Timestamp: " + this.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffff") +
         ", SubProvider: " + this.SubProvider.ToString() +
         ", MarketCenter: " + this.MarketCenter.ToString() +
-        ", Condition: " + this.Condition.ToString() +
+        ", Condition: " + this.Condition +
         ")"
 
 /// Symbol: the 'ticker' symbol </para>
@@ -101,7 +103,7 @@ type [<Struct>] Trade =
         ", Timestamp: " + this.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffff") +
         ", SubProvider: " + this.SubProvider.ToString() +
         ", MarketCenter: " + this.MarketCenter.ToString() +
-        ", Condition: " + this.Condition.ToString() +
+        ", Condition: " + this.Condition +
         ")"
         
 type TradeCandleStick =
@@ -427,3 +429,109 @@ type QuoteCandleStick =
         
     member internal this.MarkComplete() : unit =
         this.Complete <- true
+        
+type internal Tick(
+    timeReceived : DateTime,
+    trade: Option<Trade>,
+    quote : Option<Quote>) =
+    
+    let getTradeBytes(trade : Trade) : byte[] =
+        let symbolBytes : byte[] = Encoding.ASCII.GetBytes(trade.Symbol)
+        let symbolLength : byte = System.Convert.ToByte(symbolBytes.Length)
+        let symbolLengthInt32 : int = System.Convert.ToInt32 symbolLength
+        let marketCenterBytes : byte[] = BitConverter.GetBytes(trade.MarketCenter)
+        let tradePrice : byte[] = BitConverter.GetBytes(System.Convert.ToSingle(trade.Price))
+        let tradeSize : byte[] = BitConverter.GetBytes(trade.Size)
+        let timeStamp : byte[] = BitConverter.GetBytes(System.Convert.ToUInt64((trade.Timestamp - DateTime.UnixEpoch).Ticks) * 100UL)
+        let tradeTotalVolume : byte[] = BitConverter.GetBytes(trade.TotalVolume)
+        let condition : byte[] = Encoding.ASCII.GetBytes(trade.Condition)
+        let conditionLength : byte = System.Convert.ToByte(condition.Length)
+        let messageLength : byte = 27uy + symbolLength + conditionLength
+        
+        let bytes : byte[] = Array.zeroCreate (System.Convert.ToInt32(messageLength))
+        bytes[0] <- System.Convert.ToByte((int)(MessageType.Trade));
+        bytes[1] <- messageLength;
+        bytes[2] <- symbolLength;
+        Array.Copy(symbolBytes, 0, bytes, 3, symbolLengthInt32);
+        bytes[3 + symbolLengthInt32] <- System.Convert.ToByte((int)(trade.SubProvider));
+        Array.Copy(marketCenterBytes, 0, bytes, 4 + symbolLengthInt32, marketCenterBytes.Length);
+        Array.Copy(tradePrice, 0, bytes, 6 + symbolLengthInt32, tradePrice.Length);
+        Array.Copy(tradeSize, 0, bytes, 10 + symbolLengthInt32, tradeSize.Length);
+        Array.Copy(timeStamp, 0, bytes, 14 + symbolLengthInt32, timeStamp.Length);
+        Array.Copy(tradeTotalVolume, 0, bytes, 22 + symbolLengthInt32, tradeTotalVolume.Length);
+        bytes[26 + symbolLengthInt32] <- conditionLength;
+        Array.Copy(condition, 0, bytes, 27 + symbolLengthInt32, System.Convert.ToInt32(conditionLength));
+        
+        // byte 0: message type (hasn't changed)
+        // byte 1: message length (in bytes, including bytes 0 and 1)
+        // byte 2: symbol length (in bytes)
+        // bytes[3...]: symbol string (ascii)
+        // next byte: source
+        // next 2 bytes: market center (as 1 char)
+        // next 4 bytes: trade price (float)
+        // next 4 bytes: trade size (uint)
+        // next 8 bytes: timestamp (uint64)
+        // next 4 bytes: trade total volume ((uint)
+        // next byte: condition len
+        // next bytes: condition string (ascii)
+        
+        bytes;
+        
+    let getQuoteBytes(quote : Quote) : byte[] =
+        let symbolBytes : byte[] = Encoding.ASCII.GetBytes(quote.Symbol)
+        let symbolLength : byte = System.Convert.ToByte(symbolBytes.Length)
+        let symbolLengthInt32 : int = System.Convert.ToInt32 symbolLength
+        let marketCenterBytes : byte[] = BitConverter.GetBytes(quote.MarketCenter)
+        let tradePrice : byte[] = BitConverter.GetBytes(System.Convert.ToSingle(quote.Price))
+        let tradeSize : byte[] = BitConverter.GetBytes(quote.Size)
+        let timeStamp : byte[] = BitConverter.GetBytes(System.Convert.ToUInt64((quote.Timestamp - DateTime.UnixEpoch).Ticks) * 100UL)
+        let condition : byte[] = Encoding.ASCII.GetBytes(quote.Condition)
+        let conditionLength : byte = System.Convert.ToByte(condition.Length)
+        let messageLength : byte = 23uy + symbolLength + conditionLength
+        
+        let bytes : byte[] = Array.zeroCreate (System.Convert.ToInt32(messageLength))
+        bytes[0] <- System.Convert.ToByte((int)(if quote.Type = QuoteType.Ask then MessageType.Ask else MessageType.Bid));
+        bytes[1] <- messageLength;
+        bytes[2] <- symbolLength;
+        Array.Copy(symbolBytes, 0, bytes, 3, symbolLengthInt32);
+        bytes[3 + symbolLengthInt32] <- System.Convert.ToByte((int)(quote.SubProvider));
+        Array.Copy(marketCenterBytes, 0, bytes, 4 + symbolLengthInt32, marketCenterBytes.Length);
+        Array.Copy(tradePrice, 0, bytes, 6 + symbolLengthInt32, tradePrice.Length);
+        Array.Copy(tradeSize, 0, bytes, 10 + symbolLengthInt32, tradeSize.Length);
+        Array.Copy(timeStamp, 0, bytes, 14 + symbolLengthInt32, timeStamp.Length);
+        bytes[22 + symbolLengthInt32] <- conditionLength;
+        Array.Copy(condition, 0, bytes, 23 + symbolLengthInt32, System.Convert.ToInt32(conditionLength));
+        
+        // byte 0: message type (hasn't changed)
+        // byte 1: message length (in bytes, including bytes 0 and 1)
+        // byte 2: symbol length (in bytes)
+        // bytes[3...]: symbol string (ascii)
+        // next byte: source
+        // next 2 bytes: market center (as 1 char)
+        // next 4 bytes: ask/bid price (float)
+        // next 4 bytes: ask/bid size (uint)
+        // next 8 bytes: timestamp (uint64)
+        // next byte: condition len
+        // next bytes: condition string (ascii)
+        
+        bytes
+        
+    member _.IsTrade() : bool =
+        trade.IsSome
+            
+    member _.Trade() : Trade =
+        trade.Value
+            
+    member _.Quote() : Quote =
+        quote.Value
+            
+    member _.GetTimeReceivedBytes() : byte[] =
+        BitConverter.GetBytes(System.Convert.ToUInt64((timeReceived - DateTime.UnixEpoch).Ticks) * 100UL)
+        
+    member _.GetEventBytes() : byte[] =
+        match trade with
+            | Some t -> getTradeBytes t
+            | None ->
+                match quote with
+                    | Some q -> getQuoteBytes q
+                    | None -> Array.Empty<byte>()
