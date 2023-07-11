@@ -155,9 +155,13 @@ type ReplayClient(
                 if data.TryTake(&datum,1000) then
                     match datum.IsTrade() with
                     | true ->
-                        datum.Trade() |> onTrade.Invoke
+                        if useOnTrade
+                        then 
+                            datum.Trade() |> onTrade.Invoke
                     | false ->
-                        datum.Quote() |> onQuote.Invoke
+                        if useOnQuote
+                        then
+                            datum.Quote() |> onQuote.Invoke
                 else
                     Thread.Sleep(1)
             with
