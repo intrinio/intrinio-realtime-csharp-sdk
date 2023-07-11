@@ -197,13 +197,13 @@ type ReplayClient(
                             match (enum<MessageType> (System.Convert.ToInt32(eventBuffer[0]))) with
                             | MessageType.Trade ->
                                 let trade : Trade = parseTrade(eventSpanBuffer)
-                                if (channels.Contains (trade.Symbol, true) || channels.Contains (trade.Symbol, false))
+                                if (channels.Contains ("lobby", true) || channels.Contains ("lobby", false) || channels.Contains (trade.Symbol, true) || channels.Contains (trade.Symbol, false))
                                 then
                                     yield new Tick(timeReceived, Some(trade), Option<Quote>.None)
                             | MessageType.Ask 
                             | MessageType.Bid ->
                                  let quote : Quote = parseQuote(eventSpanBuffer)
-                                 if (channels.Contains (quote.Symbol, false))
+                                 if (channels.Contains ("lobby", false) || channels.Contains (quote.Symbol, false))
                                  then
                                     yield new Tick(timeReceived, Option<Trade>.None, Some(quote))
                             | _ -> logMessage(LogLevel.ERROR, "Invalid MessageType: {0}", [|eventBuffer[0]|])
@@ -276,16 +276,21 @@ type ReplayClient(
                 
     let replayThreadFn () : unit =
         let ct : CancellationToken = ctSource.Token
-        let replayFilePath : string = fetchReplayFile()
-        let ticks : IEnumerable<Tick> =
-            if withDelay
-            then replayTickFileWithDelay(replayFilePath, 100, ct)
-            else replayTickFileWithoutDelay(replayFilePath, 100, ct)  
-        for tick : Tick in ticks do
+        let mutable replayFilePath : string = String.Empty
+        try
+            logMessage(LogLevel.INFORMATION, "Downloading Replay file...", [||])
+            replayFilePath <- fetchReplayFile()
+            logMessage(LogLevel.INFORMATION, "Downloaded Replay file to: {0}", [|replayFilePath|])
+            let ticks : IEnumerable<Tick> =
+                if withDelay
+                then replayTickFileWithDelay(replayFilePath, 100, ct)
+                else replayTickFileWithoutDelay(replayFilePath, 100, ct)  
+            for tick : Tick in ticks do
                 if not ct.IsCancellationRequested
                 then data.Add(tick)
+        with | :? Exception as e -> logMessage(LogLevel.ERROR, "Error while replaying file: {0}", [|e.Message|])
         
-        if deleteFileWhenDone
+        if deleteFileWhenDone && File.Exists replayFilePath
         then
             File.Delete(replayFilePath)
 
@@ -307,6 +312,9 @@ type ReplayClient(
 
     do
         config.Validate()
+        for thread : Thread in threads do
+            thread.Start()
+        replayThread.Start()
 
     new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, date : DateTime, subProvider : SubProvider, withDelay : bool, deleteFileWhenDone : bool) =
         ReplayClient(onTrade, null, LoadConfig(), date, subProvider, withDelay, deleteFileWhenDone)

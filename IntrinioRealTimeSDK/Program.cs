@@ -101,6 +101,25 @@ namespace SampleApp
 			if (_useQuoteCandleSticks)
 				Client.Log("QUOTE CANDLESTICK STATS - Asks = {0}, Bids = {1}, AsksIncomplete = {2}, BidsIncomplete = {3}", _AskCandleStickCount, _BidCandleStickCount, _AskCandleStickCountIncomplete, _BidCandleStickCountIncomplete);
 		}
+		
+		static void ReplayTimerCallback(object obj)
+		{
+			ReplayClient client = (ReplayClient) obj;
+			Tuple<Int64, Int64, int> stats = client.GetStats();
+			Client.Log("Data Messages = {0}, Text Messages = {1}, Queue Depth = {2}", stats.Item1, stats.Item2, stats.Item3);
+			if (maxTradeCount > 0)
+			{
+				Client.Log("Most active trade: {0} ({1} updates)", maxCountTrade, maxTradeCount);
+			}
+			if (maxQuoteCount > 0)
+			{
+				Client.Log("Most active quote: {0} ({1} updates)", maxCountQuote, maxQuoteCount);
+			}
+			if (_useTradeCandleSticks)
+				Client.Log("TRADE CANDLESTICK STATS - TradeCandleSticks = {0}, TradeCandleSticksIncomplete = {1}", _tradeCandleStickCount, _tradeCandleStickCountIncomplete);
+			if (_useQuoteCandleSticks)
+				Client.Log("QUOTE CANDLESTICK STATS - Asks = {0}, Bids = {1}, AsksIncomplete = {2}, BidsIncomplete = {3}", _AskCandleStickCount, _BidCandleStickCount, _AskCandleStickCountIncomplete, _BidCandleStickCountIncomplete);
+		}
 
 		static void Cancel(object sender, ConsoleCancelEventArgs args)
 		{
@@ -144,7 +163,7 @@ namespace SampleApp
 			// //client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 			
 			replayClient = new ReplayClient(onTrade, onQuote, DateTime.Today, SubProvider.NASDAQ_BASIC, false, true);
-			timer = new Timer(TimerCallback, replayClient, 10000, 10000);
+			timer = new Timer(ReplayTimerCallback, replayClient, 10000, 10000);
 			replayClient.Join(); //Load symbols from your config or config.json
 			//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 			
