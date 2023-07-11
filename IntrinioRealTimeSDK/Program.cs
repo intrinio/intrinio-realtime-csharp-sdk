@@ -157,15 +157,15 @@ namespace SampleApp
 			// config.NumThreads = 2;
 			// client = new Client(onTrade, onQuote, config);
 			
-			// client = new Client(onTrade, onQuote);
-			// timer = new Timer(TimerCallback, client, 10000, 10000);
-			// client.Join(); //Load symbols from your config or config.json
-			// //client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
-			
-			replayClient = new ReplayClient(onTrade, onQuote, DateTime.Today, SubProvider.NASDAQ_BASIC, false, true);
-			timer = new Timer(ReplayTimerCallback, replayClient, 10000, 10000);
-			replayClient.Join(); //Load symbols from your config or config.json
+			client = new Client(onTrade, onQuote);
+			timer = new Timer(TimerCallback, client, 10000, 10000);
+			client.Join(); //Load symbols from your config or config.json
 			//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+			
+			// replayClient = new ReplayClient(onTrade, onQuote, DateTime.Today, SubProvider.NASDAQ_BASIC, true, true); //A client to replay previous day's data
+			// timer = new Timer(ReplayTimerCallback, replayClient, 10000, 10000);
+			// replayClient.Join(); //Load symbols from your config or config.json
+			// //client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 			
 			Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
 		}		
