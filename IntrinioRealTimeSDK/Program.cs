@@ -9,6 +9,7 @@ namespace SampleApp
 	class Program
 	{
 		private static Client client = null;
+		private static ReplayClient replayClient = null;
 		private static CandleStickClient _candleStickClient = null;
 		private static Timer timer = null;
 		private static readonly ConcurrentDictionary<string, int> trades = new(5, 15_000);
@@ -137,10 +138,16 @@ namespace SampleApp
 			// config.NumThreads = 2;
 			// client = new Client(onTrade, onQuote, config);
 			
-			client = new Client(onTrade, onQuote);
-			timer = new Timer(TimerCallback, client, 10000, 10000);
-			client.Join(); //Load symbols from your config or config.json
+			// client = new Client(onTrade, onQuote);
+			// timer = new Timer(TimerCallback, client, 10000, 10000);
+			// client.Join(); //Load symbols from your config or config.json
+			// //client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+			
+			replayClient = new ReplayClient(onTrade, onQuote, DateTime.Today, SubProvider.NASDAQ_BASIC, false, true);
+			timer = new Timer(TimerCallback, replayClient, 10000, 10000);
+			replayClient.Join(); //Load symbols from your config or config.json
 			//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+			
 			Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
 		}		
 	}

@@ -516,6 +516,8 @@ type internal Tick(
         
         bytes
         
+    member _.TimeReceived() : DateTime = timeReceived
+        
     member _.IsTrade() : bool =
         trade.IsSome
             

@@ -1,18 +1,18 @@
 ﻿namespace Intrinio.Realtime.Equities
 
 open Intrinio.Realtime.Equities
+open Intrinio.SDK.Model
 open Serilog
 open System
 open System.Runtime.InteropServices
 open System.IO
+open System.Net
 open System.Net.Http
 open System.Text
 open System.Collections.Concurrent
 open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
-open System.Net.Sockets
-open WebSocket4Net
 open Intrinio.Realtime.Equities.Config
 
 type ReplayClient(
@@ -20,7 +20,9 @@ type ReplayClient(
     [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>,
     config : Config,
     date : DateTime,
-    withDelay : bool) =
+    subProvider : SubProvider,
+    withDelay : bool,
+    deleteFileWhenDone : bool) =
     let empty : byte[] = Array.empty<byte>
     let tLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
     let wsLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
@@ -73,26 +75,6 @@ type ReplayClient(
             Condition = if (conditionLength > 0) then Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) else String.Empty
         }
 
-//     /// <summary>
-//     /// The results of this should be streamed and not ToList-ed.
-//     /// </summary>
-//     /// <param name="fullFilePath"></param>
-//     /// <param name="byteBufferSize"></param>
-//     /// <returns></returns>
-//     internal static IEnumerable<Tick> ReplayTickFileWithDelay(string fullFilePath, int byteBufferSize)
-//     {
-//         long start = DateTime.UtcNow.Ticks;
-//         long offset = 0L;
-//         foreach (Tick tick in ReplayTickFileWithoutDelay(fullFilePath, byteBufferSize))
-//         {
-//             if (offset == 0L)
-//                 offset = start - tick.TimeReceived.Ticks;
-//
-//             System.Threading.SpinWait.SpinUntil(() => ((tick.TimeReceived.Ticks + offset) <= DateTime.UtcNow.Ticks));
-//             yield return tick;
-//         }
-//     }
-//     
 //     internal static void WriteRowToOpenCsv(IEnumerable<string> row, TextWriter tw)
 //     {
 //         bool first = true;
@@ -191,7 +173,7 @@ type ReplayClient(
     /// <param name="fullFilePath"></param>
     /// <param name="byteBufferSize"></param>
     /// <returns></returns>
-    let replayTickFileWithoutDelay(fullFilePath : string, byteBufferSize : int) : IEnumerable<Tick> =
+    let replayTickFileWithoutDelay(fullFilePath : string, byteBufferSize : int, ct : CancellationToken) : IEnumerable<Tick> =
         use fRead : FileStream = new FileStream(fullFilePath, FileMode.Open, FileAccess.Read, FileShare.None)
         (
             let eventBuffer : byte[] = Array.zeroCreate byteBufferSize
@@ -201,49 +183,111 @@ type ReplayClient(
                 let mutable readResult : int = fRead.ReadByte() //This is message type
                 seq {
                     while (readResult <> -1) do
-                        let eventSpanBuffer : ReadOnlySpan<byte> = new ReadOnlySpan<byte>(eventBuffer)
-                        let timeReceivedSpanBuffer : ReadOnlySpan<byte> = new ReadOnlySpan<byte>(timeReceivedBuffer)
-                        eventBuffer[0] <- (byte) readResult //This is message type
-                        eventBuffer[1] <- (byte) (fRead.ReadByte()) //This is message length, including this and the previous byte.
-                        let bytesRead : int = fRead.Read(eventBuffer, 2, (eventBuffer[1]-2)) //read the rest of the message
-                        let timeBytesRead : int = fRead.Read(timeReceivedBuffer, 0, 8) //get the time received
-                        let timeReceived : DateTime = parseTimeReceived(timeReceivedSpanBuffer)
-                    
-                        match ((MessageType)eventBuffer[0]) with
-                        | MessageType.Trade ->
-                            let trade : Trade = parseTrade(eventSpanBuffer)
-                            yield new Tick(trade, Option<Quote>.None, timeReceived)
-                        | MessageType.Ask 
-                        | MessageType.Bid ->
-                             let quote : Quote = parseQuote(eventSpanBuffer)
-                             yield new Tick(Option<Trade>.None, quote, timeReceived)
-						
-                    //Set up the next iteration
-                    readResult <- fRead.ReadByte()
+                        if not ct.IsCancellationRequested
+                        then
+                            let eventSpanBuffer : ReadOnlySpan<byte> = new ReadOnlySpan<byte>(eventBuffer)
+                            let timeReceivedSpanBuffer : ReadOnlySpan<byte> = new ReadOnlySpan<byte>(timeReceivedBuffer)
+                            eventBuffer[0] <- (byte) readResult //This is message type
+                            eventBuffer[1] <- (byte) (fRead.ReadByte()) //This is message length, including this and the previous byte.
+                            let bytesRead : int = fRead.Read(eventBuffer, 2, (System.Convert.ToInt32(eventBuffer[1])-2)) //read the rest of the message
+                            let timeBytesRead : int = fRead.Read(timeReceivedBuffer, 0, 8) //get the time received
+                            let timeReceived : DateTime = parseTimeReceived(timeReceivedSpanBuffer)
+                        
+                            
+                            match (enum<MessageType> (System.Convert.ToInt32(eventBuffer[0]))) with
+                            | MessageType.Trade ->
+                                let trade : Trade = parseTrade(eventSpanBuffer)
+                                if (channels.Contains (trade.Symbol, true) || channels.Contains (trade.Symbol, false))
+                                then
+                                    yield new Tick(timeReceived, Some(trade), Option<Quote>.None)
+                            | MessageType.Ask 
+                            | MessageType.Bid ->
+                                 let quote : Quote = parseQuote(eventSpanBuffer)
+                                 if (channels.Contains (quote.Symbol, false))
+                                 then
+                                    yield new Tick(timeReceived, Option<Trade>.None, Some(quote))
+                            | _ -> logMessage(LogLevel.ERROR, "Invalid MessageType: {0}", [|eventBuffer[0]|])
+
+                            //Set up the next iteration
+                            readResult <- fRead.ReadByte()
+                        else readResult <- -1
                 }
             else
                 raise (FileLoadException("Unable to read replay file."))
         )
                 
-    // /// <summary>
-    // /// The results of this should be streamed and not ToList-ed.
-    // /// </summary>
-    // /// <param name="fullFilePath"></param>
-    // /// <param name="byteBufferSize"></param>
-    // /// <returns></returns>
-    // let replayTickFileWithDelay(fullFilePath : string, byteBufferSize : int) =
-    //     let start : long = DateTime.UtcNow.Ticks;
-    //     let offset : long = 0L;
-    //     for tick : Tick in ReplayTickFileWithoutDelay(fullFilePath, byteBufferSize) do
-    //         if (offset = 0L)
-    //         then offset <- start - tick.TimeReceived.Ticks
-    //
-    //         System.Threading.SpinWait.SpinUntil(() => ((tick.TimeReceived.Ticks + offset) <= DateTime.UtcNow.Ticks));
-    //         yield return tick;
+    /// <summary>
+    /// The results of this should be streamed and not ToList-ed.
+    /// </summary>
+    /// <param name="fullFilePath"></param>
+    /// <param name="byteBufferSize"></param>
+    /// <returns></returns>
+    let replayTickFileWithDelay(fullFilePath : string, byteBufferSize : int, ct : CancellationToken) : IEnumerable<Tick> =
+        let start : int64 = DateTime.UtcNow.Ticks;
+        let mutable offset : int64 = 0L;
+        seq {
+            for tick : Tick in replayTickFileWithoutDelay(fullFilePath, byteBufferSize, ct) do
+                if (offset = 0L)
+                then
+                    offset <- start - tick.TimeReceived().Ticks
+                    
+                if not ct.IsCancellationRequested
+                then
+                    System.Threading.SpinWait.SpinUntil(fun () -> ((tick.TimeReceived().Ticks + offset) <= DateTime.UtcNow.Ticks));
+                    yield tick
+        }
+        
+    let mapSubProvider(subProvider : SubProvider) : string =
+        match subProvider with
+        | SubProvider.IEX -> "iex"
+        | SubProvider.UTP -> "utp_delayed"
+        | SubProvider.CTA_A -> "cta_a_delayed"
+        | SubProvider.CTA_B -> "cta_b_delayed"
+        | SubProvider.OTC -> "otc_delayed"
+        | SubProvider.NASDAQ_BASIC -> "nasdaq_basic"
+        | _ -> "iex"
+        
+    let fetchReplayFile() : string =
+        let api : Intrinio.SDK.Api.SecurityApi = new Intrinio.SDK.Api.SecurityApi()
+        api.Configuration.ApiKey.Add("api_key", config.ApiKey)
+        let result : SecurityReplayFileResult = api.GetSecurityReplayFile(mapSubProvider(subProvider), date)
+        let decodedUrl : string = result.Url.Replace(@"\u0026", "&")
+        
+        let tempDir : string = System.IO.Path.GetTempPath()
+        let fileName : string = Path.Combine(tempDir, result.Name)
+        
+        use outputFile = new System.IO.FileStream(fileName,System.IO.FileMode.Create)
+        (
+            use httpClient = new HttpClient()
+            (
+                httpClient.Timeout <- TimeSpan.FromHours(1)
+                httpClient.BaseAddress <- new Uri(decodedUrl)
+                use response : HttpResponseMessage = httpClient.GetAsync(decodedUrl).Result
+                (
+                    use streamToReadFrom : Stream = response.Content.ReadAsStreamAsync().Result
+                    (
+                        streamToReadFrom.CopyTo outputFile
+                    )
+                )
+            )
+        )
+        
+        fileName
                 
     let replayThreadFn () : unit =
-        let ct = ctSource.Token
-        ()
+        let ct : CancellationToken = ctSource.Token
+        let replayFilePath : string = fetchReplayFile()
+        let ticks : IEnumerable<Tick> =
+            if withDelay
+            then replayTickFileWithDelay(replayFilePath, 100, ct)
+            else replayTickFileWithoutDelay(replayFilePath, 100, ct)  
+        for tick : Tick in ticks do
+                if not ct.IsCancellationRequested
+                then data.Add(tick)
+        
+        if deleteFileWhenDone
+        then
+            File.Delete(replayFilePath)
 
     let threads : Thread[] = Array.init config.NumThreads (fun _ -> new Thread(new ThreadStart(threadFn)))
     
@@ -264,14 +308,14 @@ type ReplayClient(
     do
         config.Validate()
 
-    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, date : DateTime, withDelay : bool) =
-        ReplayClient(onTrade, null, LoadConfig(), date, withDelay)
+    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, date : DateTime, subProvider : SubProvider, withDelay : bool, deleteFileWhenDone : bool) =
+        ReplayClient(onTrade, null, LoadConfig(), date, subProvider, withDelay, deleteFileWhenDone)
         
-    new ([<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withDelay : bool) =
-        ReplayClient(null, onQuote, LoadConfig(), date, withDelay)
+    new ([<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, subProvider : SubProvider, withDelay : bool, deleteFileWhenDone : bool) =
+        ReplayClient(null, onQuote, LoadConfig(), date, subProvider, withDelay, deleteFileWhenDone)
         
-    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withDelay : bool) =
-        ReplayClient(onTrade, onQuote, LoadConfig(), date, withDelay)
+    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, subProvider : SubProvider, withDelay : bool, deleteFileWhenDone : bool) =
+        ReplayClient(onTrade, onQuote, LoadConfig(), date, subProvider, withDelay, deleteFileWhenDone)
 
     member _.Join() : unit =
         let symbolsToAdd : HashSet<(string*bool)> =
