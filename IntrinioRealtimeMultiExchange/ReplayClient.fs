@@ -20,7 +20,6 @@ type ReplayClient(
     [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>,
     config : Config,
     date : DateTime,
-    subProvider : SubProvider,
     withDelay : bool,
     deleteFileWhenDone : bool) =
     let empty : byte[] = Array.empty<byte>
@@ -31,7 +30,7 @@ type ReplayClient(
     let data : BlockingCollection<Tick> = new BlockingCollection<Tick>(new ConcurrentQueue<Tick>())
     let useOnTrade : bool = not (obj.ReferenceEquals(onTrade,null))
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
-    let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
+    let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())        
     
     let logMessage(logLevel:LogLevel, messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =
         match logLevel with
@@ -236,7 +235,7 @@ type ReplayClient(
                     yield tick
         }
         
-    let mapSubProvider(subProvider : SubProvider) : string =
+    let mapSubProviderToApiValue(subProvider : SubProvider) : string =
         match subProvider with
         | SubProvider.IEX -> "iex"
         | SubProvider.UTP -> "utp_delayed"
@@ -246,10 +245,19 @@ type ReplayClient(
         | SubProvider.NASDAQ_BASIC -> "nasdaq_basic"
         | _ -> "iex"
         
-    let fetchReplayFile() : string =
+    let mapProviderToSubProviders(provider : Intrinio.Realtime.Equities.Provider) : SubProvider[] =
+        match provider with
+        | Provider.NONE -> [||]
+        | Provider.MANUAL -> [||]
+        | Provider.REALTIME -> [|SubProvider.IEX|]
+        | Provider.DELAYED_SIP -> [|SubProvider.UTP; SubProvider.CTA_A; SubProvider.CTA_B; SubProvider.OTC|]
+        | Provider.NASDAQ_BASIC -> [|SubProvider.NASDAQ_BASIC|]
+        | _ -> [||]
+        
+    let fetchReplayFile(subProvider : SubProvider) : string =
         let api : Intrinio.SDK.Api.SecurityApi = new Intrinio.SDK.Api.SecurityApi()
         api.Configuration.ApiKey.Add("api_key", config.ApiKey)
-        let result : SecurityReplayFileResult = api.GetSecurityReplayFile(mapSubProvider(subProvider), date)
+        let result : SecurityReplayFileResult = api.GetSecurityReplayFile(mapSubProviderToApiValue(subProvider), date)
         let decodedUrl : string = result.Url.Replace(@"\u0026", "&")
         
         let tempDir : string = System.IO.Path.GetTempPath()
@@ -272,29 +280,58 @@ type ReplayClient(
         )
         
         fileName
+    
+    let replayFileGroupWithoutDelay(tickGroup : IEnumerable<Tick>[], ct : CancellationToken) : IEnumerable<Tick> =
+        let nextTicks : Option<Tick>[] = Array.zeroCreate(tickGroup.Length)
+    
+    let replayFileGroupWithDelay(tickGroup : IEnumerable<Tick>[], ct : CancellationToken) : IEnumerable<Tick> =
+        let start : int64 = DateTime.UtcNow.Ticks;
+        let mutable offset : int64 = 0L;
+        seq {
+            for tick : Tick in replayFileGroupWithoutDelay(tickGroup, ct) do
+                if (offset = 0L)
+                then
+                    offset <- start - tick.TimeReceived().Ticks
+                    
+                if not ct.IsCancellationRequested
+                then
+                    System.Threading.SpinWait.SpinUntil(fun () -> ((tick.TimeReceived().Ticks + offset) <= DateTime.UtcNow.Ticks));
+                    yield tick
+        }
                 
     let replayThreadFn () : unit =
         let ct : CancellationToken = ctSource.Token
-        let mutable replayFilePath : string = String.Empty
-        try
-            logMessage(LogLevel.INFORMATION, "Downloading Replay file...", [||])
-            replayFilePath <- fetchReplayFile()
-            logMessage(LogLevel.INFORMATION, "Downloaded Replay file to: {0}", [|replayFilePath|])
-            let ticks : IEnumerable<Tick> =
+        let subProviders : SubProvider[] = mapProviderToSubProviders(config.Provider)
+        let replayFiles : string[] = Array.zeroCreate(subProviders.Length)
+        let allTicks : IEnumerable<Tick>[] = Array.zeroCreate(subProviders.Length)        
+        
+        try 
+            for i = 0 to subProviders.Length-1 do
+                logMessage(LogLevel.INFORMATION, "Downloading Replay file for {0} on {1}...", [|subProviders.[i].ToString(); date.ToString()|])
+                replayFiles.[i] <- fetchReplayFile(subProviders.[i])
+                logMessage(LogLevel.INFORMATION, "Downloaded Replay file to: {0}", [|replayFiles.[i]|])
+                allTicks.[i] <- replayTickFileWithoutDelay(replayFiles.[i], 100, ct)
+            
+            let aggregatedTicks : IEnumerable<Tick> =
                 if withDelay
-                then replayTickFileWithDelay(replayFilePath, 100, ct)
-                else replayTickFileWithoutDelay(replayFilePath, 100, ct)  
-            for tick : Tick in ticks do
+                then replayFileGroupWithDelay(allTicks, ct)
+                else replayFileGroupWithoutDelay(allTicks, ct)
+            
+            for tick : Tick in aggregatedTicks do
                 if not ct.IsCancellationRequested
                 then
                     data.Add(tick)
                     Interlocked.Increment(&dataMsgCount) |> ignore
+            
         with | :? Exception as e -> logMessage(LogLevel.ERROR, "Error while replaying file: {0}", [|e.Message|])
         
-        if deleteFileWhenDone && File.Exists replayFilePath
+        if deleteFileWhenDone
         then
-            logMessage(LogLevel.INFORMATION, "Deleting Replay file: {0}", [|replayFilePath|])
-            File.Delete(replayFilePath)
+            for deleteFilePath in replayFiles do
+                if File.Exists deleteFilePath
+                then
+                    logMessage(LogLevel.INFORMATION, "Deleting Replay file: {0}", [|deleteFilePath|])
+                    File.Delete(deleteFilePath)
 
     let threads : Thread[] = Array.init config.NumThreads (fun _ -> new Thread(new ThreadStart(threadFn)))
     
@@ -318,14 +355,14 @@ type ReplayClient(
             thread.Start()
         replayThread.Start()
 
-    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, date : DateTime, subProvider : SubProvider, withDelay : bool, deleteFileWhenDone : bool) =
-        ReplayClient(onTrade, null, LoadConfig(), date, subProvider, withDelay, deleteFileWhenDone)
+    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, date : DateTime, withDelay : bool, deleteFileWhenDone : bool) =
+        ReplayClient(onTrade, null, LoadConfig(), date, withDelay, deleteFileWhenDone)
         
-    new ([<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, subProvider : SubProvider, withDelay : bool, deleteFileWhenDone : bool) =
-        ReplayClient(null, onQuote, LoadConfig(), date, subProvider, withDelay, deleteFileWhenDone)
+    new ([<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withDelay : bool, deleteFileWhenDone : bool) =
+        ReplayClient(null, onQuote, LoadConfig(), date, withDelay, deleteFileWhenDone)
         
-    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, subProvider : SubProvider, withDelay : bool, deleteFileWhenDone : bool) =
-        ReplayClient(onTrade, onQuote, LoadConfig(), date, subProvider, withDelay, deleteFileWhenDone)
+    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withDelay : bool, deleteFileWhenDone : bool) =
+        ReplayClient(onTrade, onQuote, LoadConfig(), date, withDelay, deleteFileWhenDone)
 
     member _.Join() : unit =
         let symbolsToAdd : HashSet<(string*bool)> =
