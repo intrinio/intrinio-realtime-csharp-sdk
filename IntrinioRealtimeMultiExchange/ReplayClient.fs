@@ -269,7 +269,7 @@ type ReplayClient(
             (
                 httpClient.Timeout <- TimeSpan.FromHours(1)
                 httpClient.BaseAddress <- new Uri(decodedUrl)
-                use response : HttpResponseMessage = httpClient.GetAsync(decodedUrl).Result
+                use response : HttpResponseMessage = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result
                 (
                     use streamToReadFrom : Stream = response.Content.ReadAsStreamAsync().Result
                     (
@@ -315,11 +315,12 @@ type ReplayClient(
             for i = 0 to (tickGroup.Length-1) do
                 enumerators.[i] <- tickGroup.[i].GetEnumerator()
             
+            fillNextTicks(enumerators, nextTicks)
             while hasAnyValue(nextTicks) do
-                fillNextTicks(enumerators, nextTicks)
                 let nextTick : Option<Tick> = pullNextTick(nextTicks)
                 if nextTick.IsSome
                 then yield nextTick.Value
+                fillNextTicks(enumerators, nextTicks)
         }        
     
     let replayFileGroupWithDelay(tickGroup : IEnumerable<Tick>[], ct : CancellationToken) : IEnumerable<Tick> =
@@ -345,7 +346,7 @@ type ReplayClient(
         
         try 
             for i = 0 to subProviders.Length-1 do
-                logMessage(LogLevel.INFORMATION, "Downloading Replay file for {0} on {1}...", [|subProviders.[i].ToString(); date.ToString()|])
+                logMessage(LogLevel.INFORMATION, "Downloading Replay file for {0} on {1}...", [|subProviders.[i].ToString(); date.Date.ToString()|])
                 replayFiles.[i] <- fetchReplayFile(subProviders.[i])
                 logMessage(LogLevel.INFORMATION, "Downloaded Replay file to: {0}", [|replayFiles.[i]|])
                 allTicks.[i] <- replayTickFileWithoutDelay(replayFiles.[i], 100, ct)
