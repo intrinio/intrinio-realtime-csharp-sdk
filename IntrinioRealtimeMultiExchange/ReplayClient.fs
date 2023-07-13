@@ -280,14 +280,52 @@ type ReplayClient(
         )
         
         fileName
+        
+    let fillNextTicks(enumerators : IEnumerator<Tick>[], nextTicks : Option<Tick>[]) : unit =
+        for i = 0 to (nextTicks.Length-1) do
+            if nextTicks.[i].IsNone && enumerators.[i].MoveNext()
+            then
+                nextTicks.[i] <- Some(enumerators.[i].Current)
     
+    let pullNextTick(nextTicks : Option<Tick>[]) : Option<Tick> =
+        let mutable pullIndex : int = 0
+        let mutable t : DateTime = DateTime.MaxValue
+        for i = 0 to (nextTicks.Length-1) do
+            if nextTicks.[i].IsSome && nextTicks.[i].Value.TimeReceived() < t
+            then
+                pullIndex <- i
+                t <- nextTicks.[i].Value.TimeReceived()
+        
+        let pulledTick = nextTicks.[pullIndex] 
+        nextTicks.[pullIndex] <- Option<Tick>.None
+        pulledTick
+        
+    let hasAnyValue(nextTicks : Option<Tick>[]) : bool =
+        let mutable hasValue : bool = false
+        for i = 0 to (nextTicks.Length-1) do
+            if nextTicks.[i].IsSome
+            then
+                hasValue <- true
+        hasValue
+        
     let replayFileGroupWithoutDelay(tickGroup : IEnumerable<Tick>[], ct : CancellationToken) : IEnumerable<Tick> =
-        let nextTicks : Option<Tick>[] = Array.zeroCreate(tickGroup.Length)
+        seq{
+            let nextTicks : Option<Tick>[] = Array.zeroCreate(tickGroup.Length)
+            let enumerators : IEnumerator<Tick>[] = Array.zeroCreate(tickGroup.Length)
+            for i = 0 to (tickGroup.Length-1) do
+                enumerators.[i] <- tickGroup.[i].GetEnumerator()
+            
+            while hasAnyValue(nextTicks) do
+                fillNextTicks(enumerators, nextTicks)
+                let nextTick : Option<Tick> = pullNextTick(nextTicks)
+                if nextTick.IsSome
+                then yield nextTick.Value
+        }        
     
     let replayFileGroupWithDelay(tickGroup : IEnumerable<Tick>[], ct : CancellationToken) : IEnumerable<Tick> =
-        let start : int64 = DateTime.UtcNow.Ticks;
-        let mutable offset : int64 = 0L;
         seq {
+            let start : int64 = DateTime.UtcNow.Ticks;
+            let mutable offset : int64 = 0L;
             for tick : Tick in replayFileGroupWithoutDelay(tickGroup, ct) do
                 if (offset = 0L)
                 then
