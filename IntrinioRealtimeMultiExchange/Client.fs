@@ -58,7 +58,7 @@ type Client(
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
     let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
     let clientInfoHeaderKey : string = "Client-Information"
-    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv7.1"
+    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv8.0"
     let messageVersionHeaderKey : string = "UseNewEquitiesFormat"
     let messageVersionHeaderValue : string = "v2"
     
