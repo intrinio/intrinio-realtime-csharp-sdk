@@ -1,5 +1,5 @@
 # intrinio-realtime-dotnet-sdk
-SDK for working with Intrinio's realtime Multi-Exchange, delayed SIP, or NASDAQ Basic prices feeds.  Intrinio’s Multi-Exchange feed bridges the gap by merging real-time equity pricing from the IEX and MEMX exchanges. Get a comprehensive view with increased market volume and enjoy no exchange fees, no per-user requirements, no permissions or authorizations, and little to no paperwork.
+SDK for working with Intrinio's realtime Multi-Exchange, delayed SIP, or NASDAQ Basic prices feeds.  Get a comprehensive view with increased market volume and enjoy minimized exchange and per user fees.
 
 [Intrinio](https://intrinio.com/) provides real-time stock prices via a two-way WebSocket connection. To get started, [subscribe to a real-time data feed](https://intrinio.com/real-time-multi-exchange) and follow the instructions below.
 
@@ -23,7 +23,7 @@ Go to [Release](https://github.com/intrinio/intrinio-realtime-csharp-sdk/release
 
 ## Sample Project
 
-For a sample .NET project see: [intrinio-realtime-options-dotnet-sdk](https://github.com/intrinio/intrinio-realtime-csharp-sdk/blob/master/IntrinioRealTimeSDK/Program.cs)
+For a sample .NET project see: [intrinio-realtime-dotnet-sdk](https://github.com/intrinio/intrinio-realtime-csharp-sdk/blob/master/IntrinioRealTimeSDK/Program.cs)
 Be sure to update [config.json](https://github.com/intrinio/intrinio-realtime-csharp-sdk/blob/master/IntrinioRealtimeMultiExchange/config.json)
 
 ## Features
@@ -152,6 +152,7 @@ client.Leave()
 
 ### config.json
 [config.json](https://github.com/intrinio/intrinio-realtime-csharp-sdk/blob/master/IntrinioRealtimeMultiExchange/config.json)
+The application will look for the config file if you don't pass in a config object.
 ```json
 {
 	"Config": {
@@ -174,5 +175,55 @@ client.Leave()
 			{ "Name": "Console" }
 		]
 	}
+}
+```
+To create a config object to pass in instead of the file, do the following.  Don't forget to also set up sirilog configuration as well:
+```csharp
+Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
+Config.Config config = new Config.Config();
+config.Provider = Provider.REALTIME;
+config.ApiKey = "";
+config.Symbols = new[] { "AAPL", "MSFT" };
+config.NumThreads = 2;
+client = new Client(onTrade, onQuote, config);
+```
+
+## Example Replay Client Usage
+```csharp
+static void Main(string[] _)
+{
+	Client.Log("Starting sample app");
+	//You can also simulate a trading day by replaying a particular day's data. You can do this with the actual time between events, or without.
+	DateTime yesterday = DateTime.Today - TimeSpan.FromDays(1);
+	replayClient = new ReplayClient(onTrade, onQuote, yesterday, true, true); //A client to replay a previous day's data
+	timer = new Timer(ReplayTimerCallback, replayClient, 10000, 10000);
+	replayClient.Join(); //Load symbols from your config or config.json
+	//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+	Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
+}
+```
+
+## Example Candlestick Client Usage
+```csharp
+static void Main(string[] _)
+{
+	Client.Log("Starting sample app");
+	Action<Trade> onTrade = OnTrade;
+	Action<Quote> onQuote = OnQuote;
+	
+	//Subscribe the candlestick client to trade and/or quote events as well.  It's important any method subscribed this way handles exceptions so as to not cause issues for other subscribers!
+	_useTradeCandleSticks = true;
+	_useQuoteCandleSticks = true;
+	_candleStickClient = new CandleStickClient(OnTradeCandleStick, OnQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0);
+	onTrade += _candleStickClient.OnTrade;
+	onQuote += _candleStickClient.OnQuote;
+	_candleStickClient.Start();
+	
+	client = new Client(onTrade, onQuote);
+	timer = new Timer(TimerCallback, client, 10000, 10000);
+	client.Join(); //Load symbols from your config or config.json
+	//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+			
+	Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
 }
 ```
