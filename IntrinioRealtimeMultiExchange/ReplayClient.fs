@@ -256,7 +256,9 @@ type ReplayClient(
         
     let fetchReplayFile(subProvider : SubProvider) : string =
         let api : Intrinio.SDK.Api.SecurityApi = new Intrinio.SDK.Api.SecurityApi()
-        api.Configuration.ApiKey.Add("api_key", config.ApiKey)
+        if not (api.Configuration.ApiKey.ContainsKey("api_key"))
+        then
+            api.Configuration.ApiKey.Add("api_key", config.ApiKey)
         let result : SecurityReplayFileResult = api.GetSecurityReplayFile(mapSubProviderToApiValue(subProvider), date)
         let decodedUrl : string = result.Url.Replace(@"\u0026", "&")
         
