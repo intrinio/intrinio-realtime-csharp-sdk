@@ -20,7 +20,7 @@ type ReplayClient(
     [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>,
     config : Config,
     date : DateTime,
-    withDelay : bool,
+    withSimulatedDelay : bool,
     deleteFileWhenDone : bool) =
     let empty : byte[] = Array.empty<byte>
     let mutable dataMsgCount : int64 = 0L
@@ -269,7 +269,7 @@ type ReplayClient(
             (
                 httpClient.Timeout <- TimeSpan.FromHours(1)
                 httpClient.BaseAddress <- new Uri(decodedUrl)
-                use response : HttpResponseMessage = httpClient.GetAsync(decodedUrl).Result
+                use response : HttpResponseMessage = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result
                 (
                     use streamToReadFrom : Stream = response.Content.ReadAsStreamAsync().Result
                     (
@@ -315,11 +315,12 @@ type ReplayClient(
             for i = 0 to (tickGroup.Length-1) do
                 enumerators.[i] <- tickGroup.[i].GetEnumerator()
             
+            fillNextTicks(enumerators, nextTicks)
             while hasAnyValue(nextTicks) do
-                fillNextTicks(enumerators, nextTicks)
                 let nextTick : Option<Tick> = pullNextTick(nextTicks)
                 if nextTick.IsSome
                 then yield nextTick.Value
+                fillNextTicks(enumerators, nextTicks)
         }        
     
     let replayFileGroupWithDelay(tickGroup : IEnumerable<Tick>[], ct : CancellationToken) : IEnumerable<Tick> =
@@ -345,13 +346,13 @@ type ReplayClient(
         
         try 
             for i = 0 to subProviders.Length-1 do
-                logMessage(LogLevel.INFORMATION, "Downloading Replay file for {0} on {1}...", [|subProviders.[i].ToString(); date.ToString()|])
+                logMessage(LogLevel.INFORMATION, "Downloading Replay file for {0} on {1}...", [|subProviders.[i].ToString(); date.Date.ToString()|])
                 replayFiles.[i] <- fetchReplayFile(subProviders.[i])
                 logMessage(LogLevel.INFORMATION, "Downloaded Replay file to: {0}", [|replayFiles.[i]|])
                 allTicks.[i] <- replayTickFileWithoutDelay(replayFiles.[i], 100, ct)
             
             let aggregatedTicks : IEnumerable<Tick> =
-                if withDelay
+                if withSimulatedDelay
                 then replayFileGroupWithDelay(allTicks, ct)
                 else replayFileGroupWithoutDelay(allTicks, ct)
             
@@ -393,14 +394,14 @@ type ReplayClient(
             thread.Start()
         replayThread.Start()
 
-    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, date : DateTime, withDelay : bool, deleteFileWhenDone : bool) =
-        ReplayClient(onTrade, null, LoadConfig(), date, withDelay, deleteFileWhenDone)
+    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, date : DateTime, withSimulatedDelay : bool, deleteFileWhenDone : bool) =
+        ReplayClient(onTrade, null, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone)
         
-    new ([<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withDelay : bool, deleteFileWhenDone : bool) =
-        ReplayClient(null, onQuote, LoadConfig(), date, withDelay, deleteFileWhenDone)
+    new ([<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withSimulatedDelay : bool, deleteFileWhenDone : bool) =
+        ReplayClient(null, onQuote, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone)
         
-    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withDelay : bool, deleteFileWhenDone : bool) =
-        ReplayClient(onTrade, onQuote, LoadConfig(), date, withDelay, deleteFileWhenDone)
+    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withSimulatedDelay : bool, deleteFileWhenDone : bool) =
+        ReplayClient(onTrade, onQuote, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone)
 
     member _.Join() : unit =
         let symbolsToAdd : HashSet<(string*bool)> =
