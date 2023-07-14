@@ -162,7 +162,7 @@ namespace SampleApp
 			client.Join(); //Load symbols from your config or config.json
 			//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 			
-			// replayClient = new ReplayClient(onTrade, onQuote, DateTime.Today - TimeSpan.FromDays(1), SubProvider.NASDAQ_BASIC, true, true); //A client to replay previous day's data
+			// replayClient = new ReplayClient(onTrade, onQuote, DateTime.Today - TimeSpan.FromDays(1), true, true); //A client to replay previous day's data
 			// timer = new Timer(ReplayTimerCallback, replayClient, 10000, 10000);
 			// replayClient.Join(); //Load symbols from your config or config.json
 			// //client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
