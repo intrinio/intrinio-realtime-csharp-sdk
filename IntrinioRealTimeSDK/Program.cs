@@ -139,10 +139,10 @@ namespace SampleApp
 			Action<Trade> onTrade = OnTrade;
 			Action<Quote> onQuote = OnQuote;
 			
-			// Subscribe the candlestick client to trade and/or quote events as well.  It's important any method subscribed this way handles exceptions so as to not cause issues for other subscribers!
+			// //Subscribe the candlestick client to trade and/or quote events as well.  It's important any method subscribed this way handles exceptions so as to not cause issues for other subscribers!
 			// _useTradeCandleSticks = true;
 			// _useQuoteCandleSticks = true;
-			// _candleStickClient = new CandleStickClient(OnTradeCandleStick, OnQuoteCandleStick, IntervalType.OneMinute, true);
+			// _candleStickClient = new CandleStickClient(OnTradeCandleStick, OnQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0);
 			// onTrade += _candleStickClient.OnTrade;
 			// onQuote += _candleStickClient.OnQuote;
 			// _candleStickClient.Start();
