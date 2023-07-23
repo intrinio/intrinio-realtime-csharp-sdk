@@ -173,46 +173,50 @@ type ReplayClient(
     /// <param name="fullFilePath"></param>
     /// <param name="byteBufferSize"></param>
     /// <returns></returns>
-    let replayTickFileWithoutDelay(fullFilePath : string, byteBufferSize : int, ct : CancellationToken) : IEnumerable<Tick> =        
-        seq {
-            use fRead : FileStream = new FileStream(fullFilePath, FileMode.Open, FileAccess.Read, FileShare.None)
-               
-            if (fRead.CanRead)
-            then
-                let mutable readResult : int = fRead.ReadByte() //This is message type
-                while (readResult <> -1) do
-                    if not ct.IsCancellationRequested
-                    then
-                        let eventBuffer : byte[] = Array.zeroCreate byteBufferSize
-                        let timeReceivedBuffer: byte[] = Array.zeroCreate 8
-                        let eventSpanBuffer : ReadOnlySpan<byte> = new ReadOnlySpan<byte>(eventBuffer)
-                        let timeReceivedSpanBuffer : ReadOnlySpan<byte> = new ReadOnlySpan<byte>(timeReceivedBuffer)
-                        eventBuffer[0] <- (byte) readResult //This is message type
-                        eventBuffer[1] <- (byte) (fRead.ReadByte()) //This is message length, including this and the previous byte.
-                        let bytesRead : int = fRead.Read(eventBuffer, 2, (System.Convert.ToInt32(eventBuffer[1])-2)) //read the rest of the message
-                        let timeBytesRead : int = fRead.Read(timeReceivedBuffer, 0, 8) //get the time received
-                        let timeReceived : DateTime = parseTimeReceived(timeReceivedSpanBuffer)
-                        
-                        match (enum<MessageType> (System.Convert.ToInt32(eventBuffer[0]))) with
-                        | MessageType.Trade ->
-                            let trade : Trade = parseTrade(eventSpanBuffer)
-                            if (channels.Contains ("lobby", true) || channels.Contains ("lobby", false) || channels.Contains (trade.Symbol, true) || channels.Contains (trade.Symbol, false))
-                            then
-                                yield new Tick(timeReceived, Some(trade), Option<Quote>.None)
-                        | MessageType.Ask 
-                        | MessageType.Bid ->
-                             let quote : Quote = parseQuote(eventSpanBuffer)
-                             if (channels.Contains ("lobby", false) || channels.Contains (quote.Symbol, false))
-                             then
-                                yield new Tick(timeReceived, Option<Trade>.None, Some(quote))
-                        | _ -> logMessage(LogLevel.ERROR, "Invalid MessageType: {0}", [|eventBuffer[0]|])
+    let replayTickFileWithoutDelay(fullFilePath : string, byteBufferSize : int, ct : CancellationToken) : IEnumerable<Tick> =
+        if File.Exists(fullFilePath)
+        then            
+            seq {
+                use fRead : FileStream = new FileStream(fullFilePath, FileMode.Open, FileAccess.Read, FileShare.None)
+                   
+                if (fRead.CanRead)
+                then
+                    let mutable readResult : int = fRead.ReadByte() //This is message type
+                    while (readResult <> -1) do
+                        if not ct.IsCancellationRequested
+                        then
+                            let eventBuffer : byte[] = Array.zeroCreate byteBufferSize
+                            let timeReceivedBuffer: byte[] = Array.zeroCreate 8
+                            let eventSpanBuffer : ReadOnlySpan<byte> = new ReadOnlySpan<byte>(eventBuffer)
+                            let timeReceivedSpanBuffer : ReadOnlySpan<byte> = new ReadOnlySpan<byte>(timeReceivedBuffer)
+                            eventBuffer[0] <- (byte) readResult //This is message type
+                            eventBuffer[1] <- (byte) (fRead.ReadByte()) //This is message length, including this and the previous byte.
+                            let bytesRead : int = fRead.Read(eventBuffer, 2, (System.Convert.ToInt32(eventBuffer[1])-2)) //read the rest of the message
+                            let timeBytesRead : int = fRead.Read(timeReceivedBuffer, 0, 8) //get the time received
+                            let timeReceived : DateTime = parseTimeReceived(timeReceivedSpanBuffer)
+                            
+                            match (enum<MessageType> (System.Convert.ToInt32(eventBuffer[0]))) with
+                            | MessageType.Trade ->
+                                let trade : Trade = parseTrade(eventSpanBuffer)
+                                if (channels.Contains ("lobby", true) || channels.Contains ("lobby", false) || channels.Contains (trade.Symbol, true) || channels.Contains (trade.Symbol, false))
+                                then
+                                    yield new Tick(timeReceived, Some(trade), Option<Quote>.None)
+                            | MessageType.Ask 
+                            | MessageType.Bid ->
+                                 let quote : Quote = parseQuote(eventSpanBuffer)
+                                 if (channels.Contains ("lobby", false) || channels.Contains (quote.Symbol, false))
+                                 then
+                                    yield new Tick(timeReceived, Option<Trade>.None, Some(quote))
+                            | _ -> logMessage(LogLevel.ERROR, "Invalid MessageType: {0}", [|eventBuffer[0]|])
 
-                        //Set up the next iteration
-                        readResult <- fRead.ReadByte()
-                    else readResult <- -1
-            else
-                raise (FileLoadException("Unable to read replay file."))
-        }
+                            //Set up the next iteration
+                            readResult <- fRead.ReadByte()
+                        else readResult <- -1
+                else
+                    raise (FileLoadException("Unable to read replay file."))
+            }
+        else
+            Array.Empty<Tick>()
                 
     /// <summary>
     /// The results of this should be streamed and not ToList-ed.
@@ -259,30 +263,34 @@ type ReplayClient(
         if not (api.Configuration.ApiKey.ContainsKey("api_key"))
         then
             api.Configuration.ApiKey.Add("api_key", config.ApiKey)
-        let result : SecurityReplayFileResult = api.GetSecurityReplayFile(mapSubProviderToApiValue(subProvider), date)
-        let decodedUrl : string = result.Url.Replace(@"\u0026", "&")
-        
-        let tempDir : string = System.IO.Path.GetTempPath()
-        let fileName : string = Path.Combine(tempDir, result.Name)
-        
-        use outputFile = new System.IO.FileStream(fileName,System.IO.FileMode.Create)
-        (
-            use httpClient = new HttpClient()
+            
+        try
+            let result : SecurityReplayFileResult = api.GetSecurityReplayFile(mapSubProviderToApiValue(subProvider), date)
+            let decodedUrl : string = result.Url.Replace(@"\u0026", "&")
+            let tempDir : string = System.IO.Path.GetTempPath()
+            let fileName : string = Path.Combine(tempDir, result.Name)
+            
+            use outputFile = new System.IO.FileStream(fileName,System.IO.FileMode.Create)
             (
-                httpClient.Timeout <- TimeSpan.FromHours(1)
-                httpClient.BaseAddress <- new Uri(decodedUrl)
-                use response : HttpResponseMessage = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result
+                use httpClient = new HttpClient()
                 (
-                    use streamToReadFrom : Stream = response.Content.ReadAsStreamAsync().Result
+                    httpClient.Timeout <- TimeSpan.FromHours(1)
+                    httpClient.BaseAddress <- new Uri(decodedUrl)
+                    use response : HttpResponseMessage = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result
                     (
-                        streamToReadFrom.CopyTo outputFile
+                        use streamToReadFrom : Stream = response.Content.ReadAsStreamAsync().Result
+                        (
+                            streamToReadFrom.CopyTo outputFile
+                        )
                     )
                 )
             )
-        )
-        
-        fileName
-        
+            
+            fileName
+        with | :? Exception as e ->
+                 logMessage(LogLevel.ERROR, "Error while fetching {0} file: {1}", [|subProvider.ToString(), e.Message|])
+                 null
+                
     let fillNextTicks(enumerators : IEnumerator<Tick>[], nextTicks : Option<Tick>[]) : unit =
         for i = 0 to (nextTicks.Length-1) do
             if nextTicks.[i].IsNone && enumerators.[i].MoveNext()
