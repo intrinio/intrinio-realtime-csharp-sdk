@@ -537,3 +537,14 @@ type internal Tick(
                 match quote with
                     | Some q -> getQuoteBytes q
                     | None -> Array.Empty<byte>()
+                    
+type public IEquitiesWebSocketClient =
+    abstract member Join : unit -> unit
+    abstract member Join : string * bool option -> unit
+    abstract member Join : string[] * bool option -> unit
+    abstract member Leave : unit -> unit
+    abstract member Leave : string -> unit
+    abstract member Leave : string[] -> unit
+    abstract member Stop : unit -> unit
+    abstract member GetStats : unit -> (int64 * int64 * int)
+    abstract member Log : string * [<ParamArray>] propertyValues:obj[] -> unit

@@ -21,7 +21,7 @@ module private CandleStickClientInline =
         let p = NativePtr.stackalloc<'a> length |> NativePtr.toVoidPtr
         Span<'a>(p, length)
         
-    let inline internal getCurrentTimestamp(delay) : float =
+    let inline internal getCurrentTimestamp(delay : float) : float =
         (DateTime.UtcNow - DateTime.UnixEpoch.ToUniversalTime()).TotalSeconds - delay
         
     let inline internal getNearestModInterval(timestamp : float, interval: IntervalType) : float =
@@ -71,6 +71,7 @@ type CandleStickClient(
     let lostAndFoundLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
     let contracts : Dictionary<string, SymbolBucket> = new Dictionary<string, SymbolBucket>(initialDictionarySize)
     let lostAndFound : Dictionary<string, SymbolBucket> = new Dictionary<string, SymbolBucket>(initialDictionarySize)
+    let flushBufferSeconds : float = 15.0 
     
     static let getSlot(key : string, dict : Dictionary<string, SymbolBucket>, locker : ReaderWriterLockSlim) : SymbolBucket =
         match dict.TryGetValue(key) with
@@ -214,20 +215,20 @@ type CandleStickClient(
                 contractsLock.ExitReadLock()
                 for key in keys do
                     let bucket : SymbolBucket = getSlot(key, contracts, contractsLock)
-                    let currentTime : float = CandleStickClientInline.getCurrentTimestamp(sourceDelaySeconds)
+                    let flushThresholdTime : float = CandleStickClientInline.getCurrentTimestamp(sourceDelaySeconds) - flushBufferSeconds
                     bucket.Locker.EnterWriteLock()
                     try
-                        if (useOnTradeCandleStick && bucket.TradeCandleStick.IsSome && (bucket.TradeCandleStick.Value.CloseTimestamp < currentTime))
+                        if (useOnTradeCandleStick && bucket.TradeCandleStick.IsSome && (bucket.TradeCandleStick.Value.CloseTimestamp < flushThresholdTime))
                         then
                             bucket.TradeCandleStick.Value.MarkComplete()
                             onTradeCandleStick.Invoke(bucket.TradeCandleStick.Value)
                             bucket.TradeCandleStick <- Option.None
-                        if (useOnQuoteCandleStick && bucket.AskCandleStick.IsSome && (bucket.AskCandleStick.Value.CloseTimestamp < currentTime))
+                        if (useOnQuoteCandleStick && bucket.AskCandleStick.IsSome && (bucket.AskCandleStick.Value.CloseTimestamp < flushThresholdTime))
                         then
                             bucket.AskCandleStick.Value.MarkComplete()
                             onQuoteCandleStick.Invoke(bucket.AskCandleStick.Value)
                             bucket.AskCandleStick <- Option.None
-                        if (useOnQuoteCandleStick && bucket.BidCandleStick.IsSome && (bucket.BidCandleStick.Value.CloseTimestamp < currentTime))
+                        if (useOnQuoteCandleStick && bucket.BidCandleStick.IsSome && (bucket.BidCandleStick.Value.CloseTimestamp < flushThresholdTime))
                         then
                             bucket.BidCandleStick.Value.MarkComplete()
                             onQuoteCandleStick.Invoke(bucket.BidCandleStick.Value)
