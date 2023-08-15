@@ -71,7 +71,7 @@ type CandleStickClient(
     let lostAndFoundLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
     let contracts : Dictionary<string, SymbolBucket> = new Dictionary<string, SymbolBucket>(initialDictionarySize)
     let lostAndFound : Dictionary<string, SymbolBucket> = new Dictionary<string, SymbolBucket>(initialDictionarySize)
-    let flushBufferSeconds : float = 15.0 
+    let flushBufferSeconds : float = 30.0 
     
     static let getSlot(key : string, dict : Dictionary<string, SymbolBucket>, locker : ReaderWriterLockSlim) : SymbolBucket =
         match dict.TryGetValue(key) with
@@ -98,6 +98,46 @@ type CandleStickClient(
                 | (true, _) ->
                     dict.Remove(key) |> ignore
             finally locker.ExitWriteLock()
+            
+    let createNewTradeCandle(trade : Trade, timestamp : float) : TradeCandleStick option =
+        let start : float = CandleStickClientInline.getNearestModInterval(timestamp, interval)
+        let freshCandle : TradeCandleStick option = Some(new TradeCandleStick(trade.Symbol, trade.Size, trade.Price, start, (start + System.Convert.ToDouble(int interval)), interval, timestamp))
+        
+        if (useGetHistoricalTradeCandleStick && useOnTradeCandleStick)
+        then
+            try
+                let historical = getHistoricalTradeCandleStick.Invoke(freshCandle.Value.Symbol, freshCandle.Value.OpenTimestamp, freshCandle.Value.CloseTimestamp, freshCandle.Value.Interval)
+                match not (obj.ReferenceEquals(historical,null)) with
+                | false ->
+                    freshCandle
+                | true ->
+                    historical.MarkIncomplete()
+                    CandleStickClientInline.mergeTradeCandles(historical, freshCandle.Value)
+            with :? Exception as e ->
+                Log.Error("Error retrieving historical TradeCandleStick: {0}; trade: {1}", e.Message, trade)
+                freshCandle
+        else
+            freshCandle
+            
+    let createNewQuoteCandle(quote : Quote, timestamp : float) : QuoteCandleStick option =
+        let start : float = CandleStickClientInline.getNearestModInterval(timestamp, interval)
+        let freshCandle : QuoteCandleStick option = Some(new QuoteCandleStick(quote.Symbol, quote.Price, quote.Type, start, (start + System.Convert.ToDouble(int interval)), interval, timestamp))
+        
+        if (useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick)
+        then
+            try
+                let historical = getHistoricalQuoteCandleStick.Invoke(freshCandle.Value.Symbol, freshCandle.Value.OpenTimestamp, freshCandle.Value.CloseTimestamp, freshCandle.Value.QuoteType, freshCandle.Value.Interval)
+                match not (obj.ReferenceEquals(historical,null)) with
+                | false ->
+                    freshCandle
+                | true ->
+                    historical.MarkIncomplete()
+                    CandleStickClientInline.mergeQuoteCandles(historical, freshCandle.Value)
+            with :? Exception as e ->
+                Log.Error("Error retrieving historical QuoteCandleStick: {0}; quote: {1}", e.Message, quote)
+                freshCandle
+        else
+            freshCandle
             
     let addAskToLostAndFound(ask: Quote) : unit =
         let ts : float = CandleStickClientInline.convertToTimestamp(ask.Timestamp)
@@ -167,8 +207,7 @@ type CandleStickClient(
             then
                 bucket.AskCandleStick.Value.MarkComplete()
                 onQuoteCandleStick.Invoke(bucket.AskCandleStick.Value)
-                let start = CandleStickClientInline.getNearestModInterval(ts, interval)
-                bucket.AskCandleStick <- Some(new QuoteCandleStick(quote.Symbol, quote.Price, QuoteType.Ask, start, (start + System.Convert.ToDouble(int interval)), interval, ts))
+                bucket.AskCandleStick <- createNewQuoteCandle(quote, ts)
             elif (bucket.AskCandleStick.Value.OpenTimestamp <= ts)
             then
                 bucket.AskCandleStick.Value.Update(quote.Price, ts)
@@ -177,8 +216,7 @@ type CandleStickClient(
                 addAskToLostAndFound(quote)
         elif (bucket.AskCandleStick.IsNone && not (Double.IsNaN(quote.Price)))
         then
-            let start = CandleStickClientInline.getNearestModInterval(ts, interval)
-            bucket.AskCandleStick <- Some(new QuoteCandleStick(quote.Symbol, quote.Price, QuoteType.Ask, start, (start + System.Convert.ToDouble(int interval)), interval, ts))
+            bucket.AskCandleStick <- createNewQuoteCandle(quote, ts)
             if broadcastPartialCandles then onQuoteCandleStick.Invoke(bucket.AskCandleStick.Value)
     
     let onBid(quote: Quote, bucket : SymbolBucket) : unit =
@@ -189,8 +227,7 @@ type CandleStickClient(
             then
                 bucket.BidCandleStick.Value.MarkComplete()
                 onQuoteCandleStick.Invoke(bucket.BidCandleStick.Value)
-                let start = CandleStickClientInline.getNearestModInterval(ts, interval)
-                bucket.BidCandleStick <- Some(new QuoteCandleStick(quote.Symbol, quote.Price, QuoteType.Bid, start, (start + System.Convert.ToDouble(int interval)), interval, ts))
+                bucket.BidCandleStick <- createNewQuoteCandle(quote, ts)
             elif (bucket.BidCandleStick.Value.OpenTimestamp <= ts)
             then
                 bucket.BidCandleStick.Value.Update(quote.Price, ts)
@@ -199,8 +236,7 @@ type CandleStickClient(
                 addBidToLostAndFound(quote)
         elif (bucket.BidCandleStick.IsNone && not (Double.IsNaN(quote.Price)))
         then
-            let start = CandleStickClientInline.getNearestModInterval(ts, interval)
-            bucket.BidCandleStick <- Some(new QuoteCandleStick(quote.Symbol, quote.Price, QuoteType.Bid, start, (start + System.Convert.ToDouble(int interval)), interval, ts))
+            bucket.BidCandleStick <- createNewQuoteCandle(quote, ts)
             if broadcastPartialCandles then onQuoteCandleStick.Invoke(bucket.BidCandleStick.Value)
             
     let flushFn () : unit =
@@ -332,7 +368,7 @@ type CandleStickClient(
         Log.Information("Stopping candlestick late event watcher...")
 
     let lostAndFoundThread : Thread = new Thread(new ThreadStart(lostAndFoundFn))
-    
+        
     member _.OnTrade(trade: Trade) : unit =
         try
             if useOnTradeCandleStick
@@ -347,8 +383,7 @@ type CandleStickClient(
                         then
                             bucket.TradeCandleStick.Value.MarkComplete()
                             onTradeCandleStick.Invoke(bucket.TradeCandleStick.Value)
-                            let start = CandleStickClientInline.getNearestModInterval(ts, interval)
-                            bucket.TradeCandleStick <- Some(new TradeCandleStick(trade.Symbol, trade.Size, trade.Price, start, (start + System.Convert.ToDouble(int interval)), interval, ts))
+                            bucket.TradeCandleStick <- createNewTradeCandle(trade, ts)
                         elif (bucket.TradeCandleStick.Value.OpenTimestamp <= ts)
                         then
                             bucket.TradeCandleStick.Value.Update(trade.Size, trade.Price, ts)
@@ -356,8 +391,7 @@ type CandleStickClient(
                         else //This is a late trade.  We already shipped the candle, so add to lost and found
                             addTradeToLostAndFound(trade)
                     else
-                        let start = CandleStickClientInline.getNearestModInterval(ts, interval)
-                        bucket.TradeCandleStick <- Some(new TradeCandleStick(trade.Symbol, trade.Size, trade.Price, start, (start + System.Convert.ToDouble(int interval)), interval, ts))
+                        bucket.TradeCandleStick <- createNewTradeCandle(trade, ts)
                         if broadcastPartialCandles then onTradeCandleStick.Invoke(bucket.TradeCandleStick.Value)
                 finally bucket.Locker.ExitWriteLock()
         with ex ->
