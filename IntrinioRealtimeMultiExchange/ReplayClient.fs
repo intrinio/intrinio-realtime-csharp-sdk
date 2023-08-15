@@ -14,6 +14,7 @@ open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 open Intrinio.Realtime.Equities.Config
+open Serilog.Core
 
 type ReplayClient(
     [<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>,
@@ -413,54 +414,58 @@ type ReplayClient(
     new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withSimulatedDelay : bool, deleteFileWhenDone : bool) =
         ReplayClient(onTrade, onQuote, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone)
 
-    member _.Join() : unit =
-        let symbolsToAdd : HashSet<(string*bool)> =
-            config.Symbols
-            |> Seq.map(fun (symbol:string) -> (symbol, config.TradesOnly))
-            |> fun (symbols:seq<(string*bool)>) -> new HashSet<(string*bool)>(symbols)
-        symbolsToAdd.ExceptWith(channels)
-        for symbol in symbolsToAdd do join(symbol)
+    interface IEquitiesWebSocketClient with
+        member this.Join() : unit =
+            let symbolsToAdd : HashSet<(string*bool)> =
+                config.Symbols
+                |> Seq.map(fun (symbol:string) -> (symbol, config.TradesOnly))
+                |> fun (symbols:seq<(string*bool)>) -> new HashSet<(string*bool)>(symbols)
+            symbolsToAdd.ExceptWith(channels)
+            for symbol in symbolsToAdd do join(symbol)
+            
+        member this.Join(symbol: string, ?tradesOnly: bool) : unit =
+            let t: bool =
+                match tradesOnly with
+                | Some(v:bool) -> v || config.TradesOnly
+                | None -> false || config.TradesOnly
+            if not (channels.Contains((symbol, t)))
+            then join(symbol, t)
+            
+        member this.Join(symbols: string[], ?tradesOnly: bool) : unit =
+            let t: bool =
+                match tradesOnly with
+                | Some(v:bool) -> v || config.TradesOnly
+                | None -> false || config.TradesOnly
+            let symbolsToAdd : HashSet<(string*bool)> =
+                symbols
+                |> Seq.map(fun (symbol:string) -> (symbol,t))
+                |> fun (_symbols:seq<(string*bool)>) -> new HashSet<(string*bool)>(_symbols)
+            symbolsToAdd.ExceptWith(channels)
+            for symbol in symbolsToAdd do join(symbol)
+            
+        member this.Leave() : unit =
+            for channel in channels do leave(channel)
+            
+        member this.Leave(symbol: string) : unit =
+            let matchingChannels : seq<(string*bool)> = channels |> Seq.where (fun (_symbol:string, _:bool) -> _symbol = symbol)
+            for channel in matchingChannels do leave(channel)
+            
+        member this.Leave(symbols: string[]) : unit =
+            let _symbols : HashSet<string> = new HashSet<string>(symbols)
+            let matchingChannels : seq<(string*bool)> = channels |> Seq.where(fun (symbol:string, _:bool) -> _symbols.Contains(symbol))
+            for channel in matchingChannels do leave(channel)
+            
+        member this.Stop() : unit =
+            for channel in channels do leave(channel)
+            ctSource.Cancel ()
+            logMessage(LogLevel.INFORMATION, "Websocket - Closing...", [||])
+            for thread in threads do thread.Join()
+            replayThread.Join()
+            logMessage(LogLevel.INFORMATION, "Stopped", [||])
+            
+        member this.GetStats() : (int64 * int64 * int) =
+            (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count)
 
-    member _.Join(symbol: string, ?tradesOnly: bool) : unit =
-        let t: bool =
-            match tradesOnly with
-            | Some(v:bool) -> v || config.TradesOnly
-            | None -> false || config.TradesOnly
-        if not (channels.Contains((symbol, t)))
-        then join(symbol, t)
-
-    member _.Join(symbols: string[], ?tradesOnly: bool) : unit =
-        let t: bool =
-            match tradesOnly with
-            | Some(v:bool) -> v || config.TradesOnly
-            | None -> false || config.TradesOnly
-        let symbolsToAdd : HashSet<(string*bool)> =
-            symbols
-            |> Seq.map(fun (symbol:string) -> (symbol,t))
-            |> fun (_symbols:seq<(string*bool)>) -> new HashSet<(string*bool)>(_symbols)
-        symbolsToAdd.ExceptWith(channels)
-        for symbol in symbolsToAdd do join(symbol)
-
-    member _.Leave() : unit =
-        for channel in channels do leave(channel)
-
-    member _.Leave(symbol: string) : unit =
-        let matchingChannels : seq<(string*bool)> = channels |> Seq.where (fun (_symbol:string, _:bool) -> _symbol = symbol)
-        for channel in matchingChannels do leave(channel)
-
-    member _.Leave(symbols: string[]) : unit =
-        let _symbols : HashSet<string> = new HashSet<string>(symbols)
-        let matchingChannels : seq<(string*bool)> = channels |> Seq.where(fun (symbol:string, _:bool) -> _symbols.Contains(symbol))
-        for channel in matchingChannels do leave(channel)
-
-    member _.Stop() : unit =
-        for channel in channels do leave(channel)
-        ctSource.Cancel ()
-        logMessage(LogLevel.INFORMATION, "Websocket - Closing...", [||])
-        for thread in threads do thread.Join()
-        replayThread.Join()
-        logMessage(LogLevel.INFORMATION, "Stopped", [||])
-
-    member _.GetStats() : (int64 * int64 * int) = (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count)
-
-    static member Log(messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit = Log.Information(messageTemplate, propertyValues)
+        [<MessageTemplateFormatMethod("messageTemplate")>]
+        member this.Log(messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =
+            Log.Information(messageTemplate, propertyValues)

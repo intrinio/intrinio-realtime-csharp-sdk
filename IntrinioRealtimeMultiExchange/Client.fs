@@ -14,6 +14,7 @@ open System.Threading.Tasks
 open System.Net.Sockets
 open WebSocket4Net
 open Intrinio.Realtime.Equities.Config
+open Serilog.Core
 
 type internal WebSocketState(ws: WebSocket) =
     let mutable webSocket : WebSocket = ws
@@ -58,7 +59,7 @@ type Client(
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
     let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
     let clientInfoHeaderKey : string = "Client-Information"
-    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv8.0"
+    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv8.1"
     let messageVersionHeaderKey : string = "UseNewEquitiesFormat"
     let messageVersionHeaderValue : string = "v2"
     
@@ -389,62 +390,66 @@ type Client(
         
     new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>) =
         Client(onTrade, onQuote, LoadConfig())
-
-    member _.Join() : unit =
-        while not(isReady()) do Thread.Sleep(1000)
-        let symbolsToAdd : HashSet<(string*bool)> =
-            config.Symbols
-            |> Seq.map(fun (symbol:string) -> (symbol, config.TradesOnly))
-            |> fun (symbols:seq<(string*bool)>) -> new HashSet<(string*bool)>(symbols)
-        symbolsToAdd.ExceptWith(channels)
-        for symbol in symbolsToAdd do join(symbol)
-
-    member _.Join(symbol: string, ?tradesOnly: bool) : unit =
-        let t: bool =
-            match tradesOnly with
-            | Some(v:bool) -> v || config.TradesOnly
-            | None -> false || config.TradesOnly
-        while not(isReady()) do Thread.Sleep(1000)
-        if not (channels.Contains((symbol, t)))
-        then join(symbol, t)
-
-    member _.Join(symbols: string[], ?tradesOnly: bool) : unit =
-        let t: bool =
-            match tradesOnly with
-            | Some(v:bool) -> v || config.TradesOnly
-            | None -> false || config.TradesOnly
-        while not(isReady()) do Thread.Sleep(1000)
-        let symbolsToAdd : HashSet<(string*bool)> =
-            symbols
-            |> Seq.map(fun (symbol:string) -> (symbol,t))
-            |> fun (_symbols:seq<(string*bool)>) -> new HashSet<(string*bool)>(_symbols)
-        symbolsToAdd.ExceptWith(channels)
-        for symbol in symbolsToAdd do join(symbol)
-
-    member _.Leave() : unit =
-        for channel in channels do leave(channel)
-
-    member _.Leave(symbol: string) : unit =
-        let matchingChannels : seq<(string*bool)> = channels |> Seq.where (fun (_symbol:string, _:bool) -> _symbol = symbol)
-        for channel in matchingChannels do leave(channel)
-
-    member _.Leave(symbols: string[]) : unit =
-        let _symbols : HashSet<string> = new HashSet<string>(symbols)
-        let matchingChannels : seq<(string*bool)> = channels |> Seq.where(fun (symbol:string, _:bool) -> _symbols.Contains(symbol))
-        for channel in matchingChannels do leave(channel)
-
-    member _.Stop() : unit =
-        for channel in channels do leave(channel)
-        Thread.Sleep(1000)
-        wsLock.EnterWriteLock()
-        try wsState.IsReady <- false
-        finally wsLock.ExitWriteLock()
-        ctSource.Cancel ()
-        logMessage(LogLevel.INFORMATION, "Websocket - Closing...", [||])
-        wsState.WebSocket.Close()
-        for thread in threads do thread.Join()
-        logMessage(LogLevel.INFORMATION, "Stopped", [||])
-
-    member _.GetStats() : (int64 * int64 * int) = (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count)
-
-    static member Log(messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit = Log.Information(messageTemplate, propertyValues)
+        
+    interface IEquitiesWebSocketClient with
+        member this.Join() : unit =
+            while not(isReady()) do Thread.Sleep(1000)
+            let symbolsToAdd : HashSet<(string*bool)> =
+                config.Symbols
+                |> Seq.map(fun (symbol:string) -> (symbol, config.TradesOnly))
+                |> fun (symbols:seq<(string*bool)>) -> new HashSet<(string*bool)>(symbols)
+            symbolsToAdd.ExceptWith(channels)
+            for symbol in symbolsToAdd do join(symbol)
+            
+        member this.Join(symbol: string, ?tradesOnly: bool) : unit =
+            let t: bool =
+                match tradesOnly with
+                | Some(v:bool) -> v || config.TradesOnly
+                | None -> false || config.TradesOnly
+            while not(isReady()) do Thread.Sleep(1000)
+            if not (channels.Contains((symbol, t)))
+            then join(symbol, t)
+            
+        member this.Join(symbols: string[], ?tradesOnly: bool) : unit =
+            let t: bool =
+                match tradesOnly with
+                | Some(v:bool) -> v || config.TradesOnly
+                | None -> false || config.TradesOnly
+            while not(isReady()) do Thread.Sleep(1000)
+            let symbolsToAdd : HashSet<(string*bool)> =
+                symbols
+                |> Seq.map(fun (symbol:string) -> (symbol,t))
+                |> fun (_symbols:seq<(string*bool)>) -> new HashSet<(string*bool)>(_symbols)
+            symbolsToAdd.ExceptWith(channels)
+            for symbol in symbolsToAdd do join(symbol)
+            
+        member this.Leave() : unit =
+            for channel in channels do leave(channel)
+               
+        member this.Leave(symbol: string) : unit =
+            let matchingChannels : seq<(string*bool)> = channels |> Seq.where (fun (_symbol:string, _:bool) -> _symbol = symbol)
+            for channel in matchingChannels do leave(channel)
+             
+        member this.Leave(symbols: string[]) : unit =
+            let _symbols : HashSet<string> = new HashSet<string>(symbols)
+            let matchingChannels : seq<(string*bool)> = channels |> Seq.where(fun (symbol:string, _:bool) -> _symbols.Contains(symbol))
+            for channel in matchingChannels do leave(channel)
+                        
+        member this.Stop() : unit =
+            for channel in channels do leave(channel)
+            Thread.Sleep(1000)
+            wsLock.EnterWriteLock()
+            try wsState.IsReady <- false
+            finally wsLock.ExitWriteLock()
+            ctSource.Cancel ()
+            logMessage(LogLevel.INFORMATION, "Websocket - Closing...", [||])
+            wsState.WebSocket.Close()
+            for thread in threads do thread.Join()
+            logMessage(LogLevel.INFORMATION, "Stopped", [||])
+                        
+        member this.GetStats() : (int64 * int64 * int) =
+            (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count)
+                   
+        [<MessageTemplateFormatMethod("messageTemplate")>]     
+        member this.Log(messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =
+            Log.Information(messageTemplate, propertyValues)

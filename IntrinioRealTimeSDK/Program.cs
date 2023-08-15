@@ -3,13 +3,14 @@ using System.Threading;
 using System.Collections.Concurrent;
 using Intrinio.Realtime.Equities;
 using Serilog;
+using Serilog.Core;
 
 namespace SampleApp
 {
 	class Program
 	{
-		private static Client client = null;
-		private static ReplayClient replayClient = null;
+		private static IEquitiesWebSocketClient client = null;
+		private static IEquitiesWebSocketClient replayClient = null;
 		private static CandleStickClient _candleStickClient = null;
 		private static Timer timer = null;
 		private static readonly ConcurrentDictionary<string, int> trades = new(5, 15_000);
@@ -85,45 +86,26 @@ namespace SampleApp
 
 		static void TimerCallback(object obj)
 		{
-			Client client = (Client) obj;
+			IEquitiesWebSocketClient client = (IEquitiesWebSocketClient) obj;
 			Tuple<Int64, Int64, int> stats = client.GetStats();
-			Client.Log("Data Messages = {0}, Text Messages = {1}, Queue Depth = {2}", stats.Item1, stats.Item2, stats.Item3);
+			Log("Data Messages = {0}, Text Messages = {1}, Queue Depth = {2}", stats.Item1, stats.Item2, stats.Item3);
 			if (maxTradeCount > 0)
 			{
-				Client.Log("Most active trade: {0} ({1} updates)", maxCountTrade, maxTradeCount);
+				Log("Most active trade: {0} ({1} updates)", maxCountTrade, maxTradeCount);
 			}
 			if (maxQuoteCount > 0)
 			{
-				Client.Log("Most active quote: {0} ({1} updates)", maxCountQuote, maxQuoteCount);
+				Log("Most active quote: {0} ({1} updates)", maxCountQuote, maxQuoteCount);
 			}
 			if (_useTradeCandleSticks)
-				Client.Log("TRADE CANDLESTICK STATS - TradeCandleSticks = {0}, TradeCandleSticksIncomplete = {1}", _tradeCandleStickCount, _tradeCandleStickCountIncomplete);
+				Log("TRADE CANDLESTICK STATS - TradeCandleSticks = {0}, TradeCandleSticksIncomplete = {1}", _tradeCandleStickCount, _tradeCandleStickCountIncomplete);
 			if (_useQuoteCandleSticks)
-				Client.Log("QUOTE CANDLESTICK STATS - Asks = {0}, Bids = {1}, AsksIncomplete = {2}, BidsIncomplete = {3}", _AskCandleStickCount, _BidCandleStickCount, _AskCandleStickCountIncomplete, _BidCandleStickCountIncomplete);
-		}
-		
-		static void ReplayTimerCallback(object obj)
-		{
-			ReplayClient client = (ReplayClient) obj;
-			Tuple<Int64, Int64, int> stats = client.GetStats();
-			Client.Log("Data Messages = {0}, Text Messages = {1}, Queue Depth = {2}", stats.Item1, stats.Item2, stats.Item3);
-			if (maxTradeCount > 0)
-			{
-				Client.Log("Most active trade: {0} ({1} updates)", maxCountTrade, maxTradeCount);
-			}
-			if (maxQuoteCount > 0)
-			{
-				Client.Log("Most active quote: {0} ({1} updates)", maxCountQuote, maxQuoteCount);
-			}
-			if (_useTradeCandleSticks)
-				Client.Log("TRADE CANDLESTICK STATS - TradeCandleSticks = {0}, TradeCandleSticksIncomplete = {1}", _tradeCandleStickCount, _tradeCandleStickCountIncomplete);
-			if (_useQuoteCandleSticks)
-				Client.Log("QUOTE CANDLESTICK STATS - Asks = {0}, Bids = {1}, AsksIncomplete = {2}, BidsIncomplete = {3}", _AskCandleStickCount, _BidCandleStickCount, _AskCandleStickCountIncomplete, _BidCandleStickCountIncomplete);
+				Log("QUOTE CANDLESTICK STATS - Asks = {0}, Bids = {1}, AsksIncomplete = {2}, BidsIncomplete = {3}", _AskCandleStickCount, _BidCandleStickCount, _AskCandleStickCountIncomplete, _BidCandleStickCountIncomplete);
 		}
 
 		static void Cancel(object sender, ConsoleCancelEventArgs args)
 		{
-			Client.Log("Stopping sample app");
+			Log("Stopping sample app");
 			timer.Dispose();
 			client.Stop();
 			if (_useTradeCandleSticks || _useQuoteCandleSticks)
@@ -133,9 +115,15 @@ namespace SampleApp
 			Environment.Exit(0);
 		}
 
+		[MessageTemplateFormatMethod("messageTemplate")]
+		static void Log(string messageTemplate, params object[] propertyValues)
+		{
+			Serilog.Log.Information(messageTemplate, propertyValues);
+		}
+
 		static void Main(string[] _)
 		{
-			Client.Log("Starting sample app");
+			Log("Starting sample app");
 			Action<Trade> onTrade = OnTrade;
 			Action<Quote> onQuote = OnQuote;
 			
@@ -165,7 +153,7 @@ namespace SampleApp
 			// //You can also simulate a trading day by replaying a particular day's data. You can do this with the actual time between events, or without.
 			// DateTime yesterday = DateTime.Today - TimeSpan.FromDays(1);
 			// replayClient = new ReplayClient(onTrade, onQuote, yesterday, true, true); //A client to replay a previous day's data
-			// timer = new Timer(ReplayTimerCallback, replayClient, 10000, 10000);
+			// timer = new Timer(TimerCallback, replayClient, 10000, 10000);
 			// replayClient.Join(); //Load symbols from your config or config.json
 			// //client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 			
