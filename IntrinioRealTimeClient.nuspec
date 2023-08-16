@@ -15,15 +15,15 @@
 		<tags>fintech stocks prices websocket real-time market finance</tags>
 		<dependencies>
 			<group targetFramework="net6.0">
-				<dependency id="FSharp.Core" version="8.0.100-beta.23371.8" />
-				<dependency id="Microsoft.Extensions.Configuration" version="8.0.0-preview.7.23375.6" />
-				<dependency id="Microsoft.Extensions.Configuration.Binder" version="8.0.0-preview.7.23375.6" />
-				<dependency id="Microsoft.Extensions.Configuration.Json" version="8.0.0-preview.7.23375.6" />
-				<dependency id="Serilog" version="3.0.2-dev-02044" />
+				<dependency id="FSharp.Core" version="7.0.400" />
+				<dependency id="Microsoft.Extensions.Configuration" version="7.0.0" />
+				<dependency id="Microsoft.Extensions.Configuration.Binder" version="7.0.4" />
+				<dependency id="Microsoft.Extensions.Configuration.Json" version="7.0.0" />
+				<dependency id="Serilog" version="3.0.1" />
 				<dependency id="Serilog.Settings.Configuration" version="7.0.0" />
-				<dependency id="Serilog.Sinks.Console" version="4.2.0-dev-00918" />
-				<dependency id="Serilog.Sinks.File" version="5.0.1-dev-00947" />
-				<dependency id="System.Text.Json" version="8.0.0-preview.7.23375.6" />
+				<dependency id="Serilog.Sinks.Console" version="4.1.0" />
+				<dependency id="Serilog.Sinks.File" version="5.0.0" />
+				<dependency id="System.Text.Json" version="7.0.3" />
 				<dependency id="WebSocket4Net" version="0.15.2" />
 				<dependency id="Intrinio.SDK" version="7.3.0" />
 			</group>
