@@ -34,9 +34,6 @@
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.1-dev-00947" />
     <PackageReference Include="System.Text.Json" Version="8.0.0-preview.7.23375.6" />
     <PackageReference Include="WebSocket4Net" Version="0.15.2" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="8.0.100-beta.23371.8" />
   </ItemGroup>
 
