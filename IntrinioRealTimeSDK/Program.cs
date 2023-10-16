@@ -152,7 +152,7 @@ namespace SampleApp
 			
 			// //You can also simulate a trading day by replaying a particular day's data. You can do this with the actual time between events, or without.
 			// DateTime yesterday = DateTime.Today - TimeSpan.FromDays(1);
-			// replayClient = new ReplayClient(onTrade, onQuote, yesterday, true, true); //A client to replay a previous day's data
+			// replayClient = new ReplayClient(onTrade, onQuote, yesterday, false, true, false, "data.csv"); //A client to replay a previous day's data
 			// timer = new Timer(TimerCallback, replayClient, 10000, 10000);
 			// replayClient.Join(); //Load symbols from your config or config.json
 			// //client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
