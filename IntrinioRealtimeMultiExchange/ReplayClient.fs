@@ -22,7 +22,9 @@ type ReplayClient(
     config : Config,
     date : DateTime,
     withSimulatedDelay : bool,
-    deleteFileWhenDone : bool) =
+    deleteFileWhenDone : bool,
+    writeToCsv : bool,
+    csvFilePath : string) =
     let empty : byte[] = Array.empty<byte>
     let mutable dataMsgCount : int64 = 0L
     let mutable textMsgCount : int64 = 0L
@@ -31,7 +33,8 @@ type ReplayClient(
     let data : BlockingCollection<Tick> = new BlockingCollection<Tick>(new ConcurrentQueue<Tick>())
     let useOnTrade : bool = not (obj.ReferenceEquals(onTrade,null))
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
-    let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())        
+    let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
+    let csvLock : Object = new Object();
     
     let logMessage(logLevel:LogLevel, messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =
         match logLevel with
@@ -71,81 +74,63 @@ type ReplayClient(
             MarketCenter = BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2))
             Condition = if (conditionLength > 0) then Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) else String.Empty
         }
+        
+    let writeRowToOpenCsvWithoutLock(row : IEnumerable<string>) : unit =
+        let mutable first : bool = true
+        use fs : FileStream = new FileStream(csvFilePath, FileMode.Append);
+        use tw : TextWriter = new StreamWriter(fs);
+        for s : string in row do
+            if (not first)
+            then
+                tw.Write(",");
+            else
+                first <- false;
+            tw.Write($"\"{s}\"");
+        tw.WriteLine();
+    
+    let writeRowToOpenCsvWithLock(row : IEnumerable<string>) : unit =
+        lock csvLock (fun () -> writeRowToOpenCsvWithoutLock(row))
 
-//     internal static void WriteRowToOpenCsv(IEnumerable<string> row, TextWriter tw)
-//     {
-//         bool first = true;
-//         foreach (string s in row)
-//         {
-//             if (!first)
-//                 tw.Write(",");
-//             else
-//                 first = false;
-//             tw.Write($"\"{s}\"");
-//         }
-//         tw.WriteLine();
-//     }
-//
-//     internal static string DoubleRoundSecRule612(double value)
-//     {
-//         if (value >= 1.0D)
-//         {
-//             return value.ToString("0.00");
-//         }
-//         return value.ToString("0.0000");
-//     }
-//
-//     internal static IEnumerable<string> MapTickToRow(Tick tick)
-//     {
-//         yield return tick.TimeReceived.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
-//         if (tick.IsTrade)
-//         {
-//             yield return MessageType.Trade.ToString();
-//             yield return tick.Trade.Value.Symbol;
-//             yield return DoubleRoundSecRule612(tick.Trade.Value.Price);
-//             yield return tick.Trade.Value.Size.ToString();
-//             yield return tick.Trade.Value.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
-//             yield return tick.Trade.Value.SubProvider.ToString();
-//             yield return tick.Trade.Value.MarketCenter.ToString();
-//             yield return tick.Trade.Value.Condition;
-//             yield return tick.Trade.Value.TotalVolume.ToString();
-//         }
-//         else
-//         {
-//             yield return tick.Quote.Value.Type.ToString();
-//             yield return tick.Quote.Value.Symbol;
-//             yield return DoubleRoundSecRule612(tick.Quote.Value.Price);
-//             yield return tick.Quote.Value.Size.ToString();
-//             yield return tick.Quote.Value.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
-//             yield return tick.Quote.Value.SubProvider.ToString();
-//             yield return tick.Quote.Value.MarketCenter.ToString();
-//             yield return tick.Quote.Value.Condition;
-//         }
-//     }
-//
-//     internal static void WriteTicksToCsv(string csvFullPath, IEnumerable<Tick> ticks)
-//     {
-//         using (FileStream fs = new FileStream(csvFullPath, FileMode.Append))
-//         {
-//             using (TextWriter tw = new StreamWriter(fs))
-//             {
-//                 //write header row
-//                 WriteRowToOpenCsv(new string[]{"TimeReceived", "Type", "Symbol", "Price", "Size", "Timestamp", "SubProvider", "MarketCenter", "Condition", "TotalVolume"}, tw);
-//                 
-//                 foreach (Tick tick in ticks)
-//                 {
-//                     IEnumerable<string> row = MapTickToRow(tick);
-//                     WriteRowToOpenCsv(row, tw);
-//                 }
-//             }
-//         }
-//     }
-//
-//     internal static void TransformTickFileToCsv(string tickFilePath, string csvFilePath)
-//     {
-//         IEnumerable<Tick> ticks = ReplayTickFileWithoutDelay(tickFilePath, 100);
-//         WriteTicksToCsv(csvFilePath, ticks);
-//     }
+    let doubleRoundSecRule612(value : float) : string =
+        if (value >= 1.0)
+        then
+            value.ToString("0.00")
+        else
+            value.ToString("0.0000");
+
+    let mapTradeToRow(trade : Trade) : IEnumerable<string> =
+        seq{
+            yield MessageType.Trade.ToString();
+            yield trade.Symbol;
+            yield doubleRoundSecRule612(trade.Price);
+            yield trade.Size.ToString();
+            yield trade.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
+            yield trade.SubProvider.ToString();
+            yield trade.MarketCenter.ToString();
+            yield trade.Condition;
+            yield trade.TotalVolume.ToString();   
+        }
+        
+    let writeTradeToCsv(trade : Trade) : unit =
+        writeRowToOpenCsvWithLock(mapTradeToRow(trade))
+        
+    let mapQuoteToRow(quote : Quote) : IEnumerable<string> =
+        seq{
+            yield quote.Type.ToString();
+            yield quote.Symbol;
+            yield doubleRoundSecRule612(quote.Price);
+            yield quote.Size.ToString();
+            yield quote.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
+            yield quote.SubProvider.ToString();
+            yield quote.MarketCenter.ToString();
+            yield quote.Condition;   
+        }
+        
+    let writeQuoteToCsv(quote : Quote) : unit =
+        writeRowToOpenCsvWithLock(mapQuoteToRow(quote));
+        
+    let writeHeaderRow() : unit =
+        writeRowToOpenCsvWithLock ([|"Type"; "Symbol"; "Price"; "Size"; "Timestamp"; "SubProvider"; "MarketCenter"; "Condition"; "TotalVolume"|]);
     
     let threadFn () : unit =
         let ct = ctSource.Token
@@ -198,23 +183,29 @@ type ReplayClient(
                             
                             match (enum<MessageType> (System.Convert.ToInt32(eventBuffer[0]))) with
                             | MessageType.Trade ->
-                                let trade : Trade = parseTrade(eventSpanBuffer)
+                                let trade : Trade = parseTrade(eventSpanBuffer);
                                 if (channels.Contains ("lobby", true) || channels.Contains ("lobby", false) || channels.Contains (trade.Symbol, true) || channels.Contains (trade.Symbol, false))
                                 then
-                                    yield new Tick(timeReceived, Some(trade), Option<Quote>.None)
+                                    if writeToCsv
+                                    then
+                                        writeTradeToCsv trade;
+                                    yield new Tick(timeReceived, Some(trade), Option<Quote>.None);
                             | MessageType.Ask 
                             | MessageType.Bid ->
-                                 let quote : Quote = parseQuote(eventSpanBuffer)
+                                 let quote : Quote = parseQuote(eventSpanBuffer);
                                  if (channels.Contains ("lobby", false) || channels.Contains (quote.Symbol, false))
                                  then
-                                    yield new Tick(timeReceived, Option<Trade>.None, Some(quote))
-                            | _ -> logMessage(LogLevel.ERROR, "Invalid MessageType: {0}", [|eventBuffer[0]|])
+                                    if writeToCsv
+                                    then
+                                        writeQuoteToCsv quote;
+                                    yield new Tick(timeReceived, Option<Trade>.None, Some(quote));
+                            | _ -> logMessage(LogLevel.ERROR, "Invalid MessageType: {0}", [|eventBuffer[0]|]);
 
                             //Set up the next iteration
-                            readResult <- fRead.ReadByte()
-                        else readResult <- -1
+                            readResult <- fRead.ReadByte();
+                        else readResult <- -1;
                 else
-                    raise (FileLoadException("Unable to read replay file."))
+                    raise (FileLoadException("Unable to read replay file."));
             }
         else
             Array.Empty<Tick>()
@@ -398,21 +389,24 @@ type ReplayClient(
         if channels.Remove((symbol, tradesOnly))
         then 
             logMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0:l} (trades only = {1:l})", [|symbol, lastOnly|])
-
+    
     do
         config.Validate()
         for thread : Thread in threads do
             thread.Start()
+        if writeToCsv
+        then
+            writeHeaderRow();
         replayThread.Start()
 
-    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, date : DateTime, withSimulatedDelay : bool, deleteFileWhenDone : bool) =
-        ReplayClient(onTrade, null, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone)
+    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, date : DateTime, withSimulatedDelay : bool, deleteFileWhenDone : bool, writeToCsv : bool, csvFilePath : string) =
+        ReplayClient(onTrade, null, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
         
-    new ([<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withSimulatedDelay : bool, deleteFileWhenDone : bool) =
-        ReplayClient(null, onQuote, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone)
+    new ([<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withSimulatedDelay : bool, deleteFileWhenDone : bool, writeToCsv : bool, csvFilePath : string) =
+        ReplayClient(null, onQuote, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
         
-    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withSimulatedDelay : bool, deleteFileWhenDone : bool) =
-        ReplayClient(onTrade, onQuote, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone)
+    new ([<Optional; DefaultParameterValue(null:Action<Trade>)>] onTrade: Action<Trade>, [<Optional; DefaultParameterValue(null:Action<Quote>)>] onQuote : Action<Quote>, date : DateTime, withSimulatedDelay : bool, deleteFileWhenDone : bool, writeToCsv : bool, csvFilePath : string) =
+        ReplayClient(onTrade, onQuote, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
 
     interface IEquitiesWebSocketClient with
         member this.Join() : unit =
