@@ -27,6 +27,9 @@ type ReplayClient(
     csvFilePath : string) =
     let empty : byte[] = Array.empty<byte>
     let mutable dataMsgCount : int64 = 0L
+    let mutable dataEventCount : int64 = 0L
+    let mutable dataTradeCount : int64 = 0L
+    let mutable dataQuoteCount : int64 = 0L    
     let mutable textMsgCount : int64 = 0L
     let channels : HashSet<(string*bool)> = new HashSet<(string*bool)>()
     let ctSource : CancellationTokenSource = new CancellationTokenSource()
@@ -141,17 +144,19 @@ type ReplayClient(
                     match datum.IsTrade() with
                     | true ->
                         if useOnTrade
-                        then 
+                        then
+                            Interlocked.Increment(&dataTradeCount) |> ignore
                             datum.Trade() |> onTrade.Invoke
                     | false ->
                         if useOnQuote
                         then
+                            Interlocked.Increment(&dataQuoteCount) |> ignore
                             datum.Quote() |> onQuote.Invoke
                 else
                     Thread.Sleep(1)
             with
                 | :? OperationCanceledException -> ()
-                | exn -> logMessage(LogLevel.ERROR, "Error parsing message: {0:l}; {1:l}", [|exn.Message, exn.StackTrace|])
+                | exn -> logMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", [|exn.Message, exn.StackTrace|])
                 
     /// <summary>
     /// The results of this should be streamed and not ToList-ed.
@@ -361,8 +366,9 @@ type ReplayClient(
             for tick : Tick in aggregatedTicks do
                 if not ct.IsCancellationRequested
                 then
-                    data.Add(tick)
+                    Interlocked.Increment(&dataEventCount) |> ignore
                     Interlocked.Increment(&dataMsgCount) |> ignore
+                    data.Add(tick)
             
         with | :? Exception as e -> logMessage(LogLevel.ERROR, "Error while replaying file: {0}", [|e.Message|])
         
@@ -382,13 +388,13 @@ type ReplayClient(
         let lastOnly : string = if tradesOnly then "true" else "false"
         if channels.Add((symbol, tradesOnly))
         then
-            logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0:l} (trades only = {1:l})", [|symbol, lastOnly|])
+            logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", [|symbol, lastOnly|])
 
     let leave(symbol: string, tradesOnly: bool) : unit =
         let lastOnly : string = if tradesOnly then "true" else "false"
         if channels.Remove((symbol, tradesOnly))
         then 
-            logMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0:l} (trades only = {1:l})", [|symbol, lastOnly|])
+            logMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0} (trades only = {1})", [|symbol, lastOnly|])
     
     do
         config.Validate()
@@ -457,8 +463,8 @@ type ReplayClient(
             replayThread.Join()
             logMessage(LogLevel.INFORMATION, "Stopped", [||])
             
-        member this.GetStats() : (int64 * int64 * int) =
-            (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count)
+        member this.GetStats() : (int64 * int64 * int * int64 * int64 * int64) =
+            (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count, Interlocked.Read(&dataEventCount), Interlocked.Read(&dataTradeCount), Interlocked.Read(&dataQuoteCount))
 
         [<MessageTemplateFormatMethod("messageTemplate")>]
         member this.Log(messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =

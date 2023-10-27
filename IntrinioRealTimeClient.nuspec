@@ -2,7 +2,7 @@
 <package>
 	<metadata>
 		<id>IntrinioRealTimeClient</id>
-		<version>8.1.2</version>
+		<version>8.2.0</version>
 		<title>Intrinio SDK for Real-Time Stock Prices</title>
 		<authors>Intrinio</authors>
 		<owners>Intrinio</owners>
@@ -10,7 +10,7 @@
 		<licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
 		<projectUrl>https://github.com/intrinio/intrinio-realtime-csharp-sdk</projectUrl>
 		<description>Intrinio provides real-time stock prices via a two-way WebSocket connection.</description>
-		<releaseNotes>Version 8.1.2 release.</releaseNotes>
+		<releaseNotes>Version 8.2.0 release.</releaseNotes>
 		<copyright>Copyright 2023 Intrinio</copyright>
 		<tags>fintech stocks prices websocket real-time market finance</tags>
 		<dependencies>
