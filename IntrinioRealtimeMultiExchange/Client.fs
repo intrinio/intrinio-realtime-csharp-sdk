@@ -49,6 +49,9 @@ type Client(
     let mutable token : (string * DateTime) = (null, DateTime.Now)
     let mutable wsState : WebSocketState = Unchecked.defaultof<WebSocketState>
     let mutable dataMsgCount : int64 = 0L
+    let mutable dataEventCount : int64 = 0L
+    let mutable dataTradeCount : int64 = 0L
+    let mutable dataQuoteCount : int64 = 0L
     let mutable textMsgCount : int64 = 0L
     let channels : HashSet<(string*bool)> = new HashSet<(string*bool)>()
     let ctSource : CancellationTokenSource = new CancellationTokenSource()
@@ -59,10 +62,11 @@ type Client(
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
     let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
     let clientInfoHeaderKey : string = "Client-Information"
-    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv8.1"
+    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv8.2"
     let messageVersionHeaderKey : string = "UseNewEquitiesFormat"
     let messageVersionHeaderValue : string = "v2"
     
+    [<Serilog.Core.MessageTemplateFormatMethod("messageTemplate")>]
     let logMessage(logLevel:LogLevel, messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =
         match logLevel with
         | LogLevel.DEBUG -> Log.Debug(logPrefix + messageTemplate, propertyValues)
@@ -140,11 +144,13 @@ type Client(
                     if useOnTrade
                     then
                         let trade: Trade = parseTrade(chunk)
+                        Interlocked.Increment(&dataTradeCount) |> ignore
                         trade |> onTrade.Invoke
                 | MessageType.Ask | MessageType.Bid ->
                     if useOnQuote
                     then
                         let quote: Quote = parseQuote(chunk)
+                        Interlocked.Increment(&dataQuoteCount) |> ignore
                         quote |> onQuote.Invoke
                 | _ -> logMessage(LogLevel.WARNING, "Invalid MessageType: {0}", [|(int32 bytes.[startIndex])|])
         finally
@@ -160,12 +166,13 @@ type Client(
                     // The first byte tells us how many there are.
                     // From there, check the type at index 0 of each chunk to know how many bytes each message has.
                     let cnt = datum.[0] |> int
+                    Interlocked.Add(&dataEventCount, (cnt |> int64)) |> ignore
                     let mutable startIndex = 1
                     for _ in 1 .. cnt do
                         parseSocketMessage(datum, &startIndex)
             with
                 | :? OperationCanceledException -> ()
-                | exn -> logMessage(LogLevel.ERROR, "Error parsing message: {0:l}; {1:l}", [|exn.Message, exn.StackTrace|])
+                | exn -> logMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", [|exn.Message, exn.StackTrace|])
 
     let threads : Thread[] = Array.init config.NumThreads (fun _ -> new Thread(new ThreadStart(threadFn)))
 
@@ -195,13 +202,13 @@ type Client(
                     return false
             with
             | :? System.InvalidOperationException as exn ->
-                logMessage(LogLevel.ERROR, "Authorization Failure (bad URI): {0:l}", [|exn.Message|])
+                logMessage(LogLevel.ERROR, "Authorization Failure (bad URI): {0}", [|exn.Message|])
                 return false
             | :? System.Net.Http.HttpRequestException as exn ->
-                logMessage(LogLevel.ERROR, "Authoriztion Failure (bad network connection): {0:l}", [|exn.Message|])
+                logMessage(LogLevel.ERROR, "Authoriztion Failure (bad network connection): {0}", [|exn.Message|])
                 return false
             | :? System.Threading.Tasks.TaskCanceledException as exn ->
-                logMessage(LogLevel.ERROR, "Authorization Failure (timeout): {0:l}", [|exn.Message|])
+                logMessage(LogLevel.ERROR, "Authorization Failure (timeout): {0}", [|exn.Message|])
                 return false
         } |> Async.RunSynchronously
 
@@ -260,7 +267,7 @@ type Client(
             channels |> Seq.iter (fun (symbol: string, tradesOnly:bool) ->
                 let lastOnly : string = if tradesOnly then "true" else "false"
                 let message : byte[] = makeJoinMessage(tradesOnly, symbol)
-                logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0:l} (trades only = {1:l})", [|symbol, lastOnly|])
+                logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", [|symbol, lastOnly|])
                 wsState.WebSocket.Send(message, 0, message.Length) )
 
     let onClose (_ : EventArgs) : unit =
@@ -303,7 +310,7 @@ type Client(
     let onMessageReceived (args : MessageReceivedEventArgs) : unit =
         logMessage(LogLevel.DEBUG, "Websocket - Message received", [||])
         Interlocked.Increment(&textMsgCount) |> ignore
-        logMessage(LogLevel.ERROR, "Error received: {0:l}", [|args.Message|])
+        logMessage(LogLevel.ERROR, "Error received: {0}", [|args.Message|])
 
     let resetWebSocket(token: string) : unit =
         logMessage(LogLevel.INFORMATION, "Websocket - Resetting", [||])
@@ -345,7 +352,7 @@ type Client(
         if channels.Add((symbol, tradesOnly))
         then 
             let message : byte[] = makeJoinMessage(tradesOnly, symbol)
-            logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0:l} (trades only = {1:l})", [|symbol, lastOnly|])
+            logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", [|symbol, lastOnly|])
             try wsState.WebSocket.Send(message, 0, message.Length)
             with _ -> channels.Remove((symbol, tradesOnly)) |> ignore
 
@@ -354,7 +361,7 @@ type Client(
         if channels.Remove((symbol, tradesOnly))
         then 
             let message : byte[] = makeLeaveMessage(symbol)
-            logMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0:l} (trades only = {1:l})", [|symbol, lastOnly|])
+            logMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0} (trades only = {1})", [|symbol, lastOnly|])
             try wsState.WebSocket.Send(message, 0, message.Length)
             with _ -> ()
 
@@ -447,8 +454,8 @@ type Client(
             for thread in threads do thread.Join()
             logMessage(LogLevel.INFORMATION, "Stopped", [||])
                         
-        member this.GetStats() : (int64 * int64 * int) =
-            (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count)
+        member this.GetStats() : (int64 * int64 * int * int64 * int64 * int64) =
+            (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count, Interlocked.Read(&dataEventCount), Interlocked.Read(&dataTradeCount), Interlocked.Read(&dataQuoteCount))
                    
         [<MessageTemplateFormatMethod("messageTemplate")>]     
         member this.Log(messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =

@@ -554,5 +554,5 @@ type public IEquitiesWebSocketClient =
     abstract member Leave : string -> unit
     abstract member Leave : string[] -> unit
     abstract member Stop : unit -> unit
-    abstract member GetStats : unit -> (int64 * int64 * int)
+    abstract member GetStats : unit -> (int64 * int64 * int * int64 * int64 * int64)
     abstract member Log : string * [<ParamArray>] propertyValues:obj[] -> unit
