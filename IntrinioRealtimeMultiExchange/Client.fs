@@ -65,6 +65,7 @@ type Client(
     let clientInfoHeaderValue : string = "IntrinioDotNetSDKv8.3"
     let messageVersionHeaderKey : string = "UseNewEquitiesFormat"
     let messageVersionHeaderValue : string = "v2"
+    let mainThreadPriority = Thread.CurrentThread.Priority //this is set outside of our scope - let's not interfere.
     
     [<Serilog.Core.MessageTemplateFormatMethod("messageTemplate")>]
     let logMessage(logLevel:LogLevel, messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =
@@ -158,6 +159,7 @@ type Client(
 
     let threadFn () : unit =
         let ct = ctSource.Token
+        Thread.CurrentThread.Priority <- enum<ThreadPriority> (Math.Max(((int mainThreadPriority) - 1), 0)) //Set below main thread priority so doesn't interfere with main thread accepting messages.
         let mutable datum : byte[] = Array.empty<byte>
         while not (ct.IsCancellationRequested) do
             try
