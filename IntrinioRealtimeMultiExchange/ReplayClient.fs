@@ -33,7 +33,7 @@ type ReplayClient(
     let mutable textMsgCount : int64 = 0L
     let channels : HashSet<(string*bool)> = new HashSet<(string*bool)>()
     let ctSource : CancellationTokenSource = new CancellationTokenSource()
-    let data : BlockingCollection<Tick> = new BlockingCollection<Tick>(new ConcurrentQueue<Tick>())
+    let data : ConcurrentQueue<Tick> = new ConcurrentQueue<Tick>()
     let useOnTrade : bool = not (obj.ReferenceEquals(onTrade,null))
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
     let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
@@ -140,7 +140,7 @@ type ReplayClient(
         let mutable datum : Tick = new Tick(DateTime.Now, Option<Trade>.None, Option<Quote>.None) //initial throw away value
         while not (ct.IsCancellationRequested) do
             try
-                if data.TryTake(&datum,1000) then
+                if data.TryDequeue(&datum) then
                     match datum.IsTrade() with
                     | true ->
                         if useOnTrade
@@ -368,7 +368,7 @@ type ReplayClient(
                 then
                     Interlocked.Increment(&dataEventCount) |> ignore
                     Interlocked.Increment(&dataMsgCount) |> ignore
-                    data.Add(tick)
+                    data.Enqueue(tick)
             
         with | :? Exception as e -> logMessage(LogLevel.ERROR, "Error while replaying file: {0}", [|e.Message|])
         
