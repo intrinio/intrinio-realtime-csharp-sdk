@@ -55,14 +55,14 @@ type Client(
     let mutable textMsgCount : int64 = 0L
     let channels : HashSet<(string*bool)> = new HashSet<(string*bool)>()
     let ctSource : CancellationTokenSource = new CancellationTokenSource()
-    let data : BlockingCollection<byte[]> = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>())
+    let data : ConcurrentQueue<byte[]> = new ConcurrentQueue<byte[]>()
     let mutable tryReconnect : (unit -> unit) = fun () -> ()
     let httpClient : HttpClient = new HttpClient()
     let useOnTrade : bool = not (obj.ReferenceEquals(onTrade,null))
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
     let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
     let clientInfoHeaderKey : string = "Client-Information"
-    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv8.2"
+    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv8.3"
     let messageVersionHeaderKey : string = "UseNewEquitiesFormat"
     let messageVersionHeaderValue : string = "v2"
     
@@ -161,7 +161,7 @@ type Client(
         let mutable datum : byte[] = Array.empty<byte>
         while not (ct.IsCancellationRequested) do
             try
-                if data.TryTake(&datum,1000) then
+                if data.TryDequeue(&datum) then
                     // These are grouped (many) messages.
                     // The first byte tells us how many there are.
                     // From there, check the type at index 0 of each chunk to know how many bytes each message has.
@@ -305,7 +305,7 @@ type Client(
     let onDataReceived (args: DataReceivedEventArgs) : unit =
         logMessage(LogLevel.DEBUG, "Websocket - Data received", [||])
         Interlocked.Increment(&dataMsgCount) |> ignore
-        data.Add(args.Data)
+        data.Enqueue(args.Data)
 
     let onMessageReceived (args : MessageReceivedEventArgs) : unit =
         logMessage(LogLevel.DEBUG, "Websocket - Message received", [||])
