@@ -171,7 +171,7 @@ type Client(
                     for _ in 1 .. cnt do
                         parseSocketMessage(datum, &startIndex)
                 else
-                    Thread.Sleep(50)
+                    Thread.Sleep(10)
             with
                 | :? OperationCanceledException -> ()
                 | exn -> logMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", [|exn.Message, exn.StackTrace|])
