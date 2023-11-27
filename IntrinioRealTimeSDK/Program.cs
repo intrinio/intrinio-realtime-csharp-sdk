@@ -87,9 +87,9 @@ namespace SampleApp
 		static void TimerCallback(object obj)
 		{
 			IEquitiesWebSocketClient client = (IEquitiesWebSocketClient) obj;
-			Tuple<Int64, Int64, int, Int64, Int64, Int64> stats = client.GetStats();
+			ClientStats stats = client.GetStats();
 			Log("Data Messages = {0}, Text Messages = {1}, Queue Depth = {2}, Individual Events = {3}, Trades = {4}, Quotes = {5}",
-				stats.Item1, stats.Item2, stats.Item3, stats.Item4, stats.Item5, stats.Item6);
+				stats.SocketDataMessages(), stats.SocketTextMessages(), stats.QueueDepth(), stats.EventCount(), stats.TradeCount(), stats.QuoteCount());
 			if (maxTradeCount > 0)
 			{
 				Log("Most active trade: {0} ({1} updates)", maxCountTrade, maxTradeCount);

@@ -546,6 +546,32 @@ type internal Tick(
                     | Some q -> getQuoteBytes q
                     | None -> Array.Empty<byte>()
                     
+type ClientStats (
+    socketDataMessages : uint64,
+    socketTextMessages : uint64,
+    queueDepth : int,
+    eventCount : uint64,
+    tradeCount : uint64,
+    quoteCount : uint64) =
+    
+    member _.SocketDataMessages() : uint64 =
+        socketDataMessages
+        
+    member _.SocketTextMessages() : uint64 =
+        socketTextMessages
+        
+    member _.QueueDepth() : int =
+        queueDepth
+        
+    member _.EventCount() : uint64 =
+        eventCount
+        
+    member _.TradeCount() : uint64 =
+        tradeCount
+        
+    member _.QuoteCount() : uint64 =
+        quoteCount
+                    
 type public IEquitiesWebSocketClient =
     abstract member Join : unit -> unit
     abstract member Join : string * bool option -> unit
@@ -554,5 +580,5 @@ type public IEquitiesWebSocketClient =
     abstract member Leave : string -> unit
     abstract member Leave : string[] -> unit
     abstract member Stop : unit -> unit
-    abstract member GetStats : unit -> (int64 * int64 * int * int64 * int64 * int64)
+    abstract member GetStats : unit -> ClientStats
     abstract member Log : string * [<ParamArray>] propertyValues:obj[] -> unit

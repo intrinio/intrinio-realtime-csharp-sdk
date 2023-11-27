@@ -7,10 +7,6 @@ open System.Runtime.InteropServices
 open System.Collections.Concurrent
 open System.Collections.Generic
 open System.Threading
-open System.Threading.Tasks
-open System.Net.Sockets
-open WebSocket4Net
-open Intrinio.Realtime.Equities.Config
 open FSharp.NativeInterop
 open System.Runtime.CompilerServices
 
