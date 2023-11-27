@@ -1,0 +1,11 @@
+{
+  "properties": {
+    "runtimeOptions": {
+      "configProperties": {
+        "System.GC.Server": true,
+        "System.GC.CpuGroup": true,
+        "System.GC.HighMemoryPercent": 75
+      }
+    }
+  }
+}

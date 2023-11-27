@@ -11,6 +11,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="runtimeconfig.template.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\IntrinioRealtimeMultiExchange\IntrinioRealtimeMultiExchange.fsproj" />
   </ItemGroup>
 
