@@ -62,7 +62,7 @@ type Client(
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
     let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
     let clientInfoHeaderKey : string = "Client-Information"
-    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv8.3"
+    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv9.0"
     let messageVersionHeaderKey : string = "UseNewEquitiesFormat"
     let messageVersionHeaderValue : string = "v2"
     let mainThreadPriority = Thread.CurrentThread.Priority //this is set outside of our scope - let's not interfere.
