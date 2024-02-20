@@ -48,11 +48,11 @@ type Client(
     let wsLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
     let mutable token : (string * DateTime) = (null, DateTime.Now)
     let mutable wsState : WebSocketState = Unchecked.defaultof<WebSocketState>
-    let mutable dataMsgCount : int64 = 0L
-    let mutable dataEventCount : int64 = 0L
-    let mutable dataTradeCount : int64 = 0L
-    let mutable dataQuoteCount : int64 = 0L
-    let mutable textMsgCount : int64 = 0L
+    let mutable dataMsgCount : uint64 = 0UL
+    let mutable dataEventCount : uint64 = 0UL
+    let mutable dataTradeCount : uint64 = 0UL
+    let mutable dataQuoteCount : uint64 = 0UL
+    let mutable textMsgCount : uint64 = 0UL
     let channels : HashSet<(string*bool)> = new HashSet<(string*bool)>()
     let ctSource : CancellationTokenSource = new CancellationTokenSource()
     let data : ConcurrentQueue<byte[]> = new ConcurrentQueue<byte[]>()
@@ -167,10 +167,10 @@ type Client(
                     // These are grouped (many) messages.
                     // The first byte tells us how many there are.
                     // From there, check the type at index 0 of each chunk to know how many bytes each message has.
-                    let cnt = datum.[0] |> int
-                    Interlocked.Add(&dataEventCount, (cnt |> int64)) |> ignore
+                    let cnt = datum.[0] |> uint64
+                    Interlocked.Add(&dataEventCount, cnt) |> ignore
                     let mutable startIndex = 1
-                    for _ in 1 .. cnt do
+                    for _ in 1UL .. cnt do
                         parseSocketMessage(datum, &startIndex)
                 else
                     Thread.Sleep(10)
@@ -458,8 +458,8 @@ type Client(
             for thread in threads do thread.Join()
             logMessage(LogLevel.INFORMATION, "Stopped", [||])
                         
-        member this.GetStats() : (int64 * int64 * int * int64 * int64 * int64) =
-            (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count, Interlocked.Read(&dataEventCount), Interlocked.Read(&dataTradeCount), Interlocked.Read(&dataQuoteCount))
+        member this.GetStats() : ClientStats =
+            new ClientStats(Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count, Interlocked.Read(&dataEventCount), Interlocked.Read(&dataTradeCount), Interlocked.Read(&dataQuoteCount))
                    
         [<MessageTemplateFormatMethod("messageTemplate")>]     
         member this.Log(messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =

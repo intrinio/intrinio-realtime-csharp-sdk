@@ -7,10 +7,6 @@ open System.Runtime.InteropServices
 open System.Collections.Concurrent
 open System.Collections.Generic
 open System.Threading
-open System.Threading.Tasks
-open System.Net.Sockets
-open WebSocket4Net
-open Intrinio.Realtime.Equities.Config
 open FSharp.NativeInterop
 open System.Runtime.CompilerServices
 
@@ -34,6 +30,15 @@ module private CandleStickClientInline =
     let inline internal mergeQuoteCandles (a : QuoteCandleStick, b : QuoteCandleStick) : QuoteCandleStick option =
         a.Merge(b)
         Some(a)
+        
+    let inline internal isDarkPoolMarketCenter(marketCenter : char) : bool =
+        marketCenter.Equals((char)0) || Char.IsWhiteSpace(marketCenter)
+        
+    let inline internal shouldFilterTrade(incomingTrade : Trade, useFiltering) : bool =
+        useFiltering && isDarkPoolMarketCenter incomingTrade.MarketCenter
+        
+    let inline internal shouldFilterQuote(incomingQuote : Quote, useFiltering) : bool =
+        useFiltering && isDarkPoolMarketCenter incomingQuote.MarketCenter
         
     let inline internal convertToTimestamp (input : DateTime) : float =
         (input.ToUniversalTime() - DateTime.UnixEpoch.ToUniversalTime()).TotalSeconds
@@ -59,7 +64,8 @@ type CandleStickClient(
     broadcastPartialCandles : bool,
     [<Optional; DefaultParameterValue(null:Func<string, float, float, IntervalType, TradeCandleStick>)>] getHistoricalTradeCandleStick : Func<string, float, float, IntervalType, TradeCandleStick>,
     [<Optional; DefaultParameterValue(null:Func<string, float, float, QuoteType, IntervalType, QuoteCandleStick>)>] getHistoricalQuoteCandleStick : Func<string, float, float, QuoteType, IntervalType, QuoteCandleStick>,
-    sourceDelaySeconds : float) =
+    sourceDelaySeconds : float,
+    darkPoolFiltered : bool) =
     
     let ctSource : CancellationTokenSource = new CancellationTokenSource()
     let useOnTradeCandleStick : bool = not (obj.ReferenceEquals(onTradeCandleStick,null))
@@ -67,9 +73,9 @@ type CandleStickClient(
     let useGetHistoricalTradeCandleStick : bool = not (obj.ReferenceEquals(getHistoricalTradeCandleStick,null))
     let useGetHistoricalQuoteCandleStick : bool = not (obj.ReferenceEquals(getHistoricalQuoteCandleStick,null))
     let initialDictionarySize : int = 3_601_579 //a close prime number greater than 2x the max expected size.  There are usually around 1.5m option contracts.
-    let contractsLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
+    let symbolBucketsLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
     let lostAndFoundLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
-    let contracts : Dictionary<string, SymbolBucket> = new Dictionary<string, SymbolBucket>(initialDictionarySize)
+    let symbolBuckets : Dictionary<string, SymbolBucket> = new Dictionary<string, SymbolBucket>(initialDictionarySize)
     let lostAndFound : Dictionary<string, SymbolBucket> = new Dictionary<string, SymbolBucket>(initialDictionarySize)
     let flushBufferSeconds : float = 30.0 
     
@@ -244,13 +250,13 @@ type CandleStickClient(
         let ct = ctSource.Token
         while not (ct.IsCancellationRequested) do
             try                
-                contractsLock.EnterReadLock()
+                symbolBucketsLock.EnterReadLock()
                 let mutable keys : string list = []
-                for key in contracts.Keys do
+                for key in symbolBuckets.Keys do
                     keys <- key::keys
-                contractsLock.ExitReadLock()
+                symbolBucketsLock.ExitReadLock()
                 for key in keys do
-                    let bucket : SymbolBucket = getSlot(key, contracts, contractsLock)
+                    let bucket : SymbolBucket = getSlot(key, symbolBuckets, symbolBucketsLock)
                     let flushThresholdTime : float = CandleStickClientInline.getCurrentTimestamp(sourceDelaySeconds) - flushBufferSeconds
                     bucket.Locker.EnterWriteLock()
                     try
@@ -371,9 +377,9 @@ type CandleStickClient(
         
     member _.OnTrade(trade: Trade) : unit =
         try
-            if useOnTradeCandleStick
+            if useOnTradeCandleStick && (not (CandleStickClientInline.shouldFilterTrade(trade, darkPoolFiltered)))
             then
-                let bucket : SymbolBucket = getSlot(trade.Symbol, contracts, contractsLock)
+                let bucket : SymbolBucket = getSlot(trade.Symbol, symbolBuckets, symbolBucketsLock)
                 try
                     let ts : float = CandleStickClientInline.convertToTimestamp(trade.Timestamp)
                     bucket.Locker.EnterWriteLock()
@@ -399,9 +405,9 @@ type CandleStickClient(
         
     member _.OnQuote(quote: Quote) : unit =
         try
-            if useOnQuoteCandleStick
+            if useOnQuoteCandleStick && (not (CandleStickClientInline.shouldFilterQuote(quote, darkPoolFiltered)))
             then
-                let bucket : SymbolBucket = getSlot(quote.Symbol, contracts, contractsLock)
+                let bucket : SymbolBucket = getSlot(quote.Symbol, symbolBuckets, symbolBucketsLock)
                 try          
                     bucket.Locker.EnterWriteLock()
                     match quote.Type with

@@ -26,11 +26,11 @@ type ReplayClient(
     writeToCsv : bool,
     csvFilePath : string) =
     let empty : byte[] = Array.empty<byte>
-    let mutable dataMsgCount : int64 = 0L
-    let mutable dataEventCount : int64 = 0L
-    let mutable dataTradeCount : int64 = 0L
-    let mutable dataQuoteCount : int64 = 0L    
-    let mutable textMsgCount : int64 = 0L
+    let mutable dataMsgCount : uint64 = 0UL
+    let mutable dataEventCount : uint64 = 0UL
+    let mutable dataTradeCount : uint64 = 0UL
+    let mutable dataQuoteCount : uint64 = 0UL
+    let mutable textMsgCount : uint64 = 0UL
     let channels : HashSet<(string*bool)> = new HashSet<(string*bool)>()
     let ctSource : CancellationTokenSource = new CancellationTokenSource()
     let data : ConcurrentQueue<Tick> = new ConcurrentQueue<Tick>()
@@ -463,8 +463,8 @@ type ReplayClient(
             replayThread.Join()
             logMessage(LogLevel.INFORMATION, "Stopped", [||])
             
-        member this.GetStats() : (int64 * int64 * int * int64 * int64 * int64) =
-            (Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count, Interlocked.Read(&dataEventCount), Interlocked.Read(&dataTradeCount), Interlocked.Read(&dataQuoteCount))
+        member this.GetStats() : ClientStats =
+            new ClientStats(Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count, Interlocked.Read(&dataEventCount), Interlocked.Read(&dataTradeCount), Interlocked.Read(&dataQuoteCount))
 
         [<MessageTemplateFormatMethod("messageTemplate")>]
         member this.Log(messageTemplate:string, [<ParamArray>] propertyValues:obj[]) : unit =
