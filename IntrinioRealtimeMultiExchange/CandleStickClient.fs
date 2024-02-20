@@ -31,6 +31,15 @@ module private CandleStickClientInline =
         a.Merge(b)
         Some(a)
         
+    let inline internal isDarkPoolMarketCenter(marketCenter : char) : bool =
+        marketCenter.Equals((char)0) || Char.IsWhiteSpace(marketCenter)
+        
+    let inline internal shouldFilterTrade(incomingTrade : Trade, useFiltering) : bool =
+        useFiltering && isDarkPoolMarketCenter incomingTrade.MarketCenter
+        
+    let inline internal shouldFilterQuote(incomingQuote : Quote, useFiltering) : bool =
+        useFiltering && isDarkPoolMarketCenter incomingQuote.MarketCenter
+        
     let inline internal convertToTimestamp (input : DateTime) : float =
         (input.ToUniversalTime() - DateTime.UnixEpoch.ToUniversalTime()).TotalSeconds
      
@@ -55,7 +64,8 @@ type CandleStickClient(
     broadcastPartialCandles : bool,
     [<Optional; DefaultParameterValue(null:Func<string, float, float, IntervalType, TradeCandleStick>)>] getHistoricalTradeCandleStick : Func<string, float, float, IntervalType, TradeCandleStick>,
     [<Optional; DefaultParameterValue(null:Func<string, float, float, QuoteType, IntervalType, QuoteCandleStick>)>] getHistoricalQuoteCandleStick : Func<string, float, float, QuoteType, IntervalType, QuoteCandleStick>,
-    sourceDelaySeconds : float) =
+    sourceDelaySeconds : float,
+    darkPoolFiltered : bool) =
     
     let ctSource : CancellationTokenSource = new CancellationTokenSource()
     let useOnTradeCandleStick : bool = not (obj.ReferenceEquals(onTradeCandleStick,null))
@@ -367,7 +377,7 @@ type CandleStickClient(
         
     member _.OnTrade(trade: Trade) : unit =
         try
-            if useOnTradeCandleStick
+            if useOnTradeCandleStick && (not (CandleStickClientInline.shouldFilterTrade(trade, darkPoolFiltered)))
             then
                 let bucket : SymbolBucket = getSlot(trade.Symbol, symbolBuckets, symbolBucketsLock)
                 try
@@ -395,7 +405,7 @@ type CandleStickClient(
         
     member _.OnQuote(quote: Quote) : unit =
         try
-            if useOnQuoteCandleStick
+            if useOnQuoteCandleStick && (not (CandleStickClientInline.shouldFilterQuote(quote, darkPoolFiltered)))
             then
                 let bucket : SymbolBucket = getSlot(quote.Symbol, symbolBuckets, symbolBucketsLock)
                 try          
