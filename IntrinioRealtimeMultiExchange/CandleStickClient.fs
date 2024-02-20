@@ -63,9 +63,9 @@ type CandleStickClient(
     let useGetHistoricalTradeCandleStick : bool = not (obj.ReferenceEquals(getHistoricalTradeCandleStick,null))
     let useGetHistoricalQuoteCandleStick : bool = not (obj.ReferenceEquals(getHistoricalQuoteCandleStick,null))
     let initialDictionarySize : int = 3_601_579 //a close prime number greater than 2x the max expected size.  There are usually around 1.5m option contracts.
-    let contractsLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
+    let symbolBucketsLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
     let lostAndFoundLock : ReaderWriterLockSlim = new ReaderWriterLockSlim()
-    let contracts : Dictionary<string, SymbolBucket> = new Dictionary<string, SymbolBucket>(initialDictionarySize)
+    let symbolBuckets : Dictionary<string, SymbolBucket> = new Dictionary<string, SymbolBucket>(initialDictionarySize)
     let lostAndFound : Dictionary<string, SymbolBucket> = new Dictionary<string, SymbolBucket>(initialDictionarySize)
     let flushBufferSeconds : float = 30.0 
     
@@ -240,13 +240,13 @@ type CandleStickClient(
         let ct = ctSource.Token
         while not (ct.IsCancellationRequested) do
             try                
-                contractsLock.EnterReadLock()
+                symbolBucketsLock.EnterReadLock()
                 let mutable keys : string list = []
-                for key in contracts.Keys do
+                for key in symbolBuckets.Keys do
                     keys <- key::keys
-                contractsLock.ExitReadLock()
+                symbolBucketsLock.ExitReadLock()
                 for key in keys do
-                    let bucket : SymbolBucket = getSlot(key, contracts, contractsLock)
+                    let bucket : SymbolBucket = getSlot(key, symbolBuckets, symbolBucketsLock)
                     let flushThresholdTime : float = CandleStickClientInline.getCurrentTimestamp(sourceDelaySeconds) - flushBufferSeconds
                     bucket.Locker.EnterWriteLock()
                     try
@@ -369,7 +369,7 @@ type CandleStickClient(
         try
             if useOnTradeCandleStick
             then
-                let bucket : SymbolBucket = getSlot(trade.Symbol, contracts, contractsLock)
+                let bucket : SymbolBucket = getSlot(trade.Symbol, symbolBuckets, symbolBucketsLock)
                 try
                     let ts : float = CandleStickClientInline.convertToTimestamp(trade.Timestamp)
                     bucket.Locker.EnterWriteLock()
@@ -397,7 +397,7 @@ type CandleStickClient(
         try
             if useOnQuoteCandleStick
             then
-                let bucket : SymbolBucket = getSlot(quote.Symbol, contracts, contractsLock)
+                let bucket : SymbolBucket = getSlot(quote.Symbol, symbolBuckets, symbolBucketsLock)
                 try          
                     bucket.Locker.EnterWriteLock()
                     match quote.Type with
