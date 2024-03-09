@@ -24,5 +24,5 @@ For first-time setup, generate (or obtain) your NuGet API key (https://docs.micr
 Then publish the generated NuGet package:
 
 ```
-dotnet nuget push IntrinioRealTimeClient.{version}.nupkg --api-key qz2jga8pl3dvn2akksyquwcs9ygggg4exypy3bhxy6w6x6 --source https://api.nuget.org/v3/index.json
+dotnet nuget push IntrinioRealTimeClient.{version}.nupkg --api-key {api-key} --source https://api.nuget.org/v3/index.json
 ```
