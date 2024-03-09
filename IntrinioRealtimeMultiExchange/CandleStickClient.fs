@@ -30,12 +30,15 @@ module private CandleStickClientInline =
     let inline internal mergeQuoteCandles (a : QuoteCandleStick, b : QuoteCandleStick) : QuoteCandleStick option =
         a.Merge(b)
         Some(a)
+    
+    let inline internal isAnomalous(marketCenter : char, condition : string) : bool =
+        marketCenter.Equals('L') && (condition.Equals("@ Zo", StringComparison.InvariantCultureIgnoreCase) || condition.Equals("@ To", StringComparison.InvariantCultureIgnoreCase) || condition.Equals("@ TW", StringComparison.InvariantCultureIgnoreCase))
         
     let inline internal isDarkPoolMarketCenter(marketCenter : char) : bool =
-        marketCenter.Equals((char)0) || Char.IsWhiteSpace(marketCenter)
+        marketCenter.Equals((char)0) || Char.IsWhiteSpace(marketCenter) || marketCenter.Equals('D') || marketCenter.Equals('E')
         
-    let inline internal shouldFilterTrade(incomingTrade : Trade, useFiltering) : bool =
-        useFiltering && isDarkPoolMarketCenter incomingTrade.MarketCenter
+    let inline internal shouldFilterTrade(incomingTrade : Trade, useFiltering: bool) : bool =
+        useFiltering && (isDarkPoolMarketCenter incomingTrade.MarketCenter || isAnomalous(incomingTrade.MarketCenter, incomingTrade.Condition))
         
     let inline internal shouldFilterQuote(incomingQuote : Quote, useFiltering) : bool =
         useFiltering && isDarkPoolMarketCenter incomingQuote.MarketCenter
@@ -65,7 +68,7 @@ type CandleStickClient(
     [<Optional; DefaultParameterValue(null:Func<string, float, float, IntervalType, TradeCandleStick>)>] getHistoricalTradeCandleStick : Func<string, float, float, IntervalType, TradeCandleStick>,
     [<Optional; DefaultParameterValue(null:Func<string, float, float, QuoteType, IntervalType, QuoteCandleStick>)>] getHistoricalQuoteCandleStick : Func<string, float, float, QuoteType, IntervalType, QuoteCandleStick>,
     sourceDelaySeconds : float,
-    darkPoolFiltered : bool) =
+    useTradeFiltering : bool) =
     
     let ctSource : CancellationTokenSource = new CancellationTokenSource()
     let useOnTradeCandleStick : bool = not (obj.ReferenceEquals(onTradeCandleStick,null))
@@ -377,7 +380,7 @@ type CandleStickClient(
         
     member _.OnTrade(trade: Trade) : unit =
         try
-            if useOnTradeCandleStick && (not (CandleStickClientInline.shouldFilterTrade(trade, darkPoolFiltered)))
+            if useOnTradeCandleStick && (not (CandleStickClientInline.shouldFilterTrade(trade, useTradeFiltering)))
             then
                 let bucket : SymbolBucket = getSlot(trade.Symbol, symbolBuckets, symbolBucketsLock)
                 try
@@ -405,7 +408,7 @@ type CandleStickClient(
         
     member _.OnQuote(quote: Quote) : unit =
         try
-            if useOnQuoteCandleStick && (not (CandleStickClientInline.shouldFilterQuote(quote, darkPoolFiltered)))
+            if useOnQuoteCandleStick && (not (CandleStickClientInline.shouldFilterQuote(quote, useTradeFiltering)))
             then
                 let bucket : SymbolBucket = getSlot(quote.Symbol, symbolBuckets, symbolBucketsLock)
                 try          
