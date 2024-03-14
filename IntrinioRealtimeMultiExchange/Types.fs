@@ -93,6 +93,9 @@ type [<Struct>] Trade =
         MarketCenter: char
         Condition: string
     }
+    
+    member this.IsDarkpool() : bool =
+        this.MarketCenter.Equals((char)0) || this.MarketCenter.Equals('D') || this.MarketCenter.Equals('E') || Char.IsWhiteSpace(this.MarketCenter)
 
     override this.ToString() : string =
         "Trade (" +
