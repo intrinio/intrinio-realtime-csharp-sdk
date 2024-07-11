@@ -8,7 +8,7 @@ SDK for working with Intrinio's realtime Multi-Exchange, delayed SIP, or NASDAQ 
 
 ## Requirements
 
-- .NET 6+
+- .NET 8+
 
 ## Docker
 Add your API key to the config.json file in IntrinioRealTimeSDK, then
