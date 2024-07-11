@@ -62,7 +62,7 @@ type Client(
     let useOnQuote : bool = not (obj.ReferenceEquals(onQuote,null))
     let logPrefix : string = String.Format("{0}: ", config.Provider.ToString())
     let clientInfoHeaderKey : string = "Client-Information"
-    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv9.2"
+    let clientInfoHeaderValue : string = "IntrinioDotNetSDKv10.0"
     let messageVersionHeaderKey : string = "UseNewEquitiesFormat"
     let messageVersionHeaderValue : string = "v2"
     let mainThreadPriority = Thread.CurrentThread.Priority //this is set outside of our scope - let's not interfere.
@@ -219,13 +219,10 @@ type Client(
     let getToken() : string =
         tLock.EnterUpgradeableReadLock()
         try
-            if (DateTime.Now - TimeSpan.FromDays(1.0)) > (snd token)
-            then (fst token)
-            else
-                tLock.EnterWriteLock()
-                try doBackoff(trySetToken)
-                finally tLock.ExitWriteLock()
-                fst token
+            tLock.EnterWriteLock()
+            try doBackoff(trySetToken)
+            finally tLock.ExitWriteLock()
+            fst token
         finally tLock.ExitUpgradeableReadLock()
 
     let makeJoinMessage(tradesOnly: bool, symbol: string) : byte[] = 
@@ -381,13 +378,8 @@ type Client(
                     wsLock.EnterWriteLock()
                     try wsState.IsReconnecting <- true
                     finally wsLock.ExitWriteLock()
-                    if (DateTime.Now - TimeSpan.FromDays(5.0)) > (wsState.LastReset)
-                    then
-                        let _token : string = getToken()
-                        resetWebSocket(_token)
-                    else
-                        try wsState.WebSocket.Open()
-                        with _ -> ()
+                    let _token : string = getToken()
+                    resetWebSocket(_token)
                     false
             doBackoff(reconnectFn)
         let _token : string = getToken()
