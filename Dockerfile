@@ -4,9 +4,9 @@ RUN mkdir /intrinio
 
 COPY . /intrinio
 
-WORKDIR /intrinio/IntrinioRealTimeSDK
+WORKDIR /intrinio/SampleApp
 
-RUN dotnet build IntrinioRealTimeSDK.csproj
+RUN dotnet build SampleApp.csproj
  
-CMD dotnet run IntrinioRealTimeSDK.csproj
+CMD dotnet run SampleApp.csproj
 
