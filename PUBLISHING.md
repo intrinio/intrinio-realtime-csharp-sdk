@@ -5,11 +5,11 @@
 Open a powershell window. Navigate to the ...\intrinio-realtime-csharp-sdk\IntrinioRealTimeSDK folder. Run:
 
 ```
-dotnet pack IntrinioRealTimeSDK.csproj -p:NuspecFile=IntrinioRealTimeClient.nuspec
+dotnet pack SampleApp.csproj -p:NuspecFile=IntrinioRealTimeClient.nuspec
 ```
 
 This will create a `IntrinioRealTimeClient.{version}.nupkg` file. The path to this file will be output by the 'pack' command but is likely in:
-'...\intrinio-realtime-csharp-sdk\IntrinioRealTimeSDK\bin\Debug\'
+'...\intrinio-realtime-csharp-sdk\SampleApp\bin\Release\net8.0\'
 To publish the file to NuGet, run:
 
 # Publishing
