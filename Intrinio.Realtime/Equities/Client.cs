@@ -43,7 +43,7 @@ public class Client : IEquitiesWebSocketClient
     private byte[] empty = Array.Empty<byte>();
     private ReaderWriterLockSlim tLock = new ReaderWriterLockSlim();
     private ReaderWriterLockSlim wsLock = new ReaderWriterLockSlim();
-    private Tuple<string, DateTime> token = new Tuple<string, DateTime>(null, DateTime.Now);
+    private Tuple<string, DateTime> _token = new Tuple<string, DateTime>(null, DateTime.Now);
     private WebSocketState wsState = null;
     private UInt64 dataMsgCount = 0UL;
     private UInt64 dataEventCount = 0UL;
@@ -61,6 +61,7 @@ public class Client : IEquitiesWebSocketClient
     private const string messageVersionHeaderKey = "UseNewEquitiesFormat";
     private const string messageVersionHeaderValue = "v2";
     private readonly ThreadPriority mainThreadPriority = Thread.CurrentThread.Priority; //this is set outside of our scope - let's not interfere.
+    private Thread[] threads;
     #endregion //Data Members
     
     #region Constuctors
@@ -76,6 +77,9 @@ public class Client : IEquitiesWebSocketClient
         OnQuote = onQuote;
         _config = config;
         logPrefix = String.Format("{0}: ", _config?.Provider.ToString());
+        threads = GC.AllocateUninitializedArray<Thread>(config.NumThreads);
+        for (int i = 0; i < threads.Length; i++)
+            threads[i] = new Thread(new ThreadStart(threadFn));
     }
 
     /// <summary>
@@ -272,97 +276,155 @@ public class Client : IEquitiesWebSocketClient
         return new Quote(type, symbol, price, size, timestamp, subProvider, marketCenter, condition);
     }
     
-    // let parseSocketMessage (bytes: byte[], startIndex: byref<int>) : unit =
-    //     let mutable msgLength : int = 1 //default value in case corrupt array so we don't reprocess same bytes over and over. 
-    //     try
-    //         let msgType : MessageType = enum<MessageType> (int32 bytes.[startIndex])
-    //         msgLength <- int32 bytes.[startIndex + 1]
-    //         let chunk: ReadOnlySpan<byte> = new ReadOnlySpan<byte>(bytes, startIndex, msgLength)
-    //         match msgType with
-    //             | MessageType.Trade ->
-    //                 if useOnTrade
-    //                 then
-    //                     let trade: Trade = parseTrade(chunk)
-    //                     Interlocked.Increment(&dataTradeCount) |> ignore
-    //                     trade |> onTrade.Invoke
-    //             | MessageType.Ask | MessageType.Bid ->
-    //                 if useOnQuote
-    //                 then
-    //                     let quote: Quote = parseQuote(chunk)
-    //                     Interlocked.Increment(&dataQuoteCount) |> ignore
-    //                     quote |> onQuote.Invoke
-    //             | _ -> logMessage(LogLevel.WARNING, "Invalid MessageType: {0}", [|(int32 bytes.[startIndex])|])
-    //     finally
-    //         startIndex <- startIndex + msgLength
-    //
-    // let threadFn () : unit =
-    //     let ct = ctSource.Token
-    //     Thread.CurrentThread.Priority <- enum<ThreadPriority> (Math.Max(((int mainThreadPriority) - 1), 0)) //Set below main thread priority so doesn't interfere with main thread accepting messages.
-    //     let mutable datum : byte[] = Array.empty<byte>
-    //     while not (ct.IsCancellationRequested) do
-    //         try
-    //             if data.TryDequeue(&datum) then
-    //                 // These are grouped (many) messages.
-    //                 // The first byte tells us how many there are.
-    //                 // From there, check the type at index 0 of each chunk to know how many bytes each message has.
-    //                 let cnt = datum.[0] |> uint64
-    //                 Interlocked.Add(&dataEventCount, cnt) |> ignore
-    //                 let mutable startIndex = 1
-    //                 for _ in 1UL .. cnt do
-    //                     parseSocketMessage(datum, &startIndex)
-    //             else
-    //                 Thread.Sleep(10)
-    //         with
-    //             | :? OperationCanceledException -> ()
-    //             | exn -> logMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", [|exn.Message, exn.StackTrace|])
-    //
-    // let threads : Thread[] = Array.init config.NumThreads (fun _ -> new Thread(new ThreadStart(threadFn)))
-    //
-    // let doBackoff(fn: unit -> bool) : unit =
-    //     let mutable i : int = 0
-    //     let mutable backoff : int = selfHealBackoffs.[i]
-    //     let mutable success : bool = fn()
-    //     while not success do
-    //         Thread.Sleep(backoff)
-    //         i <- Math.Min(i + 1, selfHealBackoffs.Length - 1)
-    //         backoff <- selfHealBackoffs.[i]
-    //         success <- fn()
-    //
-    // let trySetToken() : bool =
-    //     logMessage(LogLevel.INFORMATION, "Authorizing...", [||])
-    //     let authUrl : string = getAuthUrl()
-    //     async {
-    //         try
-    //             let! response = httpClient.GetAsync(authUrl) |> Async.AwaitTask
-    //             if (response.IsSuccessStatusCode)
-    //             then
-    //                 let! _token = response.Content.ReadAsStringAsync() |> Async.AwaitTask
-    //                 Interlocked.Exchange(&token, (_token, DateTime.Now)) |> ignore
-    //                 return true
-    //             else
-    //                 logMessage(LogLevel.WARNING, "Authorization Failure. Authorization server status code = {0}", [|response.StatusCode|])
-    //                 return false
-    //         with
-    //         | :? System.InvalidOperationException as exn ->
-    //             logMessage(LogLevel.ERROR, "Authorization Failure (bad URI): {0}", [|exn.Message|])
-    //             return false
-    //         | :? System.Net.Http.HttpRequestException as exn ->
-    //             logMessage(LogLevel.ERROR, "Authoriztion Failure (bad network connection): {0}", [|exn.Message|])
-    //             return false
-    //         | :? System.Threading.Tasks.TaskCanceledException as exn ->
-    //             logMessage(LogLevel.ERROR, "Authorization Failure (timeout): {0}", [|exn.Message|])
-    //             return false
-    //     } |> Async.RunSynchronously
-    //
-    // let getToken() : string =
-    //     tLock.EnterUpgradeableReadLock()
-    //     try
-    //         tLock.EnterWriteLock()
-    //         try doBackoff(trySetToken)
-    //         finally tLock.ExitWriteLock()
-    //         fst token
-    //     finally tLock.ExitUpgradeableReadLock()
-    //
+    private void parseSocketMessage(byte[] bytes, ref int startIndex)
+    {
+        int msgLength = 1; //default value in case corrupt array so we don't reprocess same bytes over and over. 
+        try
+        {
+            MessageType msgType = (MessageType)Convert.ToInt32(bytes[startIndex]);
+            msgLength = Convert.ToInt32(bytes[startIndex + 1]);
+            ReadOnlySpan<byte> chunk = new ReadOnlySpan<byte>(bytes, startIndex, msgLength);
+            switch (msgType)
+            {
+                case MessageType.Trade:
+                {
+                    if (useOnTrade)
+                    {
+                        Trade trade = parseTrade(chunk);
+                        Interlocked.Increment(ref dataTradeCount);
+                        _onTrade.Invoke(trade);
+                    }
+                    break;
+                }
+                case MessageType.Ask:
+                case MessageType.Bid:
+                {
+                    if (useOnQuote)
+                    {
+                        Quote quote = parseQuote(chunk);
+                        Interlocked.Increment(ref dataQuoteCount);
+                        _onQuote.Invoke(quote);
+                    }
+                    break;
+                }
+                default:
+                    logMessage(LogLevel.WARNING, "Invalid MessageType: {0}", new object[] {Convert.ToInt32(bytes[startIndex])});
+                    break;
+            }
+        }
+        finally
+        {
+            startIndex = startIndex + msgLength;
+        }
+    }
+
+    private void threadFn()
+    {
+        CancellationToken ct = ctSource.Token;
+        Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
+        byte[] datum = Array.Empty<byte>();
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                if (data.TryDequeue(out datum))
+                {
+                    // These are grouped (many) messages.
+                    // The first byte tells us how many there are.
+                    // From there, check the type at index 0 of each chunk to know how many bytes each message has.
+                    UInt64 cnt = Convert.ToUInt64(datum[0]);
+                    Interlocked.Add(ref dataEventCount, cnt);
+                    int startIndex = 1;
+                    for (ulong i = 0UL; i < cnt; ++i)
+                        parseSocketMessage(datum, ref startIndex);
+                }
+                else
+                    Thread.Sleep(10);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exn)
+            {
+                logMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", new object[]{exn.Message, exn.StackTrace});
+            }
+        };
+    }
+    
+    private void doBackoff(Func<bool> fn)
+    {
+        int i = 0;
+        int backoff = selfHealBackoffs[i];
+        bool success = fn();
+        while (!success)
+        {
+            Thread.Sleep(backoff);
+            i = Math.Min(i + 1, selfHealBackoffs.Length - 1);
+            backoff = selfHealBackoffs[i];
+            success = fn();
+        }
+    }
+
+    private bool trySetToken()
+    {
+        logMessage(LogLevel.INFORMATION, "Authorizing...", Array.Empty<object>());
+        string authUrl = getAuthUrl();
+        try
+        {
+            HttpResponseMessage response = httpClient.GetAsync(authUrl).Result;
+            if (response.IsSuccessStatusCode)
+            {
+                string token = response.Content.ReadAsStringAsync().Result;
+                Interlocked.Exchange(ref _token, new Tuple<string, DateTime>(token, DateTime.Now));
+                return true;
+            }
+            else
+            {
+                logMessage(LogLevel.WARNING, "Authorization Failure. Authorization server status code = {0}", new object[]{response.StatusCode});
+                return false;
+            }
+        }
+        catch (System.InvalidOperationException exn)
+        {
+            logMessage(LogLevel.ERROR, "Authorization Failure (bad URI): {0}", new object[]{exn.Message});
+            return false;
+        }
+        catch (System.Net.Http.HttpRequestException exn)
+        {
+            logMessage(LogLevel.ERROR, "Authoriztion Failure (bad network connection): {0}", new object[]{exn.Message});
+            return false;
+        }
+        catch (TaskCanceledException exn)
+        {
+            logMessage(LogLevel.ERROR, "Authorization Failure (timeout): {0}", new object[]{exn.Message});
+            return false;
+        }       
+    }
+    
+    private string getToken()
+    {
+        tLock.EnterUpgradeableReadLock();
+        try
+        {
+            tLock.EnterWriteLock();
+            try
+            {
+                doBackoff(trySetToken);
+            }
+            finally
+            {
+                tLock.ExitWriteLock();
+            }
+
+            return _token.Item1;
+        }
+        finally
+        {
+            tLock.ExitUpgradeableReadLock();
+        }
+    }
+    
+    
     // let makeJoinMessage(tradesOnly: bool, symbol: string) : byte[] = 
     //     match symbol with
     //         | "lobby" -> 
@@ -505,5 +567,6 @@ public class Client : IEquitiesWebSocketClient
     //         with _ -> ()
     #endregion //Private Methods
 
+    //Use record for free correct GetHash
     private record struct Channel(string Ticker, bool TradeOnly){}
 }
