@@ -1,5 +1,7 @@
 namespace Intrinio.Realtime.Equities;
 
+using System;
+
 public struct Quote
 {
     public readonly QuoteType Type;

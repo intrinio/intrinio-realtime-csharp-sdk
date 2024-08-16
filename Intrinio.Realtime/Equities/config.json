@@ -1,0 +1,26 @@
+{
+	"Config": {
+		"ApiKey": "",
+		"NumThreads": 2,
+		"Provider": "REALTIME",
+		//"Provider": "DELAYED_SIP",
+		//"Provider": "NASDAQ_BASIC",
+		//"Provider": "MANUAL",
+		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
+		//"Symbols": [ "lobby" ]
+		//"IPAddress": "1.2.3.4"
+	},
+	"Serilog": {
+		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
+		"MinimumLevel": {
+			"Default": "Information",
+			"Override": {
+				"Microsoft": "Warning",
+				"System": "Warning"
+			}
+		},
+		"WriteTo": [
+			{ "Name": "Console" }
+		]
+	}
+}

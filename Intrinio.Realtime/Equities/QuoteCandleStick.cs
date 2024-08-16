@@ -1,5 +1,7 @@
 namespace Intrinio.Realtime.Equities;
 
+using System;
+
 public class QuoteCandleStick :IEquatable<QuoteCandleStick>, IComparable, IComparable<QuoteCandleStick>
 {
     private readonly string _symbol;

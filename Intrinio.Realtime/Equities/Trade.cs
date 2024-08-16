@@ -1,5 +1,7 @@
 namespace Intrinio.Realtime.Equities;
 
+using System;
+
 public readonly struct Trade
 {
     public readonly string Symbol;

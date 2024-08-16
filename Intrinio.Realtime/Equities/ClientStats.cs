@@ -1,5 +1,7 @@
 namespace Intrinio.Realtime.Equities;
 
+using System;
+
 public class ClientStats
 {
     private readonly UInt64 _socketDataMessages;

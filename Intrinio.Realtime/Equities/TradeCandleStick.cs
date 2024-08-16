@@ -1,5 +1,7 @@
 namespace Intrinio.Realtime.Equities;
 
+using System;
+
 public class TradeCandleStick :IEquatable<TradeCandleStick>, IComparable, IComparable<TradeCandleStick>
 {
     private readonly string _symbol;
