@@ -1,6 +1,6 @@
 {
 	"Config": {
-		"ApiKey": "",
+		"ApiKey": "API_KEY",
 		"NumThreads": 2,
 		"Provider": "REALTIME",
 		//"Provider": "DELAYED_SIP",

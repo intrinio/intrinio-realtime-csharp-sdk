@@ -22,4 +22,10 @@
         <ProjectReference Include="..\IntrinioRealtimeMultiExchange\IntrinioRealtimeMultiExchange.fsproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="config.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
 </Project>
