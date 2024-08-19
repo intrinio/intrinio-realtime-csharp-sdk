@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace Intrinio.Realtime.Equities;
 
 using Intrinio.Realtime.Equities;
@@ -111,47 +113,87 @@ public class Client : IEquitiesWebSocketClient
     #region Public Methods
     public void Join()
     {
-        throw new NotImplementedException();
+        while (!isReady())
+            Thread.Sleep(1000);
+        HashSet <Channel> symbolsToAdd = _config.Symbols.Select(s => new Channel(s, _config.TradesOnly)).ToHashSet();
+        symbolsToAdd.ExceptWith(channels);
+        foreach (Channel channel in symbolsToAdd)
+            join(channel.Ticker, channel.TradesOnly);
     }
 
-    public void Join(string channel, bool? tradesOnly)
+    public void Join(string symbol, bool? tradesOnly)
     {
-        throw new NotImplementedException();
+        bool t = tradesOnly.HasValue ? tradesOnly.Value || _config.TradesOnly : false || _config.TradesOnly;
+        while (!isReady())
+            Thread.Sleep(1000);
+        if (!channels.Contains(new (symbol, t)))
+            join(symbol, t);
     }
 
-    public void Join(string[] channels, bool? tradesOnly)
+    public void Join(string[] symbols, bool? tradesOnly)
     {
-        throw new NotImplementedException();
+        bool t = tradesOnly.HasValue ? tradesOnly.Value || _config.TradesOnly : false || _config.TradesOnly;
+        while (!isReady())
+            Thread.Sleep(1000);
+        HashSet <Channel> symbolsToAdd = symbols.Select(s => new Channel(s, t)).ToHashSet();
+        symbolsToAdd.ExceptWith(channels);
+        foreach (Channel channel in symbolsToAdd)
+            join(channel.Ticker, channel.TradesOnly);
     }
 
     public void Leave()
     {
-        throw new NotImplementedException();
+        Channel[] matchingChannels = this.channels.ToArray();
+        foreach (Channel channel in matchingChannels)
+            leave(channel.Ticker, channel.TradesOnly);
     }
 
-    public void Leave(string channel)
+    public void Leave(string symbol)
     {
-        throw new NotImplementedException();
+        Channel[] matchingChannels = this.channels.Where(c => symbol == c.Ticker).ToArray();
+        foreach (Channel channel in matchingChannels)
+            leave(channel.Ticker, channel.TradesOnly);
     }
 
-    public void Leave(string[] channels)
+    public void Leave(string[] symbols)
     {
-        throw new NotImplementedException();
+        HashSet<string> _symbols = new HashSet<string>(symbols);
+        Channel[] matchingChannels = this.channels.Where(c => _symbols.Contains(c.Ticker)).ToArray();
+        foreach (Channel channel in matchingChannels)
+            leave(channel.Ticker, channel.TradesOnly);
     }
 
     public void Stop()
     {
-        throw new NotImplementedException();
+        Leave();
+        Thread.Sleep(1000);
+        wsLock.EnterWriteLock();
+        try
+        {
+            wsState.IsReady = false;
+        }
+        finally
+        {
+            wsLock.ExitWriteLock();
+        }
+
+        ctSource.Cancel();
+        logMessage(LogLevel.INFORMATION, "Websocket - Closing...", Array.Empty<object>());
+        wsState.WebSocket.Close();
+        foreach (Thread thread in threads)
+            thread.Join();
+        logMessage(LogLevel.INFORMATION, "Stopped", Array.Empty<object>());
     }
 
     public ClientStats GetStats()
     {
-        throw new NotImplementedException();
+        return new ClientStats(Interlocked.Read(ref dataMsgCount), Interlocked.Read(ref textMsgCount), data.Count, Interlocked.Read(ref dataEventCount), Interlocked.Read(ref dataTradeCount), Interlocked.Read(ref dataQuoteCount));
     }
 
-    public void Log(string message, params object[] parameters)
+    [MessageTemplateFormatMethod("messageTemplate")]
+    public void Log(string messageTemplate, params object[] parameters)
     {
-        throw new NotImplementedException();
+        Serilog.Log.Information(messageTemplate, parameters);
     }
     #endregion //Public Methods
     
