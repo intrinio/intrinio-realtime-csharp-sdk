@@ -425,148 +425,260 @@ public class Client : IEquitiesWebSocketClient
     }
     
     
-    // let makeJoinMessage(tradesOnly: bool, symbol: string) : byte[] = 
-    //     match symbol with
-    //         | "lobby" -> 
-    //             let message : byte[] = Array.zeroCreate 11 //1 + 1 + 9
-    //             message.[0] <- 74uy //type: join (74uy) or leave (76uy)
-    //             message.[1] <- (if tradesOnly then 1uy else 0uy)
-    //             Encoding.ASCII.GetBytes("$FIREHOSE").CopyTo(message, 2)
-    //             message
-    //         | _ -> 
-    //             let message : byte[] = Array.zeroCreate (2 + symbol.Length) //1 + 1 + symbol.Length
-    //             message.[0] <- 74uy //type: join (74uy) or leave (76uy)
-    //             message.[1] <- (if tradesOnly then 1uy else 0uy)
-    //             Encoding.ASCII.GetBytes(symbol).CopyTo(message, 2)
-    //             message
-    //
-    // let makeLeaveMessage(symbol: string) : byte[] = 
-    //     match symbol with
-    //     | "lobby" -> 
-    //         let message : byte[] = Array.zeroCreate 10 // 1 (type = join) + 9 (symbol = $FIREHOSE)
-    //         message.[0] <- 76uy //type: join (74uy) or leave (76uy)
-    //         Encoding.ASCII.GetBytes("$FIREHOSE").CopyTo(message, 1)
-    //         message
-    //     | _ -> 
-    //         let message : byte[] = Array.zeroCreate (1 + symbol.Length) //1 + symbol.Length
-    //         message.[0] <- 76uy //type: join (74uy) or leave (76uy)
-    //         Encoding.ASCII.GetBytes(symbol).CopyTo(message, 1)
-    //         message
-    //
-    // let onOpen (_ : EventArgs) : unit =
-    //     logMessage(LogLevel.INFORMATION, "Websocket - Connected", [||])
-    //     wsLock.EnterWriteLock()
-    //     try
-    //         wsState.IsReady <- true
-    //         wsState.IsReconnecting <- false
-    //         for thread in threads do
-    //             if not thread.IsAlive
-    //             then thread.Start()
-    //     finally wsLock.ExitWriteLock()
-    //     if channels.Count > 0
-    //     then
-    //         channels |> Seq.iter (fun (symbol: string, tradesOnly:bool) ->
-    //             let lastOnly : string = if tradesOnly then "true" else "false"
-    //             let message : byte[] = makeJoinMessage(tradesOnly, symbol)
-    //             logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", [|symbol, lastOnly|])
-    //             wsState.WebSocket.Send(message, 0, message.Length) )
-    //
-    // let onClose (_ : EventArgs) : unit =
-    //     wsLock.EnterUpgradeableReadLock()
-    //     try 
-    //         if not wsState.IsReconnecting
-    //         then
-    //             logMessage(LogLevel.INFORMATION, "Websocket - Closed", [||])
-    //             wsLock.EnterWriteLock()
-    //             try wsState.IsReady <- false
-    //             finally wsLock.ExitWriteLock()
-    //             if (not ctSource.IsCancellationRequested)
-    //             then Task.Factory.StartNew(Action(tryReconnect)) |> ignore
-    //     finally wsLock.ExitUpgradeableReadLock()
-    //
-    // let (|Closed|Refused|Unavailable|Other|) (input:exn) =
-    //     if (input.GetType() = typeof<SocketException>) &&
-    //         input.Message.StartsWith("A connection attempt failed because the connected party did not properly respond after a period of time")
-    //     then Closed
-    //     elif (input.GetType() = typeof<SocketException>) &&
-    //         (input.Message = "No connection could be made because the target machine actively refused it.")
-    //     then Refused
-    //     elif input.Message.StartsWith("HTTP/1.1 503")
-    //     then Unavailable
-    //     else Other
-    //
-    // let onError (args : SuperSocket.ClientEngine.ErrorEventArgs) : unit =
-    //     let exn = args.Exception
-    //     match exn with
-    //     | Closed -> logMessage(LogLevel.WARNING, "Websocket - Error - Connection failed", [||])
-    //     | Refused -> logMessage(LogLevel.WARNING, "Websocket - Error - Connection refused", [||])
-    //     | Unavailable -> logMessage(LogLevel.WARNING, "Websocket - Error - Server unavailable", [||])
-    //     | _ -> logMessage(LogLevel.ERROR, "Websocket - Error - {0}:{1}", [|exn.GetType(), exn.Message|])
-    //
-    // let onDataReceived (args: DataReceivedEventArgs) : unit =
-    //     logMessage(LogLevel.DEBUG, "Websocket - Data received", [||])
-    //     Interlocked.Increment(&dataMsgCount) |> ignore
-    //     data.Enqueue(args.Data)
-    //
-    // let onMessageReceived (args : MessageReceivedEventArgs) : unit =
-    //     logMessage(LogLevel.DEBUG, "Websocket - Message received", [||])
-    //     Interlocked.Increment(&textMsgCount) |> ignore
-    //     logMessage(LogLevel.ERROR, "Error received: {0}", [|args.Message|])
-    //
-    // let resetWebSocket(token: string) : unit =
-    //     logMessage(LogLevel.INFORMATION, "Websocket - Resetting", [||])
-    //     let wsUrl : string = getWebSocketUrl(token)
-    //     let headers : List<KeyValuePair<string, string>> = getCustomSocketHeaders()
-    //     //let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
-    //     let ws : WebSocket = new WebSocket(wsUrl, null, null, headers)
-    //     ws.Opened.Add(onOpen)
-    //     ws.Closed.Add(onClose)
-    //     ws.Error.Add(onError)
-    //     ws.DataReceived.Add(onDataReceived)
-    //     ws.MessageReceived.Add(onMessageReceived)
-    //     wsLock.EnterWriteLock()
-    //     try
-    //         wsState.WebSocket <- ws
-    //         wsState.Reset()
-    //     finally wsLock.ExitWriteLock()
-    //     ws.Open()
-    //
-    // let initializeWebSockets(token: string) : unit =
-    //     wsLock.EnterWriteLock()
-    //     try
-    //         logMessage(LogLevel.INFORMATION, "Websocket - Connecting...", [||])
-    //         let wsUrl : string = getWebSocketUrl(token)
-    //         let headers : List<KeyValuePair<string, string>> = getCustomSocketHeaders()
-    //         //let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
-    //         let ws : WebSocket = new WebSocket(wsUrl, null, null, headers)
-    //         ws.Opened.Add(onOpen)
-    //         ws.Closed.Add(onClose)
-    //         ws.Error.Add(onError)
-    //         ws.DataReceived.Add(onDataReceived)
-    //         ws.MessageReceived.Add(onMessageReceived)
-    //         wsState <- new WebSocketState(ws)
-    //     finally wsLock.ExitWriteLock()
-    //     wsState.WebSocket.Open()
-    //
-    // let join(symbol: string, tradesOnly: bool) : unit =
-    //     let lastOnly : string = if tradesOnly then "true" else "false"
-    //     if channels.Add((symbol, tradesOnly))
-    //     then 
-    //         let message : byte[] = makeJoinMessage(tradesOnly, symbol)
-    //         logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", [|symbol, lastOnly|])
-    //         try wsState.WebSocket.Send(message, 0, message.Length)
-    //         with _ -> channels.Remove((symbol, tradesOnly)) |> ignore
-    //
-    // let leave(symbol: string, tradesOnly: bool) : unit =
-    //     let lastOnly : string = if tradesOnly then "true" else "false"
-    //     if channels.Remove((symbol, tradesOnly))
-    //     then 
-    //         let message : byte[] = makeLeaveMessage(symbol)
-    //         logMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0} (trades only = {1})", [|symbol, lastOnly|])
-    //         try wsState.WebSocket.Send(message, 0, message.Length)
-    //         with _ -> ()
+    private byte[] makeJoinMessage(bool tradesOnly, string symbol)
+    {
+        switch (symbol)
+        {
+            case "lobby":
+            {
+                byte[] message = new byte[11]; //1 + 1 + 9
+                message[0] = Convert.ToByte(74); //type: join (74uy) or leave (76uy)
+                message[1] = tradesOnly ? Convert.ToByte(1) : Convert.ToByte(0);
+                Encoding.ASCII.GetBytes("$FIREHOSE").CopyTo(message, 2);
+                return message;
+            }
+            default:
+            {
+                byte[] message = new byte[2 + symbol.Length]; //1 + 1 + symbol.Length
+                message[0] = Convert.ToByte(74); //type: join (74uy) or leave (76uy)
+                message[1] = tradesOnly ? Convert.ToByte(1) : Convert.ToByte(0);
+                Encoding.ASCII.GetBytes(symbol).CopyTo(message, 2);
+                return message;
+            }
+        }
+    }
+
+    private byte[] makeLeaveMessage(string symbol)
+    {
+        switch (symbol)
+        {
+            case "lobby":
+            {
+                byte[] message = new byte[10]; // 1 (type = join) + 9 (symbol = $FIREHOSE)
+                message[0] = Convert.ToByte(76); //type: join (74uy) or leave (76uy)
+                Encoding.ASCII.GetBytes("$FIREHOSE").CopyTo(message, 1);
+                return message;
+            }
+            default:
+            {
+                byte[] message = new byte[1 + symbol.Length]; //1 + symbol.Length
+                message[0] = Convert.ToByte(76); //type: join (74uy) or leave (76uy)
+                Encoding.ASCII.GetBytes(symbol).CopyTo(message, 1);
+                return message;
+            }
+        }
+    }
+
+    private void onOpen(object? _, EventArgs __)
+    {
+        logMessage(LogLevel.INFORMATION, "Websocket - Connected", Array.Empty<object>());
+        wsLock.EnterWriteLock();
+        try
+        {
+            wsState.IsReady = true;
+            wsState.IsReconnecting = false;
+            foreach (Thread thread in threads)
+            {
+                if (!thread.IsAlive)
+                    thread.Start();
+            }
+        }
+        finally
+        {
+            wsLock.ExitWriteLock();
+        }
+
+        if (channels.Count > 0)
+        {
+            foreach (Channel channel in channels)
+            {
+                string lastOnly = channel.TradesOnly ? "true" : "false";
+                byte[] message = makeJoinMessage(channel.TradesOnly, channel.Ticker);
+                logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", new string[]{channel.Ticker, lastOnly});
+                wsState.WebSocket.Send(message, 0, message.Length);
+            }
+        }
+    }
+
+    private void onClose(object? _, EventArgs __)
+    {
+        wsLock.EnterUpgradeableReadLock();
+        try
+        {
+            if (!wsState.IsReconnecting)
+            {
+                logMessage(LogLevel.INFORMATION, "Websocket - Closed", Array.Empty<object>());
+                wsLock.EnterWriteLock();
+                try
+                {
+                    wsState.IsReady = false;
+                }
+                finally
+                {
+                    wsLock.ExitWriteLock();
+                }
+
+                if (!ctSource.IsCancellationRequested)
+                {
+                    Task.Factory.StartNew(tryReconnect);
+                }
+            }
+        }
+        finally
+        {
+            wsLock.ExitUpgradeableReadLock();
+        }
+    }
+
+    private enum CloseType
+    {
+        Closed,
+        Refused,
+        Unavailable,
+        Other
+    }
+
+    private CloseType GetCloseType(Exception input)
+    {
+        if ((input.GetType() == typeof(SocketException)) && input.Message.StartsWith("A connection attempt failed because the connected party did not properly respond after a period of time"))
+        {
+            return CloseType.Closed;
+        }
+        if ((input.GetType() == typeof(SocketException)) && (input.Message == "No connection could be made because the target machine actively refused it."))
+        {
+            return CloseType.Refused;
+        }
+        if (input.Message.StartsWith("HTTP/1.1 503"))
+        {
+            return CloseType.Unavailable;
+        }
+        return CloseType.Other;
+    }
+
+    private void onError(object? _, SuperSocket.ClientEngine.ErrorEventArgs args)
+    {
+        Exception exn = args.Exception;
+        CloseType exceptionType = GetCloseType(exn);
+        switch (exceptionType)
+        {
+            case CloseType.Closed:
+                logMessage(LogLevel.WARNING, "Websocket - Error - Connection failed", Array.Empty<object>());
+                break;
+            case CloseType.Refused:
+                logMessage(LogLevel.WARNING, "Websocket - Error - Connection refused", Array.Empty<object>());
+                break;
+            case CloseType.Unavailable:
+                logMessage(LogLevel.WARNING, "Websocket - Error - Server unavailable", Array.Empty<object>());
+                break;
+            default:
+                logMessage(LogLevel.ERROR, "Websocket - Error - {0}:{1}", new object[]{exn.GetType(), exn.Message});
+                break;
+        }
+    }
+
+    private void onDataReceived(object? _, DataReceivedEventArgs args)
+    {
+        // log commented for performance reasons. Uncomment for troubleshooting.
+        //logMessage(LogLevel.DEBUG, "Websocket - Data received", Array.Empty<object>());
+        Interlocked.Increment(ref dataMsgCount);
+        data.Enqueue(args.Data);
+    }
+
+    private void onMessageReceived(object? _, MessageReceivedEventArgs args)
+    {
+        logMessage(LogLevel.DEBUG, "Websocket - Message received", Array.Empty<object>());
+        Interlocked.Increment(ref textMsgCount);
+        logMessage(LogLevel.ERROR, "Error received: {0}", new object[]{args.Message});
+    }
+
+    private void resetWebSocket(string token)
+    {
+        logMessage(LogLevel.INFORMATION, "Websocket - Resetting", Array.Empty<object>());
+        string wsUrl = getWebSocketUrl(token);
+        List<KeyValuePair<string, string>> headers = getCustomSocketHeaders();
+        //let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
+        WebSocket ws = new WebSocket(wsUrl, null, null, headers);
+        ws.Opened += onOpen;
+        ws.Closed += onClose;
+        ws.Error += onError;
+        ws.DataReceived += onDataReceived;
+        ws.MessageReceived += onMessageReceived;
+        wsLock.EnterWriteLock();
+        try
+        {
+            wsState.WebSocket = ws;
+            wsState.Reset();
+        }
+        finally
+        {
+            wsLock.ExitWriteLock();
+        }
+
+        ws.Open();
+    }
+
+    private void initializeWebSockets(string token)
+    {
+        wsLock.EnterWriteLock();
+        try
+        {
+            logMessage(LogLevel.INFORMATION, "Websocket - Connecting...", Array.Empty<object>());
+            string wsUrl = getWebSocketUrl(token);
+            List<KeyValuePair<string, string>> headers = getCustomSocketHeaders();
+            //let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
+            WebSocket ws = new WebSocket(wsUrl, null, null, headers);
+            ws.Opened += onOpen;
+            ws.Closed += onClose;
+            ws.Error += onError;
+            ws.DataReceived += onDataReceived;
+            ws.MessageReceived += onMessageReceived;
+            wsState = new WebSocketState(ws);
+        }
+        finally
+        {
+            wsLock.ExitWriteLock();
+        }
+
+        wsState.WebSocket.Open();
+    }
+    
+    private void join(string symbol, bool tradesOnly)
+    {
+        string lastOnly = tradesOnly ? "true" : "false";
+        if (channels.Add(new (symbol, tradesOnly)))
+        {
+            byte[] message = makeJoinMessage(tradesOnly, symbol);
+            logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", new object[]{symbol, lastOnly});
+            try
+            {
+                wsState.WebSocket.Send(message, 0, message.Length);
+            }
+            catch
+            {
+                channels.Remove(new (symbol, tradesOnly));
+            }
+        }
+    }
+    
+    private void leave(string symbol, bool tradesOnly)
+    {
+        string lastOnly = tradesOnly ? "true" : "false";
+        if (channels.Remove(new (symbol, tradesOnly)))
+        {
+            byte[] message = makeLeaveMessage(symbol);
+            logMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0} (trades only = {1})", new object[]{symbol, lastOnly});
+            try
+            {
+                wsState.WebSocket.Send(message, 0, message.Length);
+            }
+            catch
+            {
+                
+            }
+        }
+    }
     #endregion //Private Methods
 
-    //Use record for free correct GetHash
-    private record struct Channel(string Ticker, bool TradeOnly){}
+    //Use record for free correct implementation of GetHash that takes into account both values
+    private record struct Channel(string Ticker, bool TradesOnly){}
 }
