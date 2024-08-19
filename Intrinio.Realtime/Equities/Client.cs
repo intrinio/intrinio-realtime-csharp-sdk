@@ -2,11 +2,7 @@ using System.Linq;
 
 namespace Intrinio.Realtime.Equities;
 
-using Intrinio.Realtime.Equities;
-using Serilog;
 using System;
-using System.Runtime.InteropServices;
-using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Collections.Concurrent;
