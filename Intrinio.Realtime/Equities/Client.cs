@@ -20,50 +20,56 @@ using Serilog.Core;
 public class Client : IEquitiesWebSocketClient
 {
     #region Data Members
-    private bool useOnTrade;
-    private bool useOnQuote;
+    private bool _useOnTrade;
+    private bool _useOnQuote;
     private Action<Trade> _onTrade;
+    /// <summary>
+    /// The callback for when a trade event occurs.
+    /// </summary>
     public Action<Trade> OnTrade
     {
         set
         {
-            useOnTrade = !ReferenceEquals(value, null);
+            _useOnTrade = !ReferenceEquals(value, null);
             _onTrade = value;
         }
     }
     private Action<Quote> _onQuote;
+    /// <summary>
+    /// The callback for when a quote event occurs.
+    /// </summary>
     public Action<Quote> OnQuote
     {
         set
         {
-            useOnQuote = !ReferenceEquals(value, null);
+            _useOnQuote = !ReferenceEquals(value, null);
             _onQuote = value;
         }
     }
-    private Config _config;
-    private int[] selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
-    private byte[] empty = Array.Empty<byte>();
-    private ReaderWriterLockSlim tLock = new ReaderWriterLockSlim();
-    private ReaderWriterLockSlim wsLock = new ReaderWriterLockSlim();
-    private Tuple<string, DateTime> _token = new Tuple<string, DateTime>(null, DateTime.Now);
-    private WebSocketState wsState = null;
-    private UInt64 dataMsgCount = 0UL;
-    private UInt64 dataEventCount = 0UL;
-    private UInt64 dataTradeCount = 0UL;
-    private UInt64 dataQuoteCount = 0UL;
-    private UInt64 textMsgCount = 0UL;
-    private HashSet<Channel> channels = new HashSet<Channel>();
-    private CancellationTokenSource ctSource = new CancellationTokenSource();
-    private ConcurrentQueue<byte[]> data = new ConcurrentQueue<byte[]>();
-    private Action tryReconnect = () => { };
-    private readonly HttpClient httpClient = new HttpClient();
-    private string logPrefix;
-    private const string clientInfoHeaderKey = "Client-Information";
-    private const string clientInfoHeaderValue = "IntrinioDotNetSDKv10.0";
-    private const string messageVersionHeaderKey = "UseNewEquitiesFormat";
-    private const string messageVersionHeaderValue = "v2";
-    private readonly ThreadPriority mainThreadPriority = Thread.CurrentThread.Priority; //this is set outside of our scope - let's not interfere.
-    private Thread[] threads;
+    private readonly Config _config;
+    private readonly int[] _selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
+    private byte[] _empty = Array.Empty<byte>();
+    private readonly ReaderWriterLockSlim _tLock = new ();
+    private readonly ReaderWriterLockSlim _wsLock = new ();
+    private Tuple<string, DateTime> _token = new (null, DateTime.Now);
+    private WebSocketState _wsState = null;
+    private UInt64 _dataMsgCount = 0UL;
+    private UInt64 _dataEventCount = 0UL;
+    private UInt64 _dataTradeCount = 0UL;
+    private UInt64 _dataQuoteCount = 0UL;
+    private UInt64 _textMsgCount = 0UL;
+    private readonly HashSet<Channel> _channels = new ();
+    private readonly CancellationTokenSource _ctSource = new ();
+    private readonly ConcurrentQueue<byte[]> _data = new ();
+    private readonly Action _tryReconnect;
+    private readonly HttpClient _httpClient = new ();
+    private readonly string _logPrefix;
+    private const string ClientInfoHeaderKey = "Client-Information";
+    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv10.0";
+    private const string MessageVersionHeaderKey = "UseNewEquitiesFormat";
+    private const string MessageVersionHeaderValue = "v2";
+    private readonly ThreadPriority _mainThreadPriority = Thread.CurrentThread.Priority; //this is set outside of our scope - let's not interfere.
+    private readonly Thread[] _threads;
     #endregion //Data Members
     
     #region Constuctors
@@ -78,10 +84,42 @@ public class Client : IEquitiesWebSocketClient
         OnTrade = onTrade;
         OnQuote = onQuote;
         _config = config;
-        logPrefix = String.Format("{0}: ", _config?.Provider.ToString());
-        threads = GC.AllocateUninitializedArray<Thread>(config.NumThreads);
-        for (int i = 0; i < threads.Length; i++)
-            threads[i] = new Thread(new ThreadStart(threadFn));
+        
+        if (ReferenceEquals(null, _config))
+            throw new ArgumentException("Config may not be null.");
+        
+        _logPrefix = String.Format("{0}: ", _config?.Provider.ToString());
+        _threads = GC.AllocateUninitializedArray<Thread>(_config.NumThreads);
+        for (int i = 0; i < _threads.Length; i++)
+            _threads[i] = new Thread(new ThreadStart(ThreadFn));
+
+        _config.Validate();
+        _httpClient.Timeout = TimeSpan.FromSeconds(5.0);
+        _httpClient.DefaultRequestHeaders.Add(ClientInfoHeaderKey, ClientInfoHeaderValue);
+        _tryReconnect = () =>
+        {
+            DoBackoff(() =>
+            {
+                LogMessage(LogLevel.INFORMATION, "Websocket - Reconnecting...", Array.Empty<object>());
+                if (_wsState.IsReady)
+                    return true;
+                _wsLock.EnterWriteLock();
+                try
+                {
+                    _wsState.IsReconnecting = true;
+                }
+                finally
+                {
+                    _wsLock.ExitWriteLock();
+                }
+
+                string token = GetToken();
+                ResetWebSocket(token);
+                return false;
+            });
+        };
+        string token = GetToken();
+        InitializeWebSockets(token);
     }
 
     /// <summary>
@@ -113,81 +151,81 @@ public class Client : IEquitiesWebSocketClient
     #region Public Methods
     public void Join()
     {
-        while (!isReady())
+        while (!IsReady())
             Thread.Sleep(1000);
         HashSet <Channel> symbolsToAdd = _config.Symbols.Select(s => new Channel(s, _config.TradesOnly)).ToHashSet();
-        symbolsToAdd.ExceptWith(channels);
+        symbolsToAdd.ExceptWith(_channels);
         foreach (Channel channel in symbolsToAdd)
-            join(channel.Ticker, channel.TradesOnly);
+            JoinImpl(channel.Ticker, channel.TradesOnly);
     }
 
     public void Join(string symbol, bool? tradesOnly)
     {
         bool t = tradesOnly.HasValue ? tradesOnly.Value || _config.TradesOnly : false || _config.TradesOnly;
-        while (!isReady())
+        while (!IsReady())
             Thread.Sleep(1000);
-        if (!channels.Contains(new (symbol, t)))
-            join(symbol, t);
+        if (!_channels.Contains(new (symbol, t)))
+            JoinImpl(symbol, t);
     }
 
     public void Join(string[] symbols, bool? tradesOnly)
     {
         bool t = tradesOnly.HasValue ? tradesOnly.Value || _config.TradesOnly : false || _config.TradesOnly;
-        while (!isReady())
+        while (!IsReady())
             Thread.Sleep(1000);
         HashSet <Channel> symbolsToAdd = symbols.Select(s => new Channel(s, t)).ToHashSet();
-        symbolsToAdd.ExceptWith(channels);
+        symbolsToAdd.ExceptWith(_channels);
         foreach (Channel channel in symbolsToAdd)
-            join(channel.Ticker, channel.TradesOnly);
+            JoinImpl(channel.Ticker, channel.TradesOnly);
     }
 
     public void Leave()
     {
-        Channel[] matchingChannels = this.channels.ToArray();
+        Channel[] matchingChannels = _channels.ToArray();
         foreach (Channel channel in matchingChannels)
-            leave(channel.Ticker, channel.TradesOnly);
+            LeaveImpl(channel.Ticker, channel.TradesOnly);
     }
 
     public void Leave(string symbol)
     {
-        Channel[] matchingChannels = this.channels.Where(c => symbol == c.Ticker).ToArray();
+        Channel[] matchingChannels = _channels.Where(c => symbol == c.Ticker).ToArray();
         foreach (Channel channel in matchingChannels)
-            leave(channel.Ticker, channel.TradesOnly);
+            LeaveImpl(channel.Ticker, channel.TradesOnly);
     }
 
     public void Leave(string[] symbols)
     {
-        HashSet<string> _symbols = new HashSet<string>(symbols);
-        Channel[] matchingChannels = this.channels.Where(c => _symbols.Contains(c.Ticker)).ToArray();
+        HashSet<string> hashSymbols = new HashSet<string>(symbols);
+        Channel[] matchingChannels = _channels.Where(c => hashSymbols.Contains(c.Ticker)).ToArray();
         foreach (Channel channel in matchingChannels)
-            leave(channel.Ticker, channel.TradesOnly);
+            LeaveImpl(channel.Ticker, channel.TradesOnly);
     }
 
     public void Stop()
     {
         Leave();
         Thread.Sleep(1000);
-        wsLock.EnterWriteLock();
+        _wsLock.EnterWriteLock();
         try
         {
-            wsState.IsReady = false;
+            _wsState.IsReady = false;
         }
         finally
         {
-            wsLock.ExitWriteLock();
+            _wsLock.ExitWriteLock();
         }
 
-        ctSource.Cancel();
-        logMessage(LogLevel.INFORMATION, "Websocket - Closing...", Array.Empty<object>());
-        wsState.WebSocket.Close();
-        foreach (Thread thread in threads)
+        _ctSource.Cancel();
+        LogMessage(LogLevel.INFORMATION, "Websocket - Closing...", Array.Empty<object>());
+        _wsState.WebSocket.Close();
+        foreach (Thread thread in _threads)
             thread.Join();
-        logMessage(LogLevel.INFORMATION, "Stopped", Array.Empty<object>());
+        LogMessage(LogLevel.INFORMATION, "Stopped", Array.Empty<object>());
     }
 
     public ClientStats GetStats()
     {
-        return new ClientStats(Interlocked.Read(ref dataMsgCount), Interlocked.Read(ref textMsgCount), data.Count, Interlocked.Read(ref dataEventCount), Interlocked.Read(ref dataTradeCount), Interlocked.Read(ref dataQuoteCount));
+        return new ClientStats(Interlocked.Read(ref _dataMsgCount), Interlocked.Read(ref _textMsgCount), _data.Count, Interlocked.Read(ref _dataEventCount), Interlocked.Read(ref _dataTradeCount), Interlocked.Read(ref _dataQuoteCount));
     }
 
     [MessageTemplateFormatMethod("messageTemplate")]
@@ -199,21 +237,21 @@ public class Client : IEquitiesWebSocketClient
     
     #region Private Methods
     [Serilog.Core.MessageTemplateFormatMethod("messageTemplate")]
-    private void logMessage(LogLevel logLevel, string messageTemplate, [ParamArray] object[] propertyValues)
+    private void LogMessage(LogLevel logLevel, string messageTemplate, params object[] propertyValues)
     {
         switch (logLevel)
         {
             case LogLevel.DEBUG:
-                Serilog.Log.Debug(logPrefix + messageTemplate, propertyValues);
+                Serilog.Log.Debug(_logPrefix + messageTemplate, propertyValues);
                 break;
             case LogLevel.INFORMATION:
-                Serilog.Log.Information(logPrefix + messageTemplate, propertyValues);
+                Serilog.Log.Information(_logPrefix + messageTemplate, propertyValues);
                 break;
             case LogLevel.WARNING:
-                Serilog.Log.Warning(logPrefix + messageTemplate, propertyValues);
+                Serilog.Log.Warning(_logPrefix + messageTemplate, propertyValues);
                 break;
             case LogLevel.ERROR:
-                Serilog.Log.Error(logPrefix + messageTemplate, propertyValues);
+                Serilog.Log.Error(_logPrefix + messageTemplate, propertyValues);
                 break;
             default:
                 throw new ArgumentException("LogLevel not specified!");
@@ -221,20 +259,20 @@ public class Client : IEquitiesWebSocketClient
         }
     }
 
-    private bool isReady()
+    private bool IsReady()
     {
-        wsLock.EnterReadLock();
+        _wsLock.EnterReadLock();
         try
         {
-            return !ReferenceEquals(null, wsState) && wsState.IsReady;
+            return !ReferenceEquals(null, _wsState) && _wsState.IsReady;
         }
         finally
         {
-            wsLock.ExitReadLock();
+            _wsLock.ExitReadLock();
         }
     }
 
-    private string getAuthUrl()
+    private string GetAuthUrl()
     {
         switch (_config.Provider)
         {
@@ -256,7 +294,7 @@ public class Client : IEquitiesWebSocketClient
         }
     }
 
-    private string getWebSocketUrl(string token)
+    private string GetWebSocketUrl(string token)
     {
         switch (_config.Provider)
         {
@@ -278,15 +316,15 @@ public class Client : IEquitiesWebSocketClient
         }
     }
 
-    private List<KeyValuePair<string, string>> getCustomSocketHeaders()
+    private List<KeyValuePair<string, string>> GetCustomSocketHeaders()
     {
         List<KeyValuePair<string, string>> headers = new List<KeyValuePair<string, string>>();
-        headers.Add(new KeyValuePair<string, string>(clientInfoHeaderKey, clientInfoHeaderValue));
-        headers.Add(new KeyValuePair<string, string>(messageVersionHeaderKey, messageVersionHeaderValue));
+        headers.Add(new KeyValuePair<string, string>(ClientInfoHeaderKey, ClientInfoHeaderValue));
+        headers.Add(new KeyValuePair<string, string>(MessageVersionHeaderKey, MessageVersionHeaderValue));
         return headers;
     }
 
-    private Trade parseTrade(ReadOnlySpan<byte> bytes)
+    private Trade ParseTrade(ReadOnlySpan<byte> bytes)
     {
         int symbolLength = Convert.ToInt32(bytes[2]);
         int conditionLength = Convert.ToInt32(bytes[26 + symbolLength]);
@@ -302,7 +340,7 @@ public class Client : IEquitiesWebSocketClient
         return new Trade(symbol, price, size, timestamp, subProvider, marketCenter, condition, totalVolume);
     }
 
-    private Quote parseQuote(ReadOnlySpan<byte> bytes)
+    private Quote ParseQuote(ReadOnlySpan<byte> bytes)
     {
         int symbolLength = Convert.ToInt32(bytes[2]);
         int conditionLength = Convert.ToInt32(bytes[22 + symbolLength]);
@@ -318,7 +356,7 @@ public class Client : IEquitiesWebSocketClient
         return new Quote(type, symbol, price, size, timestamp, subProvider, marketCenter, condition);
     }
     
-    private void parseSocketMessage(byte[] bytes, ref int startIndex)
+    private void ParseSocketMessage(byte[] bytes, ref int startIndex)
     {
         int msgLength = 1; //default value in case corrupt array so we don't reprocess same bytes over and over. 
         try
@@ -330,10 +368,10 @@ public class Client : IEquitiesWebSocketClient
             {
                 case MessageType.Trade:
                 {
-                    if (useOnTrade)
+                    if (_useOnTrade)
                     {
-                        Trade trade = parseTrade(chunk);
-                        Interlocked.Increment(ref dataTradeCount);
+                        Trade trade = ParseTrade(chunk);
+                        Interlocked.Increment(ref _dataTradeCount);
                         _onTrade.Invoke(trade);
                     }
                     break;
@@ -341,16 +379,16 @@ public class Client : IEquitiesWebSocketClient
                 case MessageType.Ask:
                 case MessageType.Bid:
                 {
-                    if (useOnQuote)
+                    if (_useOnQuote)
                     {
-                        Quote quote = parseQuote(chunk);
-                        Interlocked.Increment(ref dataQuoteCount);
+                        Quote quote = ParseQuote(chunk);
+                        Interlocked.Increment(ref _dataQuoteCount);
                         _onQuote.Invoke(quote);
                     }
                     break;
                 }
                 default:
-                    logMessage(LogLevel.WARNING, "Invalid MessageType: {0}", new object[] {Convert.ToInt32(bytes[startIndex])});
+                    LogMessage(LogLevel.WARNING, "Invalid MessageType: {0}", new object[] {Convert.ToInt32(bytes[startIndex])});
                     break;
             }
         }
@@ -360,25 +398,25 @@ public class Client : IEquitiesWebSocketClient
         }
     }
 
-    private void threadFn()
+    private void ThreadFn()
     {
-        CancellationToken ct = ctSource.Token;
-        Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
+        CancellationToken ct = _ctSource.Token;
+        Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)_mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
         byte[] datum = Array.Empty<byte>();
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                if (data.TryDequeue(out datum))
+                if (_data.TryDequeue(out datum))
                 {
                     // These are grouped (many) messages.
                     // The first byte tells us how many there are.
                     // From there, check the type at index 0 of each chunk to know how many bytes each message has.
                     UInt64 cnt = Convert.ToUInt64(datum[0]);
-                    Interlocked.Add(ref dataEventCount, cnt);
+                    Interlocked.Add(ref _dataEventCount, cnt);
                     int startIndex = 1;
                     for (ulong i = 0UL; i < cnt; ++i)
-                        parseSocketMessage(datum, ref startIndex);
+                        ParseSocketMessage(datum, ref startIndex);
                 }
                 else
                     Thread.Sleep(10);
@@ -388,32 +426,32 @@ public class Client : IEquitiesWebSocketClient
             }
             catch (Exception exn)
             {
-                logMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", new object[]{exn.Message, exn.StackTrace});
+                LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", new object[]{exn.Message, exn.StackTrace});
             }
         };
     }
     
-    private void doBackoff(Func<bool> fn)
+    private void DoBackoff(Func<bool> fn)
     {
         int i = 0;
-        int backoff = selfHealBackoffs[i];
+        int backoff = _selfHealBackoffs[i];
         bool success = fn();
         while (!success)
         {
             Thread.Sleep(backoff);
-            i = Math.Min(i + 1, selfHealBackoffs.Length - 1);
-            backoff = selfHealBackoffs[i];
+            i = Math.Min(i + 1, _selfHealBackoffs.Length - 1);
+            backoff = _selfHealBackoffs[i];
             success = fn();
         }
     }
 
-    private bool trySetToken()
+    private bool TrySetToken()
     {
-        logMessage(LogLevel.INFORMATION, "Authorizing...", Array.Empty<object>());
-        string authUrl = getAuthUrl();
+        LogMessage(LogLevel.INFORMATION, "Authorizing...", Array.Empty<object>());
+        string authUrl = GetAuthUrl();
         try
         {
-            HttpResponseMessage response = httpClient.GetAsync(authUrl).Result;
+            HttpResponseMessage response = _httpClient.GetAsync(authUrl).Result;
             if (response.IsSuccessStatusCode)
             {
                 string token = response.Content.ReadAsStringAsync().Result;
@@ -422,52 +460,51 @@ public class Client : IEquitiesWebSocketClient
             }
             else
             {
-                logMessage(LogLevel.WARNING, "Authorization Failure. Authorization server status code = {0}", new object[]{response.StatusCode});
+                LogMessage(LogLevel.WARNING, "Authorization Failure. Authorization server status code = {0}", new object[]{response.StatusCode});
                 return false;
             }
         }
         catch (System.InvalidOperationException exn)
         {
-            logMessage(LogLevel.ERROR, "Authorization Failure (bad URI): {0}", new object[]{exn.Message});
+            LogMessage(LogLevel.ERROR, "Authorization Failure (bad URI): {0}", new object[]{exn.Message});
             return false;
         }
         catch (System.Net.Http.HttpRequestException exn)
         {
-            logMessage(LogLevel.ERROR, "Authoriztion Failure (bad network connection): {0}", new object[]{exn.Message});
+            LogMessage(LogLevel.ERROR, "Authoriztion Failure (bad network connection): {0}", new object[]{exn.Message});
             return false;
         }
         catch (TaskCanceledException exn)
         {
-            logMessage(LogLevel.ERROR, "Authorization Failure (timeout): {0}", new object[]{exn.Message});
+            LogMessage(LogLevel.ERROR, "Authorization Failure (timeout): {0}", new object[]{exn.Message});
             return false;
         }       
     }
     
-    private string getToken()
+    private string GetToken()
     {
-        tLock.EnterUpgradeableReadLock();
+        _tLock.EnterUpgradeableReadLock();
         try
         {
-            tLock.EnterWriteLock();
+            _tLock.EnterWriteLock();
             try
             {
-                doBackoff(trySetToken);
+                DoBackoff(TrySetToken);
             }
             finally
             {
-                tLock.ExitWriteLock();
+                _tLock.ExitWriteLock();
             }
 
             return _token.Item1;
         }
         finally
         {
-            tLock.ExitUpgradeableReadLock();
+            _tLock.ExitUpgradeableReadLock();
         }
     }
     
-    
-    private byte[] makeJoinMessage(bool tradesOnly, string symbol)
+    private byte[] MakeJoinMessage(bool tradesOnly, string symbol)
     {
         switch (symbol)
         {
@@ -490,7 +527,7 @@ public class Client : IEquitiesWebSocketClient
         }
     }
 
-    private byte[] makeLeaveMessage(string symbol)
+    private byte[] MakeLeaveMessage(string symbol)
     {
         switch (symbol)
         {
@@ -511,15 +548,15 @@ public class Client : IEquitiesWebSocketClient
         }
     }
 
-    private void onOpen(object? _, EventArgs __)
+    private void OnOpen(object? _, EventArgs __)
     {
-        logMessage(LogLevel.INFORMATION, "Websocket - Connected", Array.Empty<object>());
-        wsLock.EnterWriteLock();
+        LogMessage(LogLevel.INFORMATION, "Websocket - Connected", Array.Empty<object>());
+        _wsLock.EnterWriteLock();
         try
         {
-            wsState.IsReady = true;
-            wsState.IsReconnecting = false;
-            foreach (Thread thread in threads)
+            _wsState.IsReady = true;
+            _wsState.IsReconnecting = false;
+            foreach (Thread thread in _threads)
             {
                 if (!thread.IsAlive)
                     thread.Start();
@@ -527,48 +564,48 @@ public class Client : IEquitiesWebSocketClient
         }
         finally
         {
-            wsLock.ExitWriteLock();
+            _wsLock.ExitWriteLock();
         }
 
-        if (channels.Count > 0)
+        if (_channels.Count > 0)
         {
-            foreach (Channel channel in channels)
+            foreach (Channel channel in _channels)
             {
                 string lastOnly = channel.TradesOnly ? "true" : "false";
-                byte[] message = makeJoinMessage(channel.TradesOnly, channel.Ticker);
-                logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", new string[]{channel.Ticker, lastOnly});
-                wsState.WebSocket.Send(message, 0, message.Length);
+                byte[] message = MakeJoinMessage(channel.TradesOnly, channel.Ticker);
+                LogMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", new string[]{channel.Ticker, lastOnly});
+                _wsState.WebSocket.Send(message, 0, message.Length);
             }
         }
     }
 
-    private void onClose(object? _, EventArgs __)
+    private void OnClose(object? _, EventArgs __)
     {
-        wsLock.EnterUpgradeableReadLock();
+        _wsLock.EnterUpgradeableReadLock();
         try
         {
-            if (!wsState.IsReconnecting)
+            if (!_wsState.IsReconnecting)
             {
-                logMessage(LogLevel.INFORMATION, "Websocket - Closed", Array.Empty<object>());
-                wsLock.EnterWriteLock();
+                LogMessage(LogLevel.INFORMATION, "Websocket - Closed", Array.Empty<object>());
+                _wsLock.EnterWriteLock();
                 try
                 {
-                    wsState.IsReady = false;
+                    _wsState.IsReady = false;
                 }
                 finally
                 {
-                    wsLock.ExitWriteLock();
+                    _wsLock.ExitWriteLock();
                 }
 
-                if (!ctSource.IsCancellationRequested)
+                if (!_ctSource.IsCancellationRequested)
                 {
-                    Task.Factory.StartNew(tryReconnect);
+                    Task.Factory.StartNew(_tryReconnect);
                 }
             }
         }
         finally
         {
-            wsLock.ExitUpgradeableReadLock();
+            _wsLock.ExitUpgradeableReadLock();
         }
     }
 
@@ -597,121 +634,121 @@ public class Client : IEquitiesWebSocketClient
         return CloseType.Other;
     }
 
-    private void onError(object? _, SuperSocket.ClientEngine.ErrorEventArgs args)
+    private void OnError(object? _, SuperSocket.ClientEngine.ErrorEventArgs args)
     {
         Exception exn = args.Exception;
         CloseType exceptionType = GetCloseType(exn);
         switch (exceptionType)
         {
             case CloseType.Closed:
-                logMessage(LogLevel.WARNING, "Websocket - Error - Connection failed", Array.Empty<object>());
+                LogMessage(LogLevel.WARNING, "Websocket - Error - Connection failed", Array.Empty<object>());
                 break;
             case CloseType.Refused:
-                logMessage(LogLevel.WARNING, "Websocket - Error - Connection refused", Array.Empty<object>());
+                LogMessage(LogLevel.WARNING, "Websocket - Error - Connection refused", Array.Empty<object>());
                 break;
             case CloseType.Unavailable:
-                logMessage(LogLevel.WARNING, "Websocket - Error - Server unavailable", Array.Empty<object>());
+                LogMessage(LogLevel.WARNING, "Websocket - Error - Server unavailable", Array.Empty<object>());
                 break;
             default:
-                logMessage(LogLevel.ERROR, "Websocket - Error - {0}:{1}", new object[]{exn.GetType(), exn.Message});
+                LogMessage(LogLevel.ERROR, "Websocket - Error - {0}:{1}", new object[]{exn.GetType(), exn.Message});
                 break;
         }
     }
 
-    private void onDataReceived(object? _, DataReceivedEventArgs args)
+    private void OnDataReceived(object? _, DataReceivedEventArgs args)
     {
         // log commented for performance reasons. Uncomment for troubleshooting.
         //logMessage(LogLevel.DEBUG, "Websocket - Data received", Array.Empty<object>());
-        Interlocked.Increment(ref dataMsgCount);
-        data.Enqueue(args.Data);
+        Interlocked.Increment(ref _dataMsgCount);
+        _data.Enqueue(args.Data);
     }
 
-    private void onMessageReceived(object? _, MessageReceivedEventArgs args)
+    private void OnMessageReceived(object? _, MessageReceivedEventArgs args)
     {
-        logMessage(LogLevel.DEBUG, "Websocket - Message received", Array.Empty<object>());
-        Interlocked.Increment(ref textMsgCount);
-        logMessage(LogLevel.ERROR, "Error received: {0}", new object[]{args.Message});
+        LogMessage(LogLevel.DEBUG, "Websocket - Message received", Array.Empty<object>());
+        Interlocked.Increment(ref _textMsgCount);
+        LogMessage(LogLevel.ERROR, "Error received: {0}", new object[]{args.Message});
     }
 
-    private void resetWebSocket(string token)
+    private void ResetWebSocket(string token)
     {
-        logMessage(LogLevel.INFORMATION, "Websocket - Resetting", Array.Empty<object>());
-        string wsUrl = getWebSocketUrl(token);
-        List<KeyValuePair<string, string>> headers = getCustomSocketHeaders();
+        LogMessage(LogLevel.INFORMATION, "Websocket - Resetting", Array.Empty<object>());
+        string wsUrl = GetWebSocketUrl(token);
+        List<KeyValuePair<string, string>> headers = GetCustomSocketHeaders();
         //let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
         WebSocket ws = new WebSocket(wsUrl, null, null, headers);
-        ws.Opened += onOpen;
-        ws.Closed += onClose;
-        ws.Error += onError;
-        ws.DataReceived += onDataReceived;
-        ws.MessageReceived += onMessageReceived;
-        wsLock.EnterWriteLock();
+        ws.Opened += OnOpen;
+        ws.Closed += OnClose;
+        ws.Error += OnError;
+        ws.DataReceived += OnDataReceived;
+        ws.MessageReceived += OnMessageReceived;
+        _wsLock.EnterWriteLock();
         try
         {
-            wsState.WebSocket = ws;
-            wsState.Reset();
+            _wsState.WebSocket = ws;
+            _wsState.Reset();
         }
         finally
         {
-            wsLock.ExitWriteLock();
+            _wsLock.ExitWriteLock();
         }
 
         ws.Open();
     }
 
-    private void initializeWebSockets(string token)
+    private void InitializeWebSockets(string token)
     {
-        wsLock.EnterWriteLock();
+        _wsLock.EnterWriteLock();
         try
         {
-            logMessage(LogLevel.INFORMATION, "Websocket - Connecting...", Array.Empty<object>());
-            string wsUrl = getWebSocketUrl(token);
-            List<KeyValuePair<string, string>> headers = getCustomSocketHeaders();
+            LogMessage(LogLevel.INFORMATION, "Websocket - Connecting...", Array.Empty<object>());
+            string wsUrl = GetWebSocketUrl(token);
+            List<KeyValuePair<string, string>> headers = GetCustomSocketHeaders();
             //let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
             WebSocket ws = new WebSocket(wsUrl, null, null, headers);
-            ws.Opened += onOpen;
-            ws.Closed += onClose;
-            ws.Error += onError;
-            ws.DataReceived += onDataReceived;
-            ws.MessageReceived += onMessageReceived;
-            wsState = new WebSocketState(ws);
+            ws.Opened += OnOpen;
+            ws.Closed += OnClose;
+            ws.Error += OnError;
+            ws.DataReceived += OnDataReceived;
+            ws.MessageReceived += OnMessageReceived;
+            _wsState = new WebSocketState(ws);
         }
         finally
         {
-            wsLock.ExitWriteLock();
+            _wsLock.ExitWriteLock();
         }
 
-        wsState.WebSocket.Open();
+        _wsState.WebSocket.Open();
     }
     
-    private void join(string symbol, bool tradesOnly)
+    private void JoinImpl(string symbol, bool tradesOnly)
     {
         string lastOnly = tradesOnly ? "true" : "false";
-        if (channels.Add(new (symbol, tradesOnly)))
+        if (_channels.Add(new (symbol, tradesOnly)))
         {
-            byte[] message = makeJoinMessage(tradesOnly, symbol);
-            logMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", new object[]{symbol, lastOnly});
+            byte[] message = MakeJoinMessage(tradesOnly, symbol);
+            LogMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", new object[]{symbol, lastOnly});
             try
             {
-                wsState.WebSocket.Send(message, 0, message.Length);
+                _wsState.WebSocket.Send(message, 0, message.Length);
             }
             catch
             {
-                channels.Remove(new (symbol, tradesOnly));
+                _channels.Remove(new (symbol, tradesOnly));
             }
         }
     }
     
-    private void leave(string symbol, bool tradesOnly)
+    private void LeaveImpl(string symbol, bool tradesOnly)
     {
         string lastOnly = tradesOnly ? "true" : "false";
-        if (channels.Remove(new (symbol, tradesOnly)))
+        if (_channels.Remove(new (symbol, tradesOnly)))
         {
-            byte[] message = makeLeaveMessage(symbol);
-            logMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0} (trades only = {1})", new object[]{symbol, lastOnly});
+            byte[] message = MakeLeaveMessage(symbol);
+            LogMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0} (trades only = {1})", new object[]{symbol, lastOnly});
             try
             {
-                wsState.WebSocket.Send(message, 0, message.Length);
+                _wsState.WebSocket.Send(message, 0, message.Length);
             }
             catch
             {
