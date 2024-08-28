@@ -100,7 +100,7 @@ public class CandleStickClient
     //         then
     //             let bucket : SymbolBucket = getSlot(trade.Symbol, symbolBuckets, symbolBucketsLock)
     //             try
-    //                 let ts : float = CandleStickClientInline.convertToTimestamp(trade.Timestamp)
+    //                 let ts : double = CandleStickClientInline.convertToTimestamp(trade.Timestamp)
     //                 bucket.Locker.EnterWriteLock()
     //                 if (bucket.TradeCandleStick.IsSome)
     //                 then
@@ -150,8 +150,8 @@ public class CandleStickClient
     #endregion //Public Methods
     
     #region Private Methods
-    //let createNewTradeCandle(trade : Trade, timestamp : float) : TradeCandleStick option =
-    //     let start : float = CandleStickClientInline.getNearestModInterval(timestamp, interval)
+    //let createNewTradeCandle(trade : Trade, timestamp : double) : TradeCandleStick option =
+    //     let start : double = CandleStickClientInline.getNearestModInterval(timestamp, interval)
     //     let freshCandle : TradeCandleStick option = Some(new TradeCandleStick(trade.Symbol, trade.Size, trade.Price, start, (start + System.Convert.ToDouble(int interval)), interval, timestamp))
     //     
     //     if (useGetHistoricalTradeCandleStick && useOnTradeCandleStick)
@@ -169,9 +169,9 @@ public class CandleStickClient
     //             freshCandle
     //     else
     //         freshCandle
-    //         
-    // let createNewQuoteCandle(quote : Quote, timestamp : float) : QuoteCandleStick option =
-    //     let start : float = CandleStickClientInline.getNearestModInterval(timestamp, interval)
+            
+    // let createNewQuoteCandle(quote : Quote, timestamp : double) : QuoteCandleStick option =
+    //     let start : double = CandleStickClientInline.getNearestModInterval(timestamp, interval)
     //     let freshCandle : QuoteCandleStick option = Some(new QuoteCandleStick(quote.Symbol, quote.Price, quote.Type, start, (start + System.Convert.ToDouble(int interval)), interval, timestamp))
     //     
     //     if (useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick)
@@ -189,9 +189,9 @@ public class CandleStickClient
     //             freshCandle
     //     else
     //         freshCandle
-    //         
+             
     // let addAskToLostAndFound(ask: Quote) : unit =
-    //     let ts : float = CandleStickClientInline.convertToTimestamp(ask.Timestamp)
+    //     let ts : double = CandleStickClientInline.convertToTimestamp(ask.Timestamp)
     //     let key : string = String.Format("{0}|{1}|{2}", ask.Symbol, CandleStickClientInline.getNearestModInterval(ts, interval), interval)
     //     let bucket : SymbolBucket = getSlot(key, lostAndFound, lostAndFoundLock)
     //     try
@@ -209,9 +209,9 @@ public class CandleStickClient
     //                 bucket.Locker.ExitWriteLock()
     //     with ex ->
     //         Log.Warning("Error on handling late ask in CandleStick Client: {0}", ex.Message)
-    //     
+         
     // let addBidToLostAndFound(bid: Quote) : unit =
-    //     let ts : float = CandleStickClientInline.convertToTimestamp(bid.Timestamp)
+    //     let ts : double = CandleStickClientInline.convertToTimestamp(bid.Timestamp)
     //     let key : string = String.Format("{0}|{1}|{2}", bid.Symbol, CandleStickClientInline.getNearestModInterval(ts, interval), interval)
     //     let bucket : SymbolBucket = getSlot(key, lostAndFound, lostAndFoundLock)
     //     try
@@ -229,9 +229,9 @@ public class CandleStickClient
     //                 bucket.Locker.ExitWriteLock()
     //     with ex ->
     //         Log.Warning("Error on handling late bid in CandleStick Client: {0}", ex.Message)
-    //     
+         
     // let addTradeToLostAndFound (trade: Trade) : unit =
-    //     let ts : float = CandleStickClientInline.convertToTimestamp(trade.Timestamp)
+    //     let ts : double = CandleStickClientInline.convertToTimestamp(trade.Timestamp)
     //     let key : string = String.Format("{0}|{1}|{2}", trade.Symbol, CandleStickClientInline.getNearestModInterval(ts, interval), interval)
     //     let bucket : SymbolBucket = getSlot(key, lostAndFound, lostAndFoundLock)
     //     try
@@ -249,9 +249,9 @@ public class CandleStickClient
     //                 bucket.Locker.ExitWriteLock()
     //     with ex ->
     //         Log.Warning("Error on handling late trade in CandleStick Client: {0}", ex.Message)
-    // 
+     
     // let onAsk(quote: Quote, bucket: SymbolBucket) : unit =
-    //     let ts : float = CandleStickClientInline.convertToTimestamp(quote.Timestamp)
+    //     let ts : double = CandleStickClientInline.convertToTimestamp(quote.Timestamp)
     //     if (bucket.AskCandleStick.IsSome && not (Double.IsNaN(quote.Price)))
     //     then
     //         if (bucket.AskCandleStick.Value.CloseTimestamp < ts)
@@ -269,9 +269,9 @@ public class CandleStickClient
     //     then
     //         bucket.AskCandleStick <- createNewQuoteCandle(quote, ts)
     //         if broadcastPartialCandles then onQuoteCandleStick.Invoke(bucket.AskCandleStick.Value)
-    // 
+     
     // let onBid(quote: Quote, bucket : SymbolBucket) : unit =
-    //     let ts : float = CandleStickClientInline.convertToTimestamp(quote.Timestamp)
+    //     let ts : double = CandleStickClientInline.convertToTimestamp(quote.Timestamp)
     //     if (bucket.BidCandleStick.IsSome && not (Double.IsNaN(quote.Price)))
     //     then
     //         if (bucket.BidCandleStick.Value.CloseTimestamp < ts)
@@ -289,7 +289,7 @@ public class CandleStickClient
     //     then
     //         bucket.BidCandleStick <- createNewQuoteCandle(quote, ts)
     //         if broadcastPartialCandles then onQuoteCandleStick.Invoke(bucket.BidCandleStick.Value)
-    //         
+             
     // let flushFn () : unit =
     //     Log.Information("Starting candlestick expiration watcher...")
     //     let ct = ctSource.Token
@@ -302,7 +302,7 @@ public class CandleStickClient
     //             symbolBucketsLock.ExitReadLock()
     //             for key in keys do
     //                 let bucket : SymbolBucket = getSlot(key, symbolBuckets, symbolBucketsLock)
-    //                 let flushThresholdTime : float = CandleStickClientInline.getCurrentTimestamp(sourceDelaySeconds) - flushBufferSeconds
+    //                 let flushThresholdTime : double = CandleStickClientInline.getCurrentTimestamp(sourceDelaySeconds) - flushBufferSeconds
     //                 bucket.Locker.EnterWriteLock()
     //                 try
     //                     if (useOnTradeCandleStick && bucket.TradeCandleStick.IsSome && (bucket.TradeCandleStick.Value.CloseTimestamp < flushThresholdTime))
@@ -327,9 +327,9 @@ public class CandleStickClient
     //                 Thread.Sleep 1000    
     //         with :? OperationCanceledException -> ()
     //     Log.Information("Stopping candlestick expiration watcher...")
-    //         
+             
     // let flushThread : Thread = new Thread(new ThreadStart(flushFn))
-    // 
+     
     // let lostAndFoundFn () : unit =
     //     Log.Information("Starting candlestick late event watcher...")
     //     let ct = ctSource.Token
