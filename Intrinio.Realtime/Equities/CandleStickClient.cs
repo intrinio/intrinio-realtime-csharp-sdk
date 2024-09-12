@@ -398,17 +398,17 @@ public class CandleStickClient
         }
     }
 
-    private async void FlushFn()
+    private void FlushFn()
     {
         Log.Information("Starting candlestick expiration watcher...");
         CancellationToken ct = ctSource.Token;
         System.Threading.Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
+        List<string> keys = new List<string>();
 
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                List<string> keys = new List<string>();
                 lock (symbolBucketsLock)
                 {
                     foreach (string key in symbolBuckets.Keys)
@@ -443,11 +443,11 @@ public class CandleStickClient
                             bucket.BidCandleStick = null;
                         }
                     }
-                    await Task.Yield();
                 }
+                keys.Clear();
 
                 if (!(ct.IsCancellationRequested))
-                    Task.Delay(1000);
+                    Thread.Sleep(1000);
             }
             catch (OperationCanceledException)
             {
@@ -462,12 +462,12 @@ public class CandleStickClient
         Log.Information("Starting candlestick late event watcher...");
         CancellationToken ct = ctSource.Token;
         System.Threading.Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
+        List<string> keys = new List<string>();
 
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                List<string> keys = new List<string>();
                 lock (lostAndFoundLock)
                 {
                     foreach (string key in lostAndFound.Keys)
@@ -580,16 +580,15 @@ public class CandleStickClient
                         if (bucket.TradeCandleStick == null && bucket.AskCandleStick == null && bucket.BidCandleStick == null)
                             RemoveSlot(key, lostAndFound, lostAndFoundLock);
                     }
-                    await Task.Yield();
                 }
+                keys.Clear();
 
                 if (!ct.IsCancellationRequested)
-                    Task.Delay(1000);
+                    Thread.Sleep(1000);
             }
             catch (OperationCanceledException)
             {
             }
-            await Task.Yield();
         }
 
         Log.Information("Stopping candlestick late event watcher...");
