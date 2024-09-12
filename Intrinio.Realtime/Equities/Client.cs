@@ -45,8 +45,8 @@ public class Client : IEquitiesWebSocketClient
     private readonly Config _config;
     private readonly int[] _selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
     private byte[] _empty = Array.Empty<byte>();
-    private readonly ReaderWriterLockSlim _tLock = new ();
-    private readonly ReaderWriterLockSlim _wsLock = new ();
+    private readonly object _tLock = new ();
+    private readonly object _wsLock = new ();
     private Tuple<string, DateTime> _token = new (null, DateTime.Now);
     private WebSocketState _wsState = null;
     private UInt64 _dataMsgCount = 0UL;
@@ -58,7 +58,7 @@ public class Client : IEquitiesWebSocketClient
     private readonly CancellationTokenSource _ctSource = new ();
     private readonly ConcurrentQueue<byte[]> _data = new ();
     private readonly Action _tryReconnect;
-    private static readonly HttpClient _httpClient = new ();
+    private readonly HttpClient _httpClient = new ();
     private readonly string _logPrefix;
     private const string ClientInfoHeaderKey = "Client-Information";
     private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv10.0";
@@ -90,7 +90,7 @@ public class Client : IEquitiesWebSocketClient
             _threads[i] = new Thread(new ThreadStart(ThreadFn));
 
         _config.Validate();
-        //_httpClient.Timeout = TimeSpan.FromSeconds(5.0);
+        _httpClient.Timeout = TimeSpan.FromSeconds(5.0);
         _httpClient.DefaultRequestHeaders.Add(ClientInfoHeaderKey, ClientInfoHeaderValue);
         _tryReconnect = () =>
         {
@@ -99,14 +99,10 @@ public class Client : IEquitiesWebSocketClient
                 LogMessage(LogLevel.INFORMATION, "Websocket - Reconnecting...", Array.Empty<object>());
                 if (_wsState.IsReady)
                     return true;
-                _wsLock.EnterWriteLock();
-                try
+                
+                lock (_wsLock)
                 {
                     _wsState.IsReconnecting = true;
-                }
-                finally
-                {
-                    _wsLock.ExitWriteLock();
                 }
 
                 string token = GetToken();
@@ -201,14 +197,9 @@ public class Client : IEquitiesWebSocketClient
     {
         Leave();
         Thread.Sleep(1000);
-        _wsLock.EnterWriteLock();
-        try
+        lock (_wsLock)
         {
             _wsState.IsReady = false;
-        }
-        finally
-        {
-            _wsLock.ExitWriteLock();
         }
 
         _ctSource.Cancel();
@@ -257,14 +248,9 @@ public class Client : IEquitiesWebSocketClient
 
     private bool IsReady()
     {
-        _wsLock.EnterReadLock();
-        try
+        lock (_wsLock)
         {
             return !ReferenceEquals(null, _wsState) && _wsState.IsReady;
-        }
-        finally
-        {
-            _wsLock.ExitReadLock();
         }
     }
 
@@ -441,16 +427,16 @@ public class Client : IEquitiesWebSocketClient
         }
     }
 
-    private bool TrySetToken()
+    private async Task<bool> TrySetToken()
     {
         LogMessage(LogLevel.INFORMATION, "Authorizing...", Array.Empty<object>());
         string authUrl = GetAuthUrl();
         try
         {
-            HttpResponseMessage response = _httpClient.GetAsync(authUrl).Result;
+            HttpResponseMessage response = await _httpClient.GetAsync(authUrl);
             if (response.IsSuccessStatusCode)
             {
-                string token = response.Content.ReadAsStringAsync().Result;
+                string token = await response.Content.ReadAsStringAsync();
                 Interlocked.Exchange(ref _token, new Tuple<string, DateTime>(token, DateTime.Now));
                 return true;
             }
@@ -477,32 +463,24 @@ public class Client : IEquitiesWebSocketClient
         }
         catch (AggregateException exn)
         {
+            LogMessage(LogLevel.ERROR, "Authorization Failure: AggregateException: {0}", new object[]{exn.Message});
+            return false;
+        }
+        catch (Exception exn)
+        {
             LogMessage(LogLevel.ERROR, "Authorization Failure: {0}", new object[]{exn.Message});
             return false;
-        }  
+        } 
     }
     
     private string GetToken()
     {
-        _tLock.EnterUpgradeableReadLock();
-        try
+        lock (_tLock)
         {
-            _tLock.EnterWriteLock();
-            try
-            {
-                DoBackoff(TrySetToken);
-            }
-            finally
-            {
-                _tLock.ExitWriteLock();
-            }
+            DoBackoff((() => TrySetToken().Result));
+        }
 
-            return _token.Item1;
-        }
-        finally
-        {
-            _tLock.ExitUpgradeableReadLock();
-        }
+        return _token.Item1;
     }
     
     private byte[] MakeJoinMessage(bool tradesOnly, string symbol)
@@ -552,8 +530,7 @@ public class Client : IEquitiesWebSocketClient
     private void OnOpen(object? _, EventArgs __)
     {
         LogMessage(LogLevel.INFORMATION, "Websocket - Connected", Array.Empty<object>());
-        _wsLock.EnterWriteLock();
-        try
+        lock (_wsLock)
         {
             _wsState.IsReady = true;
             _wsState.IsReconnecting = false;
@@ -562,10 +539,6 @@ public class Client : IEquitiesWebSocketClient
                 if (!thread.IsAlive)
                     thread.Start();
             }
-        }
-        finally
-        {
-            _wsLock.ExitWriteLock();
         }
 
         if (_channels.Count > 0)
@@ -582,31 +555,18 @@ public class Client : IEquitiesWebSocketClient
 
     private void OnClose(object? _, EventArgs __)
     {
-        _wsLock.EnterUpgradeableReadLock();
-        try
+        lock (_wsLock)
         {
             if (!_wsState.IsReconnecting)
             {
                 LogMessage(LogLevel.INFORMATION, "Websocket - Closed", Array.Empty<object>());
-                _wsLock.EnterWriteLock();
-                try
-                {
-                    _wsState.IsReady = false;
-                }
-                finally
-                {
-                    _wsLock.ExitWriteLock();
-                }
+                _wsState.IsReady = false;
 
                 if (!_ctSource.IsCancellationRequested)
                 {
-                    Task.Factory.StartNew(_tryReconnect);
+                    Task.Run(_tryReconnect);
                 }
             }
-        }
-        finally
-        {
-            _wsLock.ExitUpgradeableReadLock();
         }
     }
 
@@ -683,29 +643,22 @@ public class Client : IEquitiesWebSocketClient
         ws.Error += OnError;
         ws.DataReceived += OnDataReceived;
         ws.MessageReceived += OnMessageReceived;
-        _wsLock.EnterWriteLock();
-        try
+        lock (_wsLock)
         {
             _wsState.WebSocket = ws;
             _wsState.Reset();
         }
-        finally
-        {
-            _wsLock.ExitWriteLock();
-        }
-
         ws.Open();
     }
 
     private void InitializeWebSockets(string token)
     {
-        _wsLock.EnterWriteLock();
-        try
+        lock (_wsLock)
         {
             LogMessage(LogLevel.INFORMATION, "Websocket - Connecting...", Array.Empty<object>());
             string wsUrl = GetWebSocketUrl(token);
             List<KeyValuePair<string, string>> headers = GetCustomSocketHeaders();
-            //let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
+            //WebSocket ws = new WebSocket(wsUrl, customHeaderItems = headers);
             WebSocket ws = new WebSocket(wsUrl, null, null, headers);
             ws.Opened += OnOpen;
             ws.Closed += OnClose;
@@ -713,10 +666,6 @@ public class Client : IEquitiesWebSocketClient
             ws.DataReceived += OnDataReceived;
             ws.MessageReceived += OnMessageReceived;
             _wsState = new WebSocketState(ws);
-        }
-        finally
-        {
-            _wsLock.ExitWriteLock();
         }
 
         _wsState.WebSocket.Open();
