@@ -182,7 +182,7 @@ public class QuoteCandleStick :IEquatable<QuoteCandleStick>, IComparable, ICompa
         Change = (Close - Open) / Open;
     }
             
-    internal void Update(UInt32 volume, double price, double time)
+    internal void Update(double price, double time)
     {
         High = price > High ? price : High;
         Low = price < Low ? price : Low;

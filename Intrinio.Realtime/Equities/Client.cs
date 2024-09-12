@@ -58,7 +58,7 @@ public class Client : IEquitiesWebSocketClient
     private readonly CancellationTokenSource _ctSource = new ();
     private readonly ConcurrentQueue<byte[]> _data = new ();
     private readonly Action _tryReconnect;
-    private readonly HttpClient _httpClient = new ();
+    private static readonly HttpClient _httpClient = new ();
     private readonly string _logPrefix;
     private const string ClientInfoHeaderKey = "Client-Information";
     private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv10.0";
@@ -90,7 +90,7 @@ public class Client : IEquitiesWebSocketClient
             _threads[i] = new Thread(new ThreadStart(ThreadFn));
 
         _config.Validate();
-        _httpClient.Timeout = TimeSpan.FromSeconds(5.0);
+        //_httpClient.Timeout = TimeSpan.FromSeconds(5.0);
         _httpClient.DefaultRequestHeaders.Add(ClientInfoHeaderKey, ClientInfoHeaderValue);
         _tryReconnect = () =>
         {
@@ -145,30 +145,30 @@ public class Client : IEquitiesWebSocketClient
     #endregion //Constructors
     
     #region Public Methods
-    public void Join()
+    public async void Join()
     {
         while (!IsReady())
-            Thread.Sleep(1000);
+            await Task.Delay(1000);
         HashSet <Channel> symbolsToAdd = _config.Symbols.Select(s => new Channel(s, _config.TradesOnly)).ToHashSet();
         symbolsToAdd.ExceptWith(_channels);
         foreach (Channel channel in symbolsToAdd)
             JoinImpl(channel.Ticker, channel.TradesOnly);
     }
 
-    public void Join(string symbol, bool? tradesOnly)
+    public async void Join(string symbol, bool? tradesOnly)
     {
         bool t = tradesOnly.HasValue ? tradesOnly.Value || _config.TradesOnly : false || _config.TradesOnly;
         while (!IsReady())
-            Thread.Sleep(1000);
+            await Task.Delay(1000);
         if (!_channels.Contains(new (symbol, t)))
             JoinImpl(symbol, t);
     }
 
-    public void Join(string[] symbols, bool? tradesOnly)
+    public async void Join(string[] symbols, bool? tradesOnly)
     {
         bool t = tradesOnly.HasValue ? tradesOnly.Value || _config.TradesOnly : false || _config.TradesOnly;
         while (!IsReady())
-            Thread.Sleep(1000);
+            await Task.Delay(1000);
         HashSet <Channel> symbolsToAdd = symbols.Select(s => new Channel(s, t)).ToHashSet();
         symbolsToAdd.ExceptWith(_channels);
         foreach (Channel channel in symbolsToAdd)
@@ -333,7 +333,7 @@ public class Client : IEquitiesWebSocketClient
         string condition = conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(27 + symbolLength, conditionLength)) : String.Empty;
         UInt64 totalVolume = Convert.ToUInt64(BitConverter.ToUInt32(bytes.Slice(22 + symbolLength, 4)));
 
-        return new Trade(symbol, price, size, timestamp, subProvider, marketCenter, condition, totalVolume);
+        return new Trade(symbol, price, size, totalVolume, timestamp, subProvider, marketCenter, condition);
     }
 
     private Quote ParseQuote(ReadOnlySpan<byte> bytes)
@@ -368,7 +368,7 @@ public class Client : IEquitiesWebSocketClient
                     {
                         Trade trade = ParseTrade(chunk);
                         Interlocked.Increment(ref _dataTradeCount);
-                        _onTrade.Invoke(trade);
+                        Task.Run(() => _onTrade.Invoke(trade));
                     }
                     break;
                 }
@@ -379,7 +379,7 @@ public class Client : IEquitiesWebSocketClient
                     {
                         Quote quote = ParseQuote(chunk);
                         Interlocked.Increment(ref _dataQuoteCount);
-                        _onQuote.Invoke(quote);
+                        Task.Run(() => _onQuote.Invoke(quote));
                     }
                     break;
                 }
@@ -474,7 +474,12 @@ public class Client : IEquitiesWebSocketClient
         {
             LogMessage(LogLevel.ERROR, "Authorization Failure (timeout): {0}", new object[]{exn.Message});
             return false;
-        }       
+        }
+        catch (AggregateException exn)
+        {
+            LogMessage(LogLevel.ERROR, "Authorization Failure: {0}", new object[]{exn.Message});
+            return false;
+        }  
     }
     
     private string GetToken()

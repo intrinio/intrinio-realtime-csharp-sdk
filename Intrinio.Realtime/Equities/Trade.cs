@@ -19,7 +19,7 @@ public readonly struct Trade
     /// TotalVolume: the total number of shares that have been traded since market open </para>
     /// Timestamp: the time that the trade was executed (a unix timestamp representing the number of milliseconds (or better) since the unix epoch) </para>
     /// SubProvider: the specific provider this trade came from under the parent provider grouping. </para>
-    public Trade(string symbol, double price, UInt32 size, DateTime timestamp, SubProvider subProvider, char marketCenter, string condition, UInt64 totalVolume)
+    public Trade(string symbol, double price, UInt32 size, UInt64 totalVolume, DateTime timestamp, SubProvider subProvider, char marketCenter, string condition)
     {
         Symbol = symbol;
         Price = price;

@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+
 namespace Intrinio.Realtime.Equities;
 
 using Intrinio;
@@ -16,42 +18,44 @@ public delegate QuoteCandleStick FetchHistoricalQuoteCandleStick(string symbol, 
 public class CandleStickClient
 {
     #region Data Members
-    private readonly Type interval;
+    private readonly IntervalType interval;
     private readonly bool broadcastPartialCandles;
     private readonly double sourceDelaySeconds;
     private readonly bool useTradeFiltering;
     private readonly CancellationTokenSource ctSource;
-    private const int initialDictionarySize = 3_601_579; //a close prime number greater than 2x the max expected size.  There are usually around 1.5m option contracts.
-    private readonly ReaderWriterLockSlim symbolBucketsLock;
-    private readonly ReaderWriterLockSlim lostAndFoundLock;
+    private const int initialDictionarySize = 31_387;//3_601_579; //a close prime number greater than 2x the max expected size.  There are usually around 1.5m option contracts.
+    private readonly object symbolBucketsLock;
+    private readonly object lostAndFoundLock;
     private readonly Dictionary<string, SymbolBucket> symbolBuckets;
     private readonly Dictionary<string, SymbolBucket> lostAndFound;
     private const double flushBufferSeconds = 30.0;
+    private Thread lostAndFoundThread;
+    private Thread flushThread;
     
-    private bool useOnTradeCandleStick { get { return !ReferenceEquals(onTradeCandleStick, null); } } 
-    private bool useOnQuoteCandleStick { get { return !ReferenceEquals(onQuoteCandleStick, null); } }
-    private bool useGetHistoricalTradeCandleStick  { get { return !ReferenceEquals(getHistoricalTradeCandleStick,null); } }
-    private bool useGetHistoricalQuoteCandleStick  { get { return !ReferenceEquals(getHistoricalQuoteCandleStick,null); } }
+    private bool useOnTradeCandleStick { get { return !ReferenceEquals(OnTradeCandleStick, null); } } 
+    private bool useOnQuoteCandleStick { get { return !ReferenceEquals(OnQuoteCandleStick, null); } }
+    private bool useGetHistoricalTradeCandleStick  { get { return !ReferenceEquals(GetHistoricalTradeCandleStick,null); } }
+    private bool useGetHistoricalQuoteCandleStick  { get { return !ReferenceEquals(GetHistoricalQuoteCandleStick,null); } }
     
     /// <summary>
     /// The callback used for broadcasting trade candles.
     /// </summary>
-    public Action<TradeCandleStick> onTradeCandleStick { get; set; }
+    public Action<TradeCandleStick> OnTradeCandleStick { get; set; }
     
     /// <summary>
     /// The callback used for broadcasting quote candles.
     /// </summary>
-    private Action<QuoteCandleStick> onQuoteCandleStick { get; set; }
+    private Action<QuoteCandleStick> OnQuoteCandleStick { get; set; }
     
     /// <summary>
     /// Fetch a previously broadcasted trade candlestick from the given unique parameters.
     /// </summary>
-    public FetchHistoricalTradeCandleStick getHistoricalTradeCandleStick { get; set; }
+    public FetchHistoricalTradeCandleStick GetHistoricalTradeCandleStick { get; set; }
     
     /// <summary>
     /// Fetch a previously broadcasted quote candlestick from the given unique parameters.
     /// </summary>
-    public FetchHistoricalQuoteCandleStick getHistoricalQuoteCandleStick { get; set; }
+    public FetchHistoricalQuoteCandleStick GetHistoricalQuoteCandleStick { get; set; }
     #endregion //Data Members
     
     #region Constructors
@@ -70,355 +74,527 @@ public class CandleStickClient
     public CandleStickClient(
         Action<TradeCandleStick> onTradeCandleStick, 
         Action<QuoteCandleStick> onQuoteCandleStick, 
-        Type interval, 
+        IntervalType interval, 
         bool broadcastPartialCandles, 
         FetchHistoricalTradeCandleStick getHistoricalTradeCandleStick,
         FetchHistoricalQuoteCandleStick getHistoricalQuoteCandleStick,
         double sourceDelaySeconds,
         bool useTradeFiltering)
     {
-        this.onTradeCandleStick = onTradeCandleStick;
-        this.onQuoteCandleStick = onQuoteCandleStick;
+        this.OnTradeCandleStick = onTradeCandleStick;
+        this.OnQuoteCandleStick = onQuoteCandleStick;
         this.interval = interval;
         this.broadcastPartialCandles = broadcastPartialCandles;
-        this.getHistoricalTradeCandleStick = getHistoricalTradeCandleStick;
-        this.getHistoricalQuoteCandleStick = getHistoricalQuoteCandleStick;
+        this.GetHistoricalTradeCandleStick = getHistoricalTradeCandleStick;
+        this.GetHistoricalQuoteCandleStick = getHistoricalQuoteCandleStick;
         this.sourceDelaySeconds = sourceDelaySeconds;
         this.useTradeFiltering = useTradeFiltering;
         ctSource = new CancellationTokenSource();
-        symbolBucketsLock = new ReaderWriterLockSlim();
-        lostAndFoundLock = new ReaderWriterLockSlim();
+        symbolBucketsLock = new object();
+        lostAndFoundLock = new object();
         symbolBuckets = new Dictionary<string, SymbolBucket>(initialDictionarySize);
         lostAndFound = new Dictionary<string, SymbolBucket>(initialDictionarySize);
+        lostAndFoundThread = new Thread(new ThreadStart(LostAndFoundFn));
+        flushThread = new Thread(new ThreadStart(FlushFn));
     }
     #endregion //Constructors
     
     #region Public Methods
-    //member _.OnTrade(trade: Trade) : unit =
-    //     try
-    //         if useOnTradeCandleStick && (not (CandleStickClientInline.shouldFilterTrade(trade, useTradeFiltering)))
-    //         then
-    //             let bucket : SymbolBucket = getSlot(trade.Symbol, symbolBuckets, symbolBucketsLock)
-    //             try
-    //                 let ts : double = CandleStickClientInline.convertToTimestamp(trade.Timestamp)
-    //                 bucket.Locker.EnterWriteLock()
-    //                 if (bucket.TradeCandleStick.IsSome)
-    //                 then
-    //                     if (bucket.TradeCandleStick.Value.CloseTimestamp < ts)
-    //                     then
-    //                         bucket.TradeCandleStick.Value.MarkComplete()
-    //                         onTradeCandleStick.Invoke(bucket.TradeCandleStick.Value)
-    //                         bucket.TradeCandleStick <- createNewTradeCandle(trade, ts)
-    //                     elif (bucket.TradeCandleStick.Value.OpenTimestamp <= ts)
-    //                     then
-    //                         bucket.TradeCandleStick.Value.Update(trade.Size, trade.Price, ts)
-    //                         if broadcastPartialCandles then onTradeCandleStick.Invoke(bucket.TradeCandleStick.Value)
-    //                     else //This is a late trade.  We already shipped the candle, so add to lost and found
-    //                         addTradeToLostAndFound(trade)
-    //                 else
-    //                     bucket.TradeCandleStick <- createNewTradeCandle(trade, ts)
-    //                     if broadcastPartialCandles then onTradeCandleStick.Invoke(bucket.TradeCandleStick.Value)
-    //             finally bucket.Locker.ExitWriteLock()
-    //     with ex ->
-    //         Log.Warning("Error on handling trade in CandleStick Client: {0}", ex.Message)
-    //     
-    // member _.OnQuote(quote: Quote) : unit =
-    //     try
-    //         if useOnQuoteCandleStick && (not (CandleStickClientInline.shouldFilterQuote(quote, useTradeFiltering)))
-    //         then
-    //             let bucket : SymbolBucket = getSlot(quote.Symbol, symbolBuckets, symbolBucketsLock)
-    //             try          
-    //                 bucket.Locker.EnterWriteLock()
-    //                 match quote.Type with
-    //                 | QuoteType.Ask -> onAsk(quote, bucket)
-    //                 | QuoteType.Bid -> onBid(quote, bucket)
-    //                 | _ -> ()
-    //             finally bucket.Locker.ExitWriteLock()
-    //     with ex ->
-    //         Log.Warning("Error on handling trade in CandleStick Client: {0}", ex.Message)
-    //         
-    // member _.Start() : unit =
-    //     if not flushThread.IsAlive
-    //     then
-    //         flushThread.Start()
-    //     if not lostAndFoundThread.IsAlive
-    //     then
-    //         lostAndFoundThread.Start()
-    //         
-    // member _.Stop() : unit = 
-    //     ctSource.Cancel()
+
+    public void OnTrade(Trade trade)
+    {
+        try
+        {
+            if (useOnTradeCandleStick && (!ShouldFilterTrade(trade, useTradeFiltering)))
+            {
+                SymbolBucket bucket = GetSlot(trade.Symbol, symbolBuckets, symbolBucketsLock);
+
+                lock (bucket.Locker)
+                {
+                    double ts = ConvertToTimestamp(trade.Timestamp);
+
+                    if (bucket.TradeCandleStick != null)
+                    {
+                        if (bucket.TradeCandleStick.CloseTimestamp < ts)
+                        {
+                            bucket.TradeCandleStick.MarkComplete();
+                            OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
+                            bucket.TradeCandleStick = CreateNewTradeCandle(trade, ts);
+                        }
+                        else if (bucket.TradeCandleStick.OpenTimestamp <= ts)
+                        {
+                            bucket.TradeCandleStick.Update(trade.Size, trade.Price, ts);
+                            if (broadcastPartialCandles)
+                                OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
+                        }
+                        else //This is a late trade.  We already shipped the candle, so add to lost and found
+                        {
+                            AddTradeToLostAndFound(trade);
+                        }
+                    }
+                    else
+                    {
+                        bucket.TradeCandleStick = CreateNewTradeCandle(trade, ts);
+                        if (broadcastPartialCandles)
+                            OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Warning("Error on handling trade in CandleStick Client: {0}", e.Message);
+        }
+    }
+
+    public void OnQuote(Quote quote)
+    {
+        try
+        {
+            if (useOnQuoteCandleStick && (!(ShouldFilterQuote(quote, useTradeFiltering))))
+            {
+                SymbolBucket bucket = GetSlot(quote.Symbol, symbolBuckets, symbolBucketsLock);
+
+                lock (bucket.Locker)
+                {
+                    if (quote.Type == QuoteType.Ask)
+                    {
+                        OnAsk(quote, bucket);
+                    }
+
+                    if (quote.Type == QuoteType.Bid)
+                    {
+                        OnBid(quote, bucket);
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Warning("Error on handling trade in CandleStick Client: {0}", e.Message);
+        }      
+    }
+
+    public void Start()
+    {
+        if (!flushThread.IsAlive)
+        {
+            flushThread.Start();
+        }
+
+        if (!lostAndFoundThread.IsAlive)
+        {
+            lostAndFoundThread.Start();
+        }
+    }
+
+    public void Stop()
+    {
+        ctSource.Cancel();
+    }
     #endregion //Public Methods
     
     #region Private Methods
-    //let createNewTradeCandle(trade : Trade, timestamp : double) : TradeCandleStick option =
-    //     let start : double = CandleStickClientInline.getNearestModInterval(timestamp, interval)
-    //     let freshCandle : TradeCandleStick option = Some(new TradeCandleStick(trade.Symbol, trade.Size, trade.Price, start, (start + System.Convert.ToDouble(int interval)), interval, timestamp))
-    //     
-    //     if (useGetHistoricalTradeCandleStick && useOnTradeCandleStick)
-    //     then
-    //         try
-    //             let historical = getHistoricalTradeCandleStick.Invoke(freshCandle.Value.Symbol, freshCandle.Value.OpenTimestamp, freshCandle.Value.CloseTimestamp, freshCandle.Value.Interval)
-    //             match not (obj.ReferenceEquals(historical,null)) with
-    //             | false ->
-    //                 freshCandle
-    //             | true ->
-    //                 historical.MarkIncomplete()
-    //                 CandleStickClientInline.mergeTradeCandles(historical, freshCandle.Value)
-    //         with :? Exception as e ->
-    //             Log.Error("Error retrieving historical TradeCandleStick: {0}; trade: {1}", e.Message, trade)
-    //             freshCandle
-    //     else
-    //         freshCandle
-            
-    // let createNewQuoteCandle(quote : Quote, timestamp : double) : QuoteCandleStick option =
-    //     let start : double = CandleStickClientInline.getNearestModInterval(timestamp, interval)
-    //     let freshCandle : QuoteCandleStick option = Some(new QuoteCandleStick(quote.Symbol, quote.Price, quote.Type, start, (start + System.Convert.ToDouble(int interval)), interval, timestamp))
-    //     
-    //     if (useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick)
-    //     then
-    //         try
-    //             let historical = getHistoricalQuoteCandleStick.Invoke(freshCandle.Value.Symbol, freshCandle.Value.OpenTimestamp, freshCandle.Value.CloseTimestamp, freshCandle.Value.QuoteType, freshCandle.Value.Interval)
-    //             match not (obj.ReferenceEquals(historical,null)) with
-    //             | false ->
-    //                 freshCandle
-    //             | true ->
-    //                 historical.MarkIncomplete()
-    //                 CandleStickClientInline.mergeQuoteCandles(historical, freshCandle.Value)
-    //         with :? Exception as e ->
-    //             Log.Error("Error retrieving historical QuoteCandleStick: {0}; quote: {1}", e.Message, quote)
-    //             freshCandle
-    //     else
-    //         freshCandle
-             
-    // let addAskToLostAndFound(ask: Quote) : unit =
-    //     let ts : double = CandleStickClientInline.convertToTimestamp(ask.Timestamp)
-    //     let key : string = String.Format("{0}|{1}|{2}", ask.Symbol, CandleStickClientInline.getNearestModInterval(ts, interval), interval)
-    //     let bucket : SymbolBucket = getSlot(key, lostAndFound, lostAndFoundLock)
-    //     try
-    //         if useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick
-    //         then
-    //             bucket.Locker.EnterWriteLock()
-    //             try
-    //                 if (bucket.AskCandleStick.IsSome)
-    //                 then
-    //                     bucket.AskCandleStick.Value.Update(ask.Price, ts)
-    //                 else
-    //                     let start = CandleStickClientInline.getNearestModInterval(ts, interval)
-    //                     bucket.AskCandleStick <- Some(new QuoteCandleStick(ask.Symbol, ask.Price, QuoteType.Ask, start, (start + System.Convert.ToDouble(int interval)), interval, ts))
-    //             finally
-    //                 bucket.Locker.ExitWriteLock()
-    //     with ex ->
-    //         Log.Warning("Error on handling late ask in CandleStick Client: {0}", ex.Message)
-         
-    // let addBidToLostAndFound(bid: Quote) : unit =
-    //     let ts : double = CandleStickClientInline.convertToTimestamp(bid.Timestamp)
-    //     let key : string = String.Format("{0}|{1}|{2}", bid.Symbol, CandleStickClientInline.getNearestModInterval(ts, interval), interval)
-    //     let bucket : SymbolBucket = getSlot(key, lostAndFound, lostAndFoundLock)
-    //     try
-    //         if useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick
-    //         then
-    //             bucket.Locker.EnterWriteLock()
-    //             try
-    //                 if (bucket.BidCandleStick.IsSome)
-    //                 then
-    //                     bucket.BidCandleStick.Value.Update(bid.Price, ts)
-    //                 else
-    //                     let start = CandleStickClientInline.getNearestModInterval(ts, interval)
-    //                     bucket.BidCandleStick <- Some(new QuoteCandleStick(bid.Symbol, bid.Price, QuoteType.Bid, start, (start + System.Convert.ToDouble(int interval)), interval, ts))
-    //             finally
-    //                 bucket.Locker.ExitWriteLock()
-    //     with ex ->
-    //         Log.Warning("Error on handling late bid in CandleStick Client: {0}", ex.Message)
-         
-    // let addTradeToLostAndFound (trade: Trade) : unit =
-    //     let ts : double = CandleStickClientInline.convertToTimestamp(trade.Timestamp)
-    //     let key : string = String.Format("{0}|{1}|{2}", trade.Symbol, CandleStickClientInline.getNearestModInterval(ts, interval), interval)
-    //     let bucket : SymbolBucket = getSlot(key, lostAndFound, lostAndFoundLock)
-    //     try
-    //         if useGetHistoricalTradeCandleStick && useOnTradeCandleStick
-    //         then
-    //             bucket.Locker.EnterWriteLock()
-    //             try
-    //                 if (bucket.TradeCandleStick.IsSome)
-    //                 then
-    //                     bucket.TradeCandleStick.Value.Update(trade.Size, trade.Price, ts)
-    //                 else
-    //                     let start = CandleStickClientInline.getNearestModInterval(ts, interval)
-    //                     bucket.TradeCandleStick <- Some(new TradeCandleStick(trade.Symbol, trade.Size, trade.Price, start, (start + System.Convert.ToDouble(int interval)), interval, ts))
-    //             finally
-    //                 bucket.Locker.ExitWriteLock()
-    //     with ex ->
-    //         Log.Warning("Error on handling late trade in CandleStick Client: {0}", ex.Message)
-     
-    // let onAsk(quote: Quote, bucket: SymbolBucket) : unit =
-    //     let ts : double = CandleStickClientInline.convertToTimestamp(quote.Timestamp)
-    //     if (bucket.AskCandleStick.IsSome && not (Double.IsNaN(quote.Price)))
-    //     then
-    //         if (bucket.AskCandleStick.Value.CloseTimestamp < ts)
-    //         then
-    //             bucket.AskCandleStick.Value.MarkComplete()
-    //             onQuoteCandleStick.Invoke(bucket.AskCandleStick.Value)
-    //             bucket.AskCandleStick <- createNewQuoteCandle(quote, ts)
-    //         elif (bucket.AskCandleStick.Value.OpenTimestamp <= ts)
-    //         then
-    //             bucket.AskCandleStick.Value.Update(quote.Price, ts)
-    //             if broadcastPartialCandles then onQuoteCandleStick.Invoke(bucket.AskCandleStick.Value)
-    //         else //This is a late event.  We already shipped the candle, so add to lost and found
-    //             addAskToLostAndFound(quote)
-    //     elif (bucket.AskCandleStick.IsNone && not (Double.IsNaN(quote.Price)))
-    //     then
-    //         bucket.AskCandleStick <- createNewQuoteCandle(quote, ts)
-    //         if broadcastPartialCandles then onQuoteCandleStick.Invoke(bucket.AskCandleStick.Value)
-     
-    // let onBid(quote: Quote, bucket : SymbolBucket) : unit =
-    //     let ts : double = CandleStickClientInline.convertToTimestamp(quote.Timestamp)
-    //     if (bucket.BidCandleStick.IsSome && not (Double.IsNaN(quote.Price)))
-    //     then
-    //         if (bucket.BidCandleStick.Value.CloseTimestamp < ts)
-    //         then
-    //             bucket.BidCandleStick.Value.MarkComplete()
-    //             onQuoteCandleStick.Invoke(bucket.BidCandleStick.Value)
-    //             bucket.BidCandleStick <- createNewQuoteCandle(quote, ts)
-    //         elif (bucket.BidCandleStick.Value.OpenTimestamp <= ts)
-    //         then
-    //             bucket.BidCandleStick.Value.Update(quote.Price, ts)
-    //             if broadcastPartialCandles then onQuoteCandleStick.Invoke(bucket.BidCandleStick.Value)
-    //         else //This is a late event.  We already shipped the candle, so add to lost and found
-    //             addBidToLostAndFound(quote)
-    //     elif (bucket.BidCandleStick.IsNone && not (Double.IsNaN(quote.Price)))
-    //     then
-    //         bucket.BidCandleStick <- createNewQuoteCandle(quote, ts)
-    //         if broadcastPartialCandles then onQuoteCandleStick.Invoke(bucket.BidCandleStick.Value)
-             
-    // let flushFn () : unit =
-    //     Log.Information("Starting candlestick expiration watcher...")
-    //     let ct = ctSource.Token
-    //     while not (ct.IsCancellationRequested) do
-    //         try                
-    //             symbolBucketsLock.EnterReadLock()
-    //             let mutable keys : string list = []
-    //             for key in symbolBuckets.Keys do
-    //                 keys <- key::keys
-    //             symbolBucketsLock.ExitReadLock()
-    //             for key in keys do
-    //                 let bucket : SymbolBucket = getSlot(key, symbolBuckets, symbolBucketsLock)
-    //                 let flushThresholdTime : double = CandleStickClientInline.getCurrentTimestamp(sourceDelaySeconds) - flushBufferSeconds
-    //                 bucket.Locker.EnterWriteLock()
-    //                 try
-    //                     if (useOnTradeCandleStick && bucket.TradeCandleStick.IsSome && (bucket.TradeCandleStick.Value.CloseTimestamp < flushThresholdTime))
-    //                     then
-    //                         bucket.TradeCandleStick.Value.MarkComplete()
-    //                         onTradeCandleStick.Invoke(bucket.TradeCandleStick.Value)
-    //                         bucket.TradeCandleStick <- Option.None
-    //                     if (useOnQuoteCandleStick && bucket.AskCandleStick.IsSome && (bucket.AskCandleStick.Value.CloseTimestamp < flushThresholdTime))
-    //                     then
-    //                         bucket.AskCandleStick.Value.MarkComplete()
-    //                         onQuoteCandleStick.Invoke(bucket.AskCandleStick.Value)
-    //                         bucket.AskCandleStick <- Option.None
-    //                     if (useOnQuoteCandleStick && bucket.BidCandleStick.IsSome && (bucket.BidCandleStick.Value.CloseTimestamp < flushThresholdTime))
-    //                     then
-    //                         bucket.BidCandleStick.Value.MarkComplete()
-    //                         onQuoteCandleStick.Invoke(bucket.BidCandleStick.Value)
-    //                         bucket.BidCandleStick <- Option.None
-    //                 finally
-    //                     bucket.Locker.ExitWriteLock()
-    //             if not (ct.IsCancellationRequested)
-    //             then
-    //                 Thread.Sleep 1000    
-    //         with :? OperationCanceledException -> ()
-    //     Log.Information("Stopping candlestick expiration watcher...")
-             
-    // let flushThread : Thread = new Thread(new ThreadStart(flushFn))
-     
-    // let lostAndFoundFn () : unit =
-    //     Log.Information("Starting candlestick late event watcher...")
-    //     let ct = ctSource.Token
-    //     while not (ct.IsCancellationRequested) do
-    //         try                
-    //             lostAndFoundLock.EnterReadLock()
-    //             let mutable keys : string list = []
-    //             for key in lostAndFound.Keys do
-    //                 keys <- key::keys
-    //             lostAndFoundLock.ExitReadLock()
-    //             for key in keys do
-    //                 let bucket : SymbolBucket = getSlot(key, lostAndFound, lostAndFoundLock)
-    //                 bucket.Locker.EnterWriteLock()
-    //                 try
-    //                     if (useGetHistoricalTradeCandleStick && useOnTradeCandleStick && bucket.TradeCandleStick.IsSome)
-    //                     then
-    //                         try
-    //                             let historical = getHistoricalTradeCandleStick.Invoke(bucket.TradeCandleStick.Value.Symbol, bucket.TradeCandleStick.Value.OpenTimestamp, bucket.TradeCandleStick.Value.CloseTimestamp, bucket.TradeCandleStick.Value.Interval)
-    //                             match not (obj.ReferenceEquals(historical,null)) with
-    //                             | false ->
-    //                                 bucket.TradeCandleStick.Value.MarkComplete()
-    //                                 onTradeCandleStick.Invoke(bucket.TradeCandleStick.Value)
-    //                                 bucket.TradeCandleStick <- Option.None
-    //                             | true -> 
-    //                                 bucket.TradeCandleStick <- CandleStickClientInline.mergeTradeCandles(historical, bucket.TradeCandleStick.Value)
-    //                                 bucket.TradeCandleStick.Value.MarkComplete()
-    //                                 onTradeCandleStick.Invoke(bucket.TradeCandleStick.Value)
-    //                                 bucket.TradeCandleStick <- Option.None
-    //                         with :? Exception as e ->
-    //                             Log.Error("Error retrieving historical TradeCandleStick: {0}", e.Message)
-    //                             bucket.TradeCandleStick.Value.MarkComplete()
-    //                             onTradeCandleStick.Invoke(bucket.TradeCandleStick.Value)
-    //                             bucket.TradeCandleStick <- Option.None
-    //                     else
-    //                         bucket.TradeCandleStick <- Option.None
-    //                     if (useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick && bucket.AskCandleStick.IsSome)
-    //                     then
-    //                         try
-    //                             let historical = getHistoricalQuoteCandleStick.Invoke(bucket.AskCandleStick.Value.Symbol, bucket.AskCandleStick.Value.OpenTimestamp, bucket.AskCandleStick.Value.CloseTimestamp, bucket.AskCandleStick.Value.QuoteType, bucket.AskCandleStick.Value.Interval)
-    //                             match not (obj.ReferenceEquals(historical,null)) with
-    //                             | false ->
-    //                                 bucket.AskCandleStick.Value.MarkComplete()
-    //                                 onQuoteCandleStick.Invoke(bucket.AskCandleStick.Value)
-    //                                 bucket.AskCandleStick <- Option.None
-    //                             | true ->
-    //                                 bucket.AskCandleStick <- CandleStickClientInline.mergeQuoteCandles(historical, bucket.AskCandleStick.Value)
-    //                                 bucket.AskCandleStick.Value.MarkComplete()
-    //                                 onQuoteCandleStick.Invoke(bucket.AskCandleStick.Value)
-    //                                 bucket.AskCandleStick <- Option.None
-    //                         with :? Exception as e ->
-    //                             Log.Error("Error retrieving historical QuoteCandleStick: {0}", e.Message)
-    //                             bucket.AskCandleStick.Value.MarkComplete()
-    //                             onQuoteCandleStick.Invoke(bucket.AskCandleStick.Value)
-    //                             bucket.AskCandleStick <- Option.None
-    //                     else
-    //                         bucket.AskCandleStick <- Option.None
-    //                     if (useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick && bucket.BidCandleStick.IsSome)
-    //                     then
-    //                         try
-    //                             let historical = getHistoricalQuoteCandleStick.Invoke(bucket.BidCandleStick.Value.Symbol, bucket.BidCandleStick.Value.OpenTimestamp, bucket.BidCandleStick.Value.CloseTimestamp, bucket.BidCandleStick.Value.QuoteType, bucket.BidCandleStick.Value.Interval)
-    //                             match not (obj.ReferenceEquals(historical,null)) with
-    //                             | false ->
-    //                                 bucket.BidCandleStick.Value.MarkComplete()
-    //                                 onQuoteCandleStick.Invoke(bucket.BidCandleStick.Value)
-    //                                 bucket.BidCandleStick <- Option.None
-    //                             | true ->
-    //                                 bucket.BidCandleStick <- CandleStickClientInline.mergeQuoteCandles(historical, bucket.BidCandleStick.Value)
-    //                                 bucket.BidCandleStick.Value.MarkComplete()
-    //                                 onQuoteCandleStick.Invoke(bucket.BidCandleStick.Value)
-    //                                 bucket.BidCandleStick <- Option.None
-    //                         with :? Exception as e ->
-    //                             Log.Error("Error retrieving historical QuoteCandleStick: {0}", e.Message)
-    //                             bucket.BidCandleStick.Value.MarkComplete()
-    //                             onQuoteCandleStick.Invoke(bucket.BidCandleStick.Value)
-    //                             bucket.BidCandleStick <- Option.None
-    //                     else
-    //                         bucket.BidCandleStick <- Option.None
-    //                     if bucket.TradeCandleStick.IsNone && bucket.AskCandleStick.IsNone && bucket.BidCandleStick.IsNone
-    //                     then
-    //                         removeSlot(key, lostAndFound, lostAndFoundLock)
-    //                 finally
-    //                     bucket.Locker.ExitWriteLock()
-    //             if not (ct.IsCancellationRequested)
-    //             then
-    //                 Thread.Sleep 1000    
-    //         with :? OperationCanceledException -> ()
-    //     Log.Information("Stopping candlestick late event watcher...")
 
-    // let lostAndFoundThread : Thread = new Thread(new ThreadStart(lostAndFoundFn))
+    private TradeCandleStick CreateNewTradeCandle(Trade trade, double timestamp)
+    {
+        double start = GetNearestModInterval(timestamp, interval);
+        TradeCandleStick freshCandle = new TradeCandleStick(trade.Symbol, trade.Size, trade.Price, start, (start + System.Convert.ToDouble((int)interval)), interval, timestamp);
+
+        if (useGetHistoricalTradeCandleStick && useOnTradeCandleStick)
+        {
+            try
+            {
+                TradeCandleStick historical = GetHistoricalTradeCandleStick(freshCandle.Symbol, freshCandle.OpenTimestamp, freshCandle.CloseTimestamp, freshCandle.Interval);
+                if (ReferenceEquals(historical,null))
+                    return freshCandle;
+                historical.MarkIncomplete();
+                return MergeTradeCandles(historical, freshCandle);
+            }
+            catch (Exception e)
+            {
+                Log.Error("Error retrieving historical TradeCandleStick: {0}; trade: {1}", e.Message, trade);
+                return freshCandle;
+            }
+        }
+        else
+        {
+            return freshCandle;
+        }
+    }
+
+    private QuoteCandleStick CreateNewQuoteCandle(Quote quote, double timestamp)
+    {
+        double start = GetNearestModInterval(timestamp, interval);
+        QuoteCandleStick freshCandle = new QuoteCandleStick(quote.Symbol, quote.Price, quote.Type, start, (start + System.Convert.ToDouble((int)interval)), interval, timestamp);
+        if (useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick)
+        {
+            try
+            {
+                QuoteCandleStick historical = GetHistoricalQuoteCandleStick.Invoke(freshCandle.Symbol, freshCandle.OpenTimestamp, freshCandle.CloseTimestamp, freshCandle.QuoteType, freshCandle.Interval);
+                if (ReferenceEquals(historical,null))
+                    return freshCandle;
+                historical.MarkIncomplete();
+                return MergeQuoteCandles(historical, freshCandle);
+            }
+            catch (Exception e)
+            {
+                Log.Error("Error retrieving historical QuoteCandleStick: {0}; quote: {1}", e.Message, quote);
+                return freshCandle;
+            }
+        }
+        else
+        {
+            return freshCandle;
+        }
+    }
+
+    private void AddAskToLostAndFound(Quote ask)
+    {
+        double ts = ConvertToTimestamp(ask.Timestamp);
+        string key = String.Format("{0}|{1}|{2}", ask.Symbol, GetNearestModInterval(ts, interval), interval);
+        SymbolBucket bucket = GetSlot(key, lostAndFound, lostAndFoundLock);
+        try
+        {
+            if (useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick)
+            {
+                lock (bucket.Locker)
+                {
+                    if (bucket.AskCandleStick != null)
+                    {
+                        bucket.AskCandleStick.Update(ask.Price, ts);
+                    }
+                    else
+                    {
+                        double start = GetNearestModInterval(ts, interval);
+                        bucket.AskCandleStick = new QuoteCandleStick(ask.Symbol, ask.Price, QuoteType.Ask, start, (start + System.Convert.ToDouble((int)interval)), interval, ts);
+                    }
+                }       
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Error on handling late ask in CandleStick Client: {0}", ex.Message);
+        }    
+    }
+
+    private void AddBidToLostAndFound(Quote bid)
+    {
+        double ts = ConvertToTimestamp(bid.Timestamp);
+        string key = String.Format("{0}|{1}|{2}", bid.Symbol, GetNearestModInterval(ts, interval), interval);
+        SymbolBucket bucket = GetSlot(key, lostAndFound, lostAndFoundLock);
+        try
+        {
+            if (useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick)
+            {
+                lock (bucket.Locker)
+                {
+                    if (bucket.BidCandleStick != null)
+                    {
+                        bucket.BidCandleStick.Update(bid.Price, ts);
+                    }
+                    else
+                    {
+                        double start = GetNearestModInterval(ts, interval);
+                        bucket.BidCandleStick = new QuoteCandleStick(bid.Symbol, bid.Price, QuoteType.Bid, start, (start + System.Convert.ToDouble((int) interval)), interval, ts);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Error on handling late bid in CandleStick Client: {0}", ex.Message);
+        }   
+    }
+
+    private void AddTradeToLostAndFound(Trade trade)
+    {
+        double ts = ConvertToTimestamp(trade.Timestamp);
+        string key = String.Format("{0}|{1}|{2}", trade.Symbol, GetNearestModInterval(ts, interval), interval);
+        SymbolBucket bucket = GetSlot(key, lostAndFound, lostAndFoundLock);
+        try
+        {
+            if (useGetHistoricalTradeCandleStick && useOnTradeCandleStick)
+            {
+                lock (bucket.Locker)
+                {
+                    if (bucket.TradeCandleStick != null)
+                    {
+                        bucket.TradeCandleStick.Update(trade.Size, trade.Price, ts);
+                    }
+                    else
+                    {
+                        double start = GetNearestModInterval(ts, interval);
+                        bucket.TradeCandleStick = new TradeCandleStick(trade.Symbol, trade.Size, trade.Price, start, (start + System.Convert.ToDouble((int)interval)), interval, ts);
+                    }
+                }               
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Error on handling late trade in CandleStick Client: {0}", ex.Message);
+        }   
+    }
+
+    private void OnAsk(Quote quote, SymbolBucket bucket)
+    {
+        double ts = ConvertToTimestamp(quote.Timestamp);
+
+        if (bucket.AskCandleStick != null && !Double.IsNaN(quote.Price))
+        {
+            if (bucket.AskCandleStick.CloseTimestamp < ts)
+            {
+                bucket.AskCandleStick.MarkComplete();
+                OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
+                bucket.AskCandleStick = CreateNewQuoteCandle(quote, ts);
+            }
+            else if (bucket.AskCandleStick.OpenTimestamp <= ts)
+            {
+                bucket.AskCandleStick.Update(quote.Price, ts);
+                if (broadcastPartialCandles)
+                    OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
+            }
+            else //This is a late event.  We already shipped the candle, so add to lost and found
+            {
+                AddAskToLostAndFound(quote);
+            }
+        }
+        else if (bucket.AskCandleStick == null && !Double.IsNaN(quote.Price))
+        {
+            bucket.AskCandleStick = CreateNewQuoteCandle(quote, ts);
+            if (broadcastPartialCandles)
+                OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
+        }
+    }
+
+    private void OnBid(Quote quote, SymbolBucket bucket)
+    {
+        double ts = ConvertToTimestamp(quote.Timestamp);
+
+        if (bucket.BidCandleStick != null && !Double.IsNaN(quote.Price))
+        {
+            if (bucket.BidCandleStick.CloseTimestamp < ts)
+            {
+                bucket.BidCandleStick.MarkComplete();
+                OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
+                bucket.BidCandleStick = CreateNewQuoteCandle(quote, ts);
+            }
+            else if(bucket.BidCandleStick.OpenTimestamp <= ts)
+            {
+                bucket.BidCandleStick.Update(quote.Price, ts);
+                if (broadcastPartialCandles)
+                    OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
+            }
+            else //This is a late event.  We already shipped the candle, so add to lost and found
+            {
+                AddBidToLostAndFound(quote);
+            }        
+        }
+        else if (bucket.BidCandleStick == null && !Double.IsNaN(quote.Price))
+        {
+            bucket.BidCandleStick = CreateNewQuoteCandle(quote, ts);
+            if (broadcastPartialCandles)
+                OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
+        }
+    }
+
+    private async void FlushFn()
+    {
+        Log.Information("Starting candlestick expiration watcher...");
+        CancellationToken ct = ctSource.Token;
+        System.Threading.Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                List<string> keys = new List<string>();
+                lock (symbolBucketsLock)
+                {
+                    foreach (string key in symbolBuckets.Keys)
+                        keys.Add(key);
+                }
+
+                foreach (string key in keys)
+                {
+                    SymbolBucket bucket = GetSlot(key, symbolBuckets, symbolBucketsLock);
+                    double flushThresholdTime = GetCurrentTimestamp(sourceDelaySeconds) - flushBufferSeconds;
+
+                    lock (bucket.Locker)
+                    {
+                        if (useOnTradeCandleStick && bucket.TradeCandleStick != null && (bucket.TradeCandleStick.CloseTimestamp < flushThresholdTime))
+                        {
+                            bucket.TradeCandleStick.MarkComplete();
+                            OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
+                            bucket.TradeCandleStick = null;
+                        }
+
+                        if (useOnQuoteCandleStick && bucket.AskCandleStick != null && (bucket.AskCandleStick.CloseTimestamp < flushThresholdTime))
+                        {
+                            bucket.AskCandleStick.MarkComplete();
+                            OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
+                            bucket.AskCandleStick = null;
+                        }
+
+                        if (useOnQuoteCandleStick && bucket.BidCandleStick != null && (bucket.BidCandleStick.CloseTimestamp < flushThresholdTime))
+                        {
+                            bucket.BidCandleStick.MarkComplete();
+                            OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
+                            bucket.BidCandleStick = null;
+                        }
+                    }
+                    await Task.Yield();
+                }
+
+                if (!(ct.IsCancellationRequested))
+                    Task.Delay(1000);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        Log.Information("Stopping candlestick expiration watcher...");
+    }
+
+    private async void LostAndFoundFn()
+    {
+        Log.Information("Starting candlestick late event watcher...");
+        CancellationToken ct = ctSource.Token;
+        System.Threading.Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                List<string> keys = new List<string>();
+                lock (lostAndFoundLock)
+                {
+                    foreach (string key in lostAndFound.Keys)
+                        keys.Add(key);
+                }
+
+                foreach (string key in keys)
+                {
+                    SymbolBucket bucket = GetSlot(key, lostAndFound, lostAndFoundLock);
+
+                    lock (bucket.Locker)
+                    {
+                        if (useGetHistoricalTradeCandleStick && useOnTradeCandleStick && bucket.TradeCandleStick != null)
+                        {
+                            try
+                            {
+                                TradeCandleStick historical = GetHistoricalTradeCandleStick.Invoke(bucket.TradeCandleStick.Symbol, bucket.TradeCandleStick.OpenTimestamp, bucket.TradeCandleStick.CloseTimestamp, bucket.TradeCandleStick.Interval);
+                                if (ReferenceEquals(historical,null))
+                                {
+                                    bucket.TradeCandleStick.MarkComplete();
+                                    OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
+                                    bucket.TradeCandleStick = null;
+                                }
+                                else
+                                {
+                                    bucket.TradeCandleStick = MergeTradeCandles(historical, bucket.TradeCandleStick);
+                                    bucket.TradeCandleStick.MarkComplete();
+                                    OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
+                                    bucket.TradeCandleStick = null;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                Log.Error("Error retrieving historical TradeCandleStick: {0}", e.Message);
+                                bucket.TradeCandleStick.MarkComplete();
+                                OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
+                                bucket.TradeCandleStick = null;
+                            }
+                        }
+                        else
+                        {
+                            bucket.TradeCandleStick = null;
+                        }
+
+                        if (useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick && bucket.AskCandleStick != null)
+                        {
+                            try
+                            {
+                                QuoteCandleStick historical = GetHistoricalQuoteCandleStick.Invoke(bucket.AskCandleStick.Symbol, bucket.AskCandleStick.OpenTimestamp, bucket.AskCandleStick.CloseTimestamp, bucket.AskCandleStick.QuoteType, bucket.AskCandleStick.Interval);
+                                if (ReferenceEquals(historical,null))
+                                {
+                                    bucket.AskCandleStick.MarkComplete();
+                                    OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
+                                    bucket.AskCandleStick = null;
+                                }
+                                else
+                                {
+                                    bucket.AskCandleStick = MergeQuoteCandles(historical, bucket.AskCandleStick);
+                                    bucket.AskCandleStick.MarkComplete();
+                                    OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
+                                    bucket.AskCandleStick = null;
+                                }
+                                
+                            }
+                            catch (Exception e)
+                            {
+                                Log.Error("Error retrieving historical QuoteCandleStick: {0}", e.Message);
+                                bucket.AskCandleStick.MarkComplete();
+                                OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
+                                bucket.AskCandleStick = null;
+                            }
+                        }
+                        else
+                        {
+                            bucket.AskCandleStick = null;
+                        }
+
+                        if (useGetHistoricalQuoteCandleStick && useOnQuoteCandleStick && bucket.BidCandleStick != null)
+                        {
+                            try
+                            {
+                                QuoteCandleStick historical = GetHistoricalQuoteCandleStick.Invoke(bucket.BidCandleStick.Symbol, bucket.BidCandleStick.OpenTimestamp, bucket.BidCandleStick.CloseTimestamp, bucket.BidCandleStick.QuoteType, bucket.BidCandleStick.Interval);
+                                if (ReferenceEquals(historical,null))
+                                {
+                                    bucket.BidCandleStick.MarkComplete();
+                                    OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
+                                    bucket.BidCandleStick = null;
+                                }
+                                else
+                                {
+                                    bucket.BidCandleStick = MergeQuoteCandles(historical, bucket.BidCandleStick);
+                                    bucket.BidCandleStick.MarkComplete();
+                                    OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
+                                    bucket.BidCandleStick = null;
+                                }
+                            }
+                            catch (Exception e)
+                            {
+                                Log.Error("Error retrieving historical QuoteCandleStick: {0}", e.Message);
+                                bucket.BidCandleStick.MarkComplete();
+                                OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
+                                bucket.BidCandleStick = null;
+                            }
+                        }
+                        else
+                        {
+                            bucket.BidCandleStick = null;
+                        }
+
+                        if (bucket.TradeCandleStick == null && bucket.AskCandleStick == null && bucket.BidCandleStick == null)
+                            RemoveSlot(key, lostAndFound, lostAndFoundLock);
+                    }
+                    await Task.Yield();
+                }
+
+                if (!ct.IsCancellationRequested)
+                    Task.Delay(1000);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            await Task.Yield();
+        }
+
+        Log.Information("Stopping candlestick late event watcher...");
+    }
+    
     #endregion //Private Methods
     
     private class SymbolBucket
@@ -426,14 +602,14 @@ public class CandleStickClient
         public TradeCandleStick TradeCandleStick;
         public QuoteCandleStick AskCandleStick;
         public QuoteCandleStick BidCandleStick;
-        public ReaderWriterLockSlim Locker;
+        public object Locker;
     
         public SymbolBucket(TradeCandleStick tradeCandleStick, QuoteCandleStick askCandleStick, QuoteCandleStick bidCandleStick)
         {
             TradeCandleStick = tradeCandleStick;
             AskCandleStick = askCandleStick;
             BidCandleStick = bidCandleStick;
-            Locker = new ReaderWriterLockSlim();
+            Locker = new object();
         }
     }
     
@@ -507,7 +683,7 @@ public class CandleStickClient
         return (input.ToUniversalTime() - DateTime.UnixEpoch.ToUniversalTime()).TotalSeconds;
     }
 
-    private static SymbolBucket getSlot(string key, Dictionary<string, SymbolBucket> dict, ReaderWriterLockSlim locker)
+    private static SymbolBucket GetSlot(string key, Dictionary<string, SymbolBucket> dict, object locker)
     {
         SymbolBucket value;
         if (dict.TryGetValue(key, out value))
@@ -515,8 +691,7 @@ public class CandleStickClient
             return value;
         }
 
-        locker.EnterWriteLock();
-        try
+        lock (locker)
         {
             if (dict.TryGetValue(key, out value))
             {
@@ -527,27 +702,18 @@ public class CandleStickClient
             dict.Add(key, bucket);
             return bucket;
         }
-        finally
-        {
-            locker.ExitWriteLock();
-        }
     }
 
-    private static void removeSlot(string key, Dictionary<string, SymbolBucket> dict, ReaderWriterLockSlim locker)
+    private static void RemoveSlot(string key, Dictionary<string, SymbolBucket> dict, object locker)
     {
         if (dict.ContainsKey(key))
         {
-            locker.EnterWriteLock();
-            try
+            lock (locker)
             {
                 if (dict.ContainsKey(key))
                 {
                     dict.Remove(key);
                 }
-            }
-            finally
-            {
-                locker.ExitWriteLock();
             }
         }
     }
