@@ -354,7 +354,14 @@ public class Client : IEquitiesWebSocketClient
                     {
                         Trade trade = ParseTrade(chunk);
                         Interlocked.Increment(ref _dataTradeCount);
-                        Task.Run(() => _onTrade.Invoke(trade));
+                        try
+                        {
+                            _onTrade.Invoke(trade);
+                        }
+                        catch (Exception e)
+                        {
+                            LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                        }
                     }
                     break;
                 }
@@ -365,7 +372,14 @@ public class Client : IEquitiesWebSocketClient
                     {
                         Quote quote = ParseQuote(chunk);
                         Interlocked.Increment(ref _dataQuoteCount);
-                        Task.Run(() => _onQuote.Invoke(quote));
+                        try
+                        {
+                            _onQuote.Invoke(quote);
+                        }
+                        catch (Exception e)
+                        {
+                            LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                        }
                     }
                     break;
                 }
