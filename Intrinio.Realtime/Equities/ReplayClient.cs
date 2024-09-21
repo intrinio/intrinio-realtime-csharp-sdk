@@ -70,8 +70,10 @@ public class ReplayClient : IEquitiesWebSocketClient
         
         logPrefix = logPrefix = String.Format("{0}: ", config.Provider.ToString());
         csvLock = new Object();
-        threads = Array.init(config.NumThreads, (fun _-> new Thread(new ThreadStart(threadFn))));
-        replayThread = new Thread(new ThreadStart(replayThreadFn));
+        threads = new Thread[config.NumThreads];
+        for (int i = 0; i < threads.Length; i++)
+            threads[i] = new Thread(threadFn);
+        replayThread = new Thread(replayThreadFn);
 
         config.Validate();
         foreach (Thread thread in threads)
@@ -81,17 +83,17 @@ public class ReplayClient : IEquitiesWebSocketClient
         replayThread.Start();
     }
 
-    public ReplayClient(Action<Trade> onTrade, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(onTrade, null, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
+    public ReplayClient(Action<Trade> onTrade, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(onTrade, null, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
     {
         
     }
 
-    public ReplayClient(Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(null, onQuote, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
+    public ReplayClient(Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(null, onQuote, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
     {
         
     }
 
-    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(onTrade, onQuote, LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
+    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(onTrade, onQuote, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
     {
         
     }

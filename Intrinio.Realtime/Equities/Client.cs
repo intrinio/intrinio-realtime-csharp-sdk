@@ -56,7 +56,9 @@ public class Client : IEquitiesWebSocketClient
     private UInt64 _textMsgCount = 0UL;
     private readonly HashSet<Channel> _channels = new ();
     private readonly CancellationTokenSource _ctSource = new ();
-    private readonly ConcurrentQueue<byte[]> _data = new ();
+    private const int BufferBlockSize = 256 * 64; //256 possible messages in a group, and let's buffer 64bytes per message
+    private readonly RingBuffer _data;
+    private readonly DropOldestRingBuffer _overflowData;
     private readonly Action _tryReconnect;
     private readonly HttpClient _httpClient = new ();
     private readonly string _logPrefix;
@@ -83,13 +85,16 @@ public class Client : IEquitiesWebSocketClient
         
         if (ReferenceEquals(null, _config))
             throw new ArgumentException("Config may not be null.");
+        _config.Validate();
         
         _logPrefix = String.Format("{0}: ", _config?.Provider.ToString());
         _threads = GC.AllocateUninitializedArray<Thread>(_config.NumThreads);
         for (int i = 0; i < _threads.Length; i++)
             _threads[i] = new Thread(new ThreadStart(ThreadFn));
-
-        _config.Validate();
+        
+        _data = new RingBuffer(BufferBlockSize, Convert.ToUInt32(_config.BufferSize));
+        _overflowData = new DropOldestRingBuffer(BufferBlockSize, Convert.ToUInt32(_config.BufferSize));
+        
         _httpClient.Timeout = TimeSpan.FromSeconds(5.0);
         _httpClient.DefaultRequestHeaders.Add(ClientInfoHeaderKey, ClientInfoHeaderValue);
         _tryReconnect = () =>
@@ -212,7 +217,17 @@ public class Client : IEquitiesWebSocketClient
 
     public ClientStats GetStats()
     {
-        return new ClientStats(Interlocked.Read(ref _dataMsgCount), Interlocked.Read(ref _textMsgCount), _data.Count, Interlocked.Read(ref _dataEventCount), Interlocked.Read(ref _dataTradeCount), Interlocked.Read(ref _dataQuoteCount));
+        return new ClientStats(Interlocked.Read(ref _dataMsgCount),
+            Interlocked.Read(ref _textMsgCount),
+            Convert.ToInt32(_data.Count),
+            Interlocked.Read(ref _dataEventCount),
+            Interlocked.Read(ref _dataTradeCount),
+            Interlocked.Read(ref _dataQuoteCount),
+            Convert.ToInt32(_data.BlockCapacity),
+            Convert.ToInt32(_overflowData.Count),
+            Convert.ToInt32(_overflowData.BlockCapacity),
+            Convert.ToInt32(_overflowData.DropCount),
+            System.Convert.ToInt32(_data.DropCount));
     }
 
     [MessageTemplateFormatMethod("messageTemplate")]
@@ -393,17 +408,75 @@ public class Client : IEquitiesWebSocketClient
             startIndex = startIndex + msgLength;
         }
     }
+    
+    private void ParseSocketMessage(Span<byte> bytes, ref int startIndex)
+    {
+        int msgLength = 1; //default value in case corrupt array so we don't reprocess same bytes over and over. 
+        try
+        {
+            MessageType msgType = (MessageType)Convert.ToInt32(bytes[startIndex]);
+            msgLength = Convert.ToInt32(bytes[startIndex + 1]);
+            ReadOnlySpan<byte> chunk = bytes.Slice(startIndex, msgLength);
+            switch (msgType)
+            {
+                case MessageType.Trade:
+                {
+                    if (_useOnTrade)
+                    {
+                        Trade trade = ParseTrade(chunk);
+                        Interlocked.Increment(ref _dataTradeCount);
+                        try
+                        {
+                            _onTrade.Invoke(trade);
+                        }
+                        catch (Exception e)
+                        {
+                            LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                        }
+                    }
+                    break;
+                }
+                case MessageType.Ask:
+                case MessageType.Bid:
+                {
+                    if (_useOnQuote)
+                    {
+                        Quote quote = ParseQuote(chunk);
+                        Interlocked.Increment(ref _dataQuoteCount);
+                        try
+                        {
+                            _onQuote.Invoke(quote);
+                        }
+                        catch (Exception e)
+                        {
+                            LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                        }
+                    }
+                    break;
+                }
+                default:
+                    LogMessage(LogLevel.WARNING, "Invalid MessageType: {0}", new object[] {Convert.ToInt32(bytes[startIndex])});
+                    break;
+            }
+        }
+        finally
+        {
+            startIndex = startIndex + msgLength;
+        }
+    }
 
     private void ThreadFn()
     {
         CancellationToken ct = _ctSource.Token;
         Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)_mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
-        byte[] datum = Array.Empty<byte>();
+        //byte[] datum = Array.Empty<byte>();
+        byte[] underlyingBuffer = new byte[BufferBlockSize];
+        Span<byte> datum = new Span<byte>(underlyingBuffer);
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                if (_data.TryDequeue(out datum))
+                if (_data.TryDequeue(datum) || _overflowData.TryDequeue(datum))
                 {
                     // These are grouped (many) messages.
                     // The first byte tells us how many there are.
@@ -635,7 +708,8 @@ public class Client : IEquitiesWebSocketClient
         // log commented for performance reasons. Uncomment for troubleshooting.
         //logMessage(LogLevel.DEBUG, "Websocket - Data received", Array.Empty<object>());
         Interlocked.Increment(ref _dataMsgCount);
-        _data.Enqueue(args.Data);
+        if (!_data.TryEnqueue(args.Data))
+            _overflowData.Enqueue(args.Data);
     }
 
     private void OnMessageReceived(object? _, MessageReceivedEventArgs args)

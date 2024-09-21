@@ -10,8 +10,13 @@ public class ClientStats
     private readonly UInt64 _eventCount;
     private readonly UInt64 _tradeCount;
     private readonly UInt64 _quoteCount;
+    private readonly int _queueCapacity;
+    private readonly int _overflowQueueDepth;
+    private readonly int _overflowQueueCapacity;
+    private readonly int _droppedCount;
+    private readonly int _overflowCount;
 
-    public ClientStats(UInt64 socketDataMessages, UInt64 socketTextMessages, int queueDepth, UInt64 eventCount, UInt64 tradeCount, UInt64 quoteCount)
+    public ClientStats(UInt64 socketDataMessages, UInt64 socketTextMessages, int queueDepth, UInt64 eventCount, UInt64 tradeCount, UInt64 quoteCount, int queueCapacity, int overflowQueueDepth, int overflowQueueCapacity, int droppedCount, int overflowCount)
     {
         _socketDataMessages = socketDataMessages;
         _socketTextMessages = socketTextMessages;
@@ -19,6 +24,11 @@ public class ClientStats
         _eventCount = eventCount;
         _tradeCount = tradeCount;
         _quoteCount = quoteCount;
+        _queueCapacity = queueCapacity;
+        _overflowQueueDepth = overflowQueueDepth;
+        _overflowQueueCapacity = overflowQueueCapacity;
+        _droppedCount = droppedCount;
+        _overflowCount = overflowCount;
     }
 
     public UInt64 SocketDataMessages()
@@ -36,6 +46,21 @@ public class ClientStats
         return _queueDepth;
     }
     
+    public int QueueCapacity()
+    {
+        return _queueCapacity;
+    }
+    
+    public int OverflowQueueDepth()
+    {
+        return _overflowQueueDepth;
+    }
+    
+    public int OverflowQueueCapacity()
+    {
+        return _overflowQueueCapacity;
+    }
+    
     public UInt64 EventCount()
     {
         return _eventCount;
@@ -49,5 +74,15 @@ public class ClientStats
     public UInt64 QuoteCount()
     {
         return _quoteCount;
+    }
+
+    public int DroppedCount()
+    {
+        return _droppedCount;
+    }
+
+    public int OverflowCount()
+    {
+        return _overflowCount;
     }
 }

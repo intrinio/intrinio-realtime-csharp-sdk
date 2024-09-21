@@ -6,9 +6,11 @@
 		//"Provider": "DELAYED_SIP",
 		//"Provider": "NASDAQ_BASIC",
 		//"Provider": "MANUAL",
+		//"IPAddress": "1.2.3.4",
+		"BufferSize": 2048,
+		"OverflowBufferSize": 2048,
 		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
 		//"Symbols": [ "lobby" ]
-		//"IPAddress": "1.2.3.4"
 	},
 	"Serilog": {
 		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],

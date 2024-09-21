@@ -20,6 +20,10 @@ public class Config
     public bool TradesOnly { get; set; }
     
     public int NumThreads { get; set; }
+    
+    public int BufferSize { get; set; }
+    
+    public int OverflowBufferSize { get; set; }
 
     /// <summary>
     /// The configuration for The Equities Websocket Client.
@@ -32,6 +36,8 @@ public class Config
         Symbols = Array.Empty<string>();
         TradesOnly = false;
         NumThreads = 2;
+        BufferSize = 2048;
+        OverflowBufferSize = 2048;
     }
 
     public void Validate()
@@ -54,6 +60,16 @@ public class Config
         if (NumThreads <= 0)
         {
             throw new ArgumentException("You must specify a valid 'NumThreads'");
+        }
+
+        if (BufferSize < 2048)
+        {
+            throw new ArgumentException("'BufferSize' must be greater than or equal to 2048.");
+        }
+        
+        if (OverflowBufferSize < 2048)
+        {
+            throw new ArgumentException("'OverflowBufferSize' must be greater than or equal to 2048.");
         }
     }
 
