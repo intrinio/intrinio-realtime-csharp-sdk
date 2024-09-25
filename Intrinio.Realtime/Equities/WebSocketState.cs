@@ -1,11 +1,12 @@
 namespace Intrinio.Realtime.Equities;
 
 using System;
-using WebSocket4Net;
+using System.Net.WebSockets;
+//using WebSocket4Net;
 
 internal class WebSocketState
 {
-    public WebSocket WebSocket { get; set; }
+    public ClientWebSocket WebSocket { get; set; }
     public bool IsReady { get; set; }
     public bool IsReconnecting { get; set; }
     
@@ -16,7 +17,14 @@ internal class WebSocketState
         get { return _lastReset; }
     }
     
-    public WebSocketState(WebSocket ws)
+    public bool IsConnected { 
+        get
+        {
+            return IsReady && !IsReconnecting && WebSocket != null && WebSocket.State == System.Net.WebSockets.WebSocketState.Open;
+        }
+    }
+    
+    public WebSocketState(ClientWebSocket ws)
     {
         WebSocket = ws;
         IsReady = false;

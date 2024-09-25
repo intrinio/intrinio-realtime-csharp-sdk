@@ -1,14 +1,16 @@
 {
 	"Config": {
-		"ApiKey": "",
+		"ApiKey": "API_KEY_HERE",
 		"NumThreads": 2,
 		"Provider": "REALTIME",
 		//"Provider": "DELAYED_SIP",
 		//"Provider": "NASDAQ_BASIC",
 		//"Provider": "MANUAL",
-		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
+		//"IPAddress": "1.2.3.4",
+		"BufferSize": 2048,
+		"OverflowBufferSize": 2048,
+		"Symbols": [ "AAPL", "MSFT", "TSLA" ]
 		//"Symbols": [ "lobby" ]
-		//"IPAddress": "1.2.3.4"
 	},
 	"Serilog": {
 		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],

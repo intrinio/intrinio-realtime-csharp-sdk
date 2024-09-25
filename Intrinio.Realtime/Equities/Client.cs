@@ -1,4 +1,6 @@
 using System.Linq;
+using System.Net;
+using System.Net.WebSockets;
 
 namespace Intrinio.Realtime.Equities;
 
@@ -10,7 +12,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Sockets;
-using WebSocket4Net;
 using Serilog.Core;
 
 public class Client : IEquitiesWebSocketClient
@@ -57,7 +58,7 @@ public class Client : IEquitiesWebSocketClient
     private readonly HashSet<Channel> _channels = new ();
     private readonly CancellationTokenSource _ctSource = new ();
     private const int BufferBlockSize = 256 * 64; //256 possible messages in a group, and let's buffer 64bytes per message
-    private readonly RingBuffer _data;
+    private readonly SingleProducerRingBuffer _data;
     private readonly DropOldestRingBuffer _overflowData;
     private readonly Action _tryReconnect;
     private readonly HttpClient _httpClient = new ();
@@ -68,6 +69,7 @@ public class Client : IEquitiesWebSocketClient
     private const string MessageVersionHeaderValue = "v2";
     private readonly ThreadPriority _mainThreadPriority = Thread.CurrentThread.Priority; //this is set outside of our scope - let's not interfere.
     private readonly Thread[] _threads;
+    private readonly Thread _receiveThread;
     #endregion //Data Members
     
     #region Constuctors
@@ -88,11 +90,12 @@ public class Client : IEquitiesWebSocketClient
         _config.Validate();
         
         _logPrefix = String.Format("{0}: ", _config?.Provider.ToString());
+        _receiveThread = new Thread(ReceiveFn);
         _threads = GC.AllocateUninitializedArray<Thread>(_config.NumThreads);
         for (int i = 0; i < _threads.Length; i++)
-            _threads[i] = new Thread(new ThreadStart(ThreadFn));
+            _threads[i] = new Thread(new ThreadStart(ProcessFn));
         
-        _data = new RingBuffer(BufferBlockSize, Convert.ToUInt32(_config.BufferSize));
+        _data = new SingleProducerRingBuffer(BufferBlockSize, Convert.ToUInt32(_config.BufferSize));
         _overflowData = new DropOldestRingBuffer(BufferBlockSize, Convert.ToUInt32(_config.BufferSize));
         
         _httpClient.Timeout = TimeSpan.FromSeconds(5.0);
@@ -198,7 +201,7 @@ public class Client : IEquitiesWebSocketClient
             LeaveImpl(channel.Ticker, channel.TradesOnly);
     }
 
-    public void Stop()
+    public async void Stop()
     {
         Leave();
         Thread.Sleep(1000);
@@ -206,10 +209,10 @@ public class Client : IEquitiesWebSocketClient
         {
             _wsState.IsReady = false;
         }
-
-        _ctSource.Cancel();
         LogMessage(LogLevel.INFORMATION, "Websocket - Closing...", Array.Empty<object>());
-        _wsState.WebSocket.Close();
+        await _wsState.WebSocket.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, null, _ctSource.Token);
+        _ctSource.Cancel();
+        _receiveThread.Join();
         foreach (Thread thread in _threads)
             thread.Join();
         LogMessage(LogLevel.INFORMATION, "Stopped", Array.Empty<object>());
@@ -258,6 +261,98 @@ public class Client : IEquitiesWebSocketClient
             default:
                 throw new ArgumentException("LogLevel not specified!");
                 break;
+        }
+    }
+    
+    private enum CloseType
+    {
+        Closed,
+        Refused,
+        Unavailable,
+        Other
+    }
+
+    private CloseType GetCloseType(Exception exception)
+    {
+        if ((exception.GetType() == typeof(SocketException)) 
+            || exception.Message.StartsWith("A connection attempt failed because the connected party did not properly respond after a period of time")
+            || exception.Message.StartsWith("The remote party closed the WebSocket connection without completing the close handshake")
+            )
+        {
+            return CloseType.Closed;
+        }
+        if ((exception.GetType() == typeof(SocketException)) && (exception.Message == "No connection could be made because the target machine actively refused it."))
+        {
+            return CloseType.Refused;
+        }
+        if (exception.Message.StartsWith("HTTP/1.1 503"))
+        {
+            return CloseType.Unavailable;
+        }
+        return CloseType.Other;
+    }
+
+    private async void ReceiveFn()
+    {
+        CancellationToken token = _ctSource.Token;
+        Thread.CurrentThread.Priority = ThreadPriority.Highest;
+        byte[] buffer = new byte[BufferBlockSize];
+        while (!token.IsCancellationRequested)
+        {
+            try
+            {
+                if (_wsState.IsConnected)
+                {
+                    var result = await _wsState.WebSocket.ReceiveAsync(buffer, token);
+                    switch (result.MessageType)
+                    {
+                        case WebSocketMessageType.Binary:
+                            if (result.Count > 0)
+                            {
+                                Interlocked.Increment(ref _dataMsgCount);
+                                if (!_data.TryEnqueue(buffer))
+                                    _overflowData.Enqueue(buffer);
+                            }
+                            break;
+                        case WebSocketMessageType.Text:
+                            OnTextMessageReceived(buffer);
+                            break;
+                        case WebSocketMessageType.Close:
+                            OnClose(buffer);
+                            break;
+                    }
+                }
+                else
+                    await Task.Delay(1000, token);
+            }
+            catch (NullReferenceException ex)
+            {
+                //Do nothing, websocket is resetting.
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exn)
+            {
+                CloseType exceptionType = GetCloseType(exn);
+                switch (exceptionType)
+                {
+                    case CloseType.Closed:
+                        LogMessage(LogLevel.WARNING, "Websocket - Error - Connection failed", Array.Empty<object>());
+                        break;
+                    case CloseType.Refused:
+                        LogMessage(LogLevel.WARNING, "Websocket - Error - Connection refused", Array.Empty<object>());
+                        break;
+                    case CloseType.Unavailable:
+                        LogMessage(LogLevel.WARNING, "Websocket - Error - Server unavailable", Array.Empty<object>());
+                        break;
+                    default:
+                        LogMessage(LogLevel.ERROR, "Websocket - Error - {0}:{1}", new object[]{exn.GetType(), exn.Message});
+                        break;
+                }
+
+                OnClose(buffer);
+            }
         }
     }
 
@@ -352,63 +447,7 @@ public class Client : IEquitiesWebSocketClient
 
         return new Quote(type, symbol, price, size, timestamp, subProvider, marketCenter, condition);
     }
-    
-    private void ParseSocketMessage(byte[] bytes, ref int startIndex)
-    {
-        int msgLength = 1; //default value in case corrupt array so we don't reprocess same bytes over and over. 
-        try
-        {
-            MessageType msgType = (MessageType)Convert.ToInt32(bytes[startIndex]);
-            msgLength = Convert.ToInt32(bytes[startIndex + 1]);
-            ReadOnlySpan<byte> chunk = new ReadOnlySpan<byte>(bytes, startIndex, msgLength);
-            switch (msgType)
-            {
-                case MessageType.Trade:
-                {
-                    if (_useOnTrade)
-                    {
-                        Trade trade = ParseTrade(chunk);
-                        Interlocked.Increment(ref _dataTradeCount);
-                        try
-                        {
-                            _onTrade.Invoke(trade);
-                        }
-                        catch (Exception e)
-                        {
-                            LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
-                        }
-                    }
-                    break;
-                }
-                case MessageType.Ask:
-                case MessageType.Bid:
-                {
-                    if (_useOnQuote)
-                    {
-                        Quote quote = ParseQuote(chunk);
-                        Interlocked.Increment(ref _dataQuoteCount);
-                        try
-                        {
-                            _onQuote.Invoke(quote);
-                        }
-                        catch (Exception e)
-                        {
-                            LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
-                        }
-                    }
-                    break;
-                }
-                default:
-                    LogMessage(LogLevel.WARNING, "Invalid MessageType: {0}", new object[] {Convert.ToInt32(bytes[startIndex])});
-                    break;
-            }
-        }
-        finally
-        {
-            startIndex = startIndex + msgLength;
-        }
-    }
-    
+
     private void ParseSocketMessage(Span<byte> bytes, ref int startIndex)
     {
         int msgLength = 1; //default value in case corrupt array so we don't reprocess same bytes over and over. 
@@ -425,10 +464,7 @@ public class Client : IEquitiesWebSocketClient
                     {
                         Trade trade = ParseTrade(chunk);
                         Interlocked.Increment(ref _dataTradeCount);
-                        try
-                        {
-                            _onTrade.Invoke(trade);
-                        }
+                        try { _onTrade.Invoke(trade); }
                         catch (Exception e)
                         {
                             LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
@@ -443,10 +479,7 @@ public class Client : IEquitiesWebSocketClient
                     {
                         Quote quote = ParseQuote(chunk);
                         Interlocked.Increment(ref _dataQuoteCount);
-                        try
-                        {
-                            _onQuote.Invoke(quote);
-                        }
+                        try { _onQuote.Invoke(quote); }
                         catch (Exception e)
                         {
                             LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
@@ -465,11 +498,10 @@ public class Client : IEquitiesWebSocketClient
         }
     }
 
-    private void ThreadFn()
+    private void ProcessFn()
     {
         CancellationToken ct = _ctSource.Token;
         Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)_mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
-        //byte[] datum = Array.Empty<byte>();
         byte[] underlyingBuffer = new byte[BufferBlockSize];
         Span<byte> datum = new Span<byte>(underlyingBuffer);
         while (!ct.IsCancellationRequested)
@@ -614,7 +646,7 @@ public class Client : IEquitiesWebSocketClient
         }
     }
 
-    private void OnOpen(object? _, EventArgs __)
+    private async void OnOpen()
     {
         LogMessage(LogLevel.INFORMATION, "Websocket - Connected", Array.Empty<object>());
         lock (_wsLock)
@@ -623,9 +655,11 @@ public class Client : IEquitiesWebSocketClient
             _wsState.IsReconnecting = false;
             foreach (Thread thread in _threads)
             {
-                if (!thread.IsAlive)
+                if (!thread.IsAlive && thread.ThreadState.HasFlag(ThreadState.Unstarted))
                     thread.Start();
             }
+            if (!_receiveThread.IsAlive && _receiveThread.ThreadState.HasFlag(ThreadState.Unstarted))
+                _receiveThread.Start();
         }
 
         if (_channels.Count > 0)
@@ -634,132 +668,80 @@ public class Client : IEquitiesWebSocketClient
             {
                 string lastOnly = channel.TradesOnly ? "true" : "false";
                 byte[] message = MakeJoinMessage(channel.TradesOnly, channel.Ticker);
+                ArraySegment<byte> segment = new ArraySegment<byte>(message);
                 LogMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", new string[]{channel.Ticker, lastOnly});
-                _wsState.WebSocket.Send(message, 0, message.Length);
+                await _wsState.WebSocket.SendAsync(segment, WebSocketMessageType.Binary, true, _ctSource.Token);
             }
         }
     }
 
-    private void OnClose(object? _, EventArgs __)
+    private void OnClose(ArraySegment<byte> message)
     {
         lock (_wsLock)
         {
-            if (!_wsState.IsReconnecting)
+            try
             {
-                LogMessage(LogLevel.INFORMATION, "Websocket - Closed", Array.Empty<object>());
-                _wsState.IsReady = false;
-
-                if (!_ctSource.IsCancellationRequested)
+                if (!_wsState.IsReconnecting)
                 {
-                    Task.Run(_tryReconnect);
+                    // if (message != null && message.Count > 0)
+                    //     LogMessage(LogLevel.INFORMATION, "Websocket - Closed. {0}", Encoding.ASCII.GetString(message));
+                    // else
+                    //     LogMessage(LogLevel.INFORMATION, "Websocket - Closed.");
+                    LogMessage(LogLevel.INFORMATION, "Websocket - Closed.");
+                
+                    _wsState.IsReady = false;
+
+                    if (!_ctSource.IsCancellationRequested)
+                    {
+                        Task.Run(_tryReconnect);
+                    }
                 }
+            }
+            catch(Exception e)
+            {
+                LogMessage(LogLevel.INFORMATION, "Websocket - Error on close: {0}. Stack Trace: {1}", e.Message, e.StackTrace);
             }
         }
     }
 
-    private enum CloseType
+    private void OnTextMessageReceived(ArraySegment<byte> message)
     {
-        Closed,
-        Refused,
-        Unavailable,
-        Other
-    }
-
-    private CloseType GetCloseType(Exception input)
-    {
-        if ((input.GetType() == typeof(SocketException)) && input.Message.StartsWith("A connection attempt failed because the connected party did not properly respond after a period of time"))
-        {
-            return CloseType.Closed;
-        }
-        if ((input.GetType() == typeof(SocketException)) && (input.Message == "No connection could be made because the target machine actively refused it."))
-        {
-            return CloseType.Refused;
-        }
-        if (input.Message.StartsWith("HTTP/1.1 503"))
-        {
-            return CloseType.Unavailable;
-        }
-        return CloseType.Other;
-    }
-
-    private void OnError(object? _, SuperSocket.ClientEngine.ErrorEventArgs args)
-    {
-        Exception exn = args.Exception;
-        CloseType exceptionType = GetCloseType(exn);
-        switch (exceptionType)
-        {
-            case CloseType.Closed:
-                LogMessage(LogLevel.WARNING, "Websocket - Error - Connection failed", Array.Empty<object>());
-                break;
-            case CloseType.Refused:
-                LogMessage(LogLevel.WARNING, "Websocket - Error - Connection refused", Array.Empty<object>());
-                break;
-            case CloseType.Unavailable:
-                LogMessage(LogLevel.WARNING, "Websocket - Error - Server unavailable", Array.Empty<object>());
-                break;
-            default:
-                LogMessage(LogLevel.ERROR, "Websocket - Error - {0}:{1}", new object[]{exn.GetType(), exn.Message});
-                break;
-        }
-    }
-
-    private void OnDataReceived(object? _, DataReceivedEventArgs args)
-    {
-        // log commented for performance reasons. Uncomment for troubleshooting.
-        //logMessage(LogLevel.DEBUG, "Websocket - Data received", Array.Empty<object>());
-        Interlocked.Increment(ref _dataMsgCount);
-        if (!_data.TryEnqueue(args.Data))
-            _overflowData.Enqueue(args.Data);
-    }
-
-    private void OnMessageReceived(object? _, MessageReceivedEventArgs args)
-    {
-        LogMessage(LogLevel.DEBUG, "Websocket - Message received", Array.Empty<object>());
         Interlocked.Increment(ref _textMsgCount);
-        LogMessage(LogLevel.ERROR, "Error received: {0}", new object[]{args.Message});
+        LogMessage(LogLevel.ERROR, "Error received: {0}", Encoding.ASCII.GetString(message));
     }
 
-    private void ResetWebSocket(string token)
+    private async void ResetWebSocket(string token)
     {
         LogMessage(LogLevel.INFORMATION, "Websocket - Resetting", Array.Empty<object>());
-        string wsUrl = GetWebSocketUrl(token);
+        Uri wsUrl = new Uri(GetWebSocketUrl(token));
         List<KeyValuePair<string, string>> headers = GetCustomSocketHeaders();
-        //let ws : WebSocket = new WebSocket(wsUrl, customHeaderItems = headers)
-        WebSocket ws = new WebSocket(wsUrl, null, null, headers);
-        ws.Opened += OnOpen;
-        ws.Closed += OnClose;
-        ws.Error += OnError;
-        ws.DataReceived += OnDataReceived;
-        ws.MessageReceived += OnMessageReceived;
+        ClientWebSocket ws = new ClientWebSocket();
+        headers.ForEach(h => ws.Options.SetRequestHeader(h.Key, h.Value));
         lock (_wsLock)
         {
             _wsState.WebSocket = ws;
             _wsState.Reset();
         }
-        ws.Open();
+        await _wsState.WebSocket.ConnectAsync(wsUrl, _ctSource.Token);
+        OnOpen();
     }
 
     private void InitializeWebSockets(string token)
     {
+        Uri wsUrl = new Uri(GetWebSocketUrl(token));
+        List<KeyValuePair<string, string>> headers = GetCustomSocketHeaders();
         lock (_wsLock)
         {
             LogMessage(LogLevel.INFORMATION, "Websocket - Connecting...", Array.Empty<object>());
-            string wsUrl = GetWebSocketUrl(token);
-            List<KeyValuePair<string, string>> headers = GetCustomSocketHeaders();
-            //WebSocket ws = new WebSocket(wsUrl, customHeaderItems = headers);
-            WebSocket ws = new WebSocket(wsUrl, null, null, headers);
-            ws.Opened += OnOpen;
-            ws.Closed += OnClose;
-            ws.Error += OnError;
-            ws.DataReceived += OnDataReceived;
-            ws.MessageReceived += OnMessageReceived;
+            ClientWebSocket ws = new ClientWebSocket();
+            headers.ForEach(h => ws.Options.SetRequestHeader(h.Key, h.Value));
             _wsState = new WebSocketState(ws);
         }
-
-        _wsState.WebSocket.Open();
+        _wsState.WebSocket.ConnectAsync(wsUrl, _ctSource.Token).Wait(_ctSource.Token);
+        OnOpen();
     }
     
-    private void JoinImpl(string symbol, bool tradesOnly)
+    private async void JoinImpl(string symbol, bool tradesOnly)
     {
         string lastOnly = tradesOnly ? "true" : "false";
         if (_channels.Add(new (symbol, tradesOnly)))
@@ -768,7 +750,7 @@ public class Client : IEquitiesWebSocketClient
             LogMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0} (trades only = {1})", new object[]{symbol, lastOnly});
             try
             {
-                _wsState.WebSocket.Send(message, 0, message.Length);
+                await _wsState.WebSocket.SendAsync(message, WebSocketMessageType.Binary, true, _ctSource.Token);
             }
             catch
             {
@@ -777,7 +759,7 @@ public class Client : IEquitiesWebSocketClient
         }
     }
     
-    private void LeaveImpl(string symbol, bool tradesOnly)
+    private async void LeaveImpl(string symbol, bool tradesOnly)
     {
         string lastOnly = tradesOnly ? "true" : "false";
         if (_channels.Remove(new (symbol, tradesOnly)))
@@ -786,7 +768,7 @@ public class Client : IEquitiesWebSocketClient
             LogMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0} (trades only = {1})", new object[]{symbol, lastOnly});
             try
             {
-                _wsState.WebSocket.Send(message, 0, message.Length);
+                await _wsState.WebSocket.SendAsync(message, WebSocketMessageType.Binary, true, _ctSource.Token);
             }
             catch
             {

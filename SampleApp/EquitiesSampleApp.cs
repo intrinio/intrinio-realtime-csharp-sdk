@@ -88,8 +88,16 @@ public class EquitiesSampleApp
 	{
 		IEquitiesWebSocketClient client = (IEquitiesWebSocketClient) obj;
 		ClientStats stats = client.GetStats();
-		Log("Data Messages = {0}, Text Messages = {1}, Queue Depth = {2}, Individual Events = {3}, Trades = {4}, Quotes = {5}",
-			stats.SocketDataMessages(), stats.SocketTextMessages(), stats.QueueDepth(), stats.EventCount(), stats.TradeCount(), stats.QuoteCount());
+		Log("Socket Stats - Data Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, Individual Events: {6}, Trades: {7}, Quotes: {8}",
+			stats.SocketDataMessages(),
+			stats.SocketTextMessages(),
+			(stats.QueueDepth() * 100) / stats.QueueCapacity(),
+			(stats.OverflowQueueDepth() * 100) / stats.OverflowQueueCapacity(),
+			stats.DroppedCount(),
+			stats.OverflowCount(),
+			stats.EventCount(),
+			stats.TradeCount(),
+			stats.QuoteCount());
 		if (maxTradeCount > 0)
 		{
 			Log("Most active trade: {0} ({1} updates)", maxCountTrade, maxTradeCount);
@@ -147,7 +155,7 @@ public class EquitiesSampleApp
 		// client = new Client(onTrade, onQuote, config);
 		
 		client = new Client(onTrade, onQuote);
-		timer = new Timer(TimerCallback, client, 10000, 10000);
+		timer = new Timer(TimerCallback, client, 60000, 60000);
 		client.Join(); //Load symbols from your config or config.json
 		//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		

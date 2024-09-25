@@ -1,6 +1,6 @@
 {
 	"Config": {
-		"ApiKey": "",
+		"ApiKey": "API_KEY_HERE",
 		"NumThreads": 2,
 		"Provider": "REALTIME",
 		//"Provider": "DELAYED_SIP",
@@ -9,7 +9,7 @@
 		//"IPAddress": "1.2.3.4",
 		"BufferSize": 2048,
 		"OverflowBufferSize": 2048,
-		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
+		"Symbols": [ "AAPL", "MSFT", "TSLA" ]
 		//"Symbols": [ "lobby" ]
 	},
 	"Serilog": {
