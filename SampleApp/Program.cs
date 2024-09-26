@@ -9,9 +9,9 @@ namespace SampleApp
 {
 	class Program
 	{
-		static void Main(string[] _)
+		static async Task Main(string[] args)
 		{
-			EquitiesSampleApp.Run(new string[]{});
+			await EquitiesSampleApp.Run(args);
 		}		
 	}
 }

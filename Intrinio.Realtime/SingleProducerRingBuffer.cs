@@ -2,7 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
-namespace Intrinio.Realtime.Equities;
+namespace Intrinio.Realtime;
 
 public class SingleProducerRingBuffer
 {

@@ -5,12 +5,13 @@ using Intrinio.Realtime.Equities;
 using Serilog;
 using Serilog.Core;
 
+using Intrinio.Realtime;
+
 namespace SampleApp;
 
 public class EquitiesSampleApp
 {
     private static IEquitiesWebSocketClient client = null;
-	private static IEquitiesWebSocketClient replayClient = null;
 	private static CandleStickClient _candleStickClient = null;
 	private static Timer timer = null;
 	private static readonly ConcurrentDictionary<string, int> trades = new(5, 15_000);
@@ -96,8 +97,8 @@ public class EquitiesSampleApp
 			stats.DroppedCount(),
 			stats.OverflowCount(),
 			stats.EventCount(),
-			stats.TradeCount(),
-			stats.QuoteCount());
+			client.TradeCount,
+			client.QuoteCount);
 		if (maxTradeCount > 0)
 		{
 			Log("Most active trade: {0} ({1} updates)", maxCountTrade, maxTradeCount);
@@ -130,7 +131,7 @@ public class EquitiesSampleApp
 		Serilog.Log.Information(messageTemplate, propertyValues);
 	}
 
-	public static void Run(string[] _)
+	public static async Task Run(string[] _)
 	{
 		Log("Starting sample app");
 		Action<Trade> onTrade = OnTrade;
@@ -154,17 +155,19 @@ public class EquitiesSampleApp
 		// config.NumThreads = 2;
 		// client = new Client(onTrade, onQuote, config);
 		
-		client = new Client(onTrade, onQuote);
+		client = new EquitiesWebSocketClient(onTrade, onQuote);
+		await client.Start();
 		timer = new Timer(TimerCallback, client, 60000, 60000);
-		client.Join(); //Load symbols from your config or config.json
-		//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		await client.Join(); //Load symbols from your config or config.json
+		// await client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
 		// //You can also simulate a trading day by replaying a particular day's data. You can do this with the actual time between events, or without.
 		// DateTime yesterday = DateTime.Today - TimeSpan.FromDays(1);
-		// replayClient = new ReplayClient(onTrade, onQuote, yesterday, false, true, false, "data.csv"); //A client to replay a previous day's data
+		// client = new ReplayClient(onTrade, onQuote, yesterday, false, true, false, "data.csv"); //A client to replay a previous day's data
+		// await client.Start();
 		// timer = new Timer(TimerCallback, replayClient, 10000, 10000);
-		// replayClient.Join(); //Load symbols from your config or config.json
-		// //client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		// await client.Join(); //Load symbols from your config or config.json
+		// // await client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
 		Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
 	}

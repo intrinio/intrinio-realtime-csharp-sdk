@@ -1,4 +1,4 @@
-namespace Intrinio.Realtime.Equities;
+namespace Intrinio.Realtime;
 
 using System;
 using System.Net.WebSockets;
