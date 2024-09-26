@@ -1,21 +1,12 @@
-using System.Linq;
-using System.Net;
-using System.Net.WebSockets;
-using System.Runtime.CompilerServices;
-
-namespace Intrinio.Realtime.Equities;
-
 using System;
-using System.Net.Http;
 using System.Text;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Net.Sockets;
-using Serilog.Core;
+using System.Linq;
+using System.Runtime.CompilerServices;
 
-using Intrinio.Realtime;
+namespace Intrinio.Realtime.Equities;
 
 public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
 {
