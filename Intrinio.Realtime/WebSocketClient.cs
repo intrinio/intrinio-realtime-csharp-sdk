@@ -41,7 +41,8 @@ public abstract class WebSocketClient
     private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv10.0";
     private readonly ThreadPriority _mainThreadPriority;
     private readonly Thread[] _threads;
-    private readonly Thread _receiveThread;
+    private Thread _receiveThread;
+    private bool _started;
     #endregion //Data Members
     
     #region Constuctors
@@ -53,17 +54,14 @@ public abstract class WebSocketClient
     /// <param name="config"></param>
     public WebSocketClient(uint processingThreadsQuantity, uint bufferSize, uint overflowBufferSize, uint maxMessageSize)
     {
+        _started = false;
         _mainThreadPriority = Thread.CurrentThread.Priority; //this is set outside of our scope - let's not interfere.
         _maxMessageSize = maxMessageSize;
         _bufferBlockSize = 256 * _maxMessageSize; //256 possible messages in a group, and let's buffer 64bytes per message
         _processingThreadsQuantity = processingThreadsQuantity > 0 ? processingThreadsQuantity : 2;
         _bufferSize = bufferSize >= 2048 ? bufferSize : 2048;
         _overflowBufferSize = overflowBufferSize >= 2048 ? overflowBufferSize : 2048;
-        
-        _receiveThread = new Thread(ReceiveFn);
         _threads = GC.AllocateUninitializedArray<Thread>(Convert.ToInt32(_processingThreadsQuantity));
-        for (int i = 0; i < _threads.Length; i++)
-            _threads[i] = new Thread(new ThreadStart(ProcessFn));
         
         _data = new SingleProducerRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
         _overflowData = new DropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_overflowBufferSize));
@@ -95,6 +93,14 @@ public abstract class WebSocketClient
 
     public async Task Start()
     {
+        if (_started)
+            return;
+        _started = true;
+        
+        _receiveThread = new Thread(ReceiveFn);
+        for (int i = 0; i < _threads.Length; i++)
+            _threads[i] = new Thread(ProcessFn);
+        
         _httpClient.DefaultRequestHeaders.Add(ClientInfoHeaderKey, ClientInfoHeaderValue);
         foreach (KeyValuePair<string,string> customSocketHeader in GetCustomSocketHeaders())
         {
@@ -106,25 +112,38 @@ public abstract class WebSocketClient
     
     public async Task Stop()
     {
-        LeaveImpl();
-        Thread.Sleep(1000);
-        lock (_wsLock)
+        if (_started)
         {
-            _wsState.IsReady = false;
+            try
+            {
+                LeaveImpl();
+                Thread.Sleep(1000);
+                lock (_wsLock)
+                {
+                    _wsState.IsReady = false;
+                }
+                LogMessage(LogLevel.INFORMATION, "Websocket - Closing...", Array.Empty<object>());
+                try
+                {
+                    await _wsState.WebSocket.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, null, _ctSource.Token);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
+                _ctSource.Cancel();
+                if (_receiveThread != null) 
+                    _receiveThread.Join();
+                foreach (Thread thread in _threads)
+                    if (thread != null)
+                        thread.Join();
+            }
+            finally
+            {
+                _started = false;
+            }
         }
-        LogMessage(LogLevel.INFORMATION, "Websocket - Closing...", Array.Empty<object>());
-        try
-        {
-            await _wsState.WebSocket.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, null, _ctSource.Token);
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine(e);
-        }
-        _ctSource.Cancel();
-        _receiveThread.Join();
-        foreach (Thread thread in _threads)
-            thread.Join();
+        
         LogMessage(LogLevel.INFORMATION, "Stopped", Array.Empty<object>());
     }
 
