@@ -1,11 +1,10 @@
 using System;
 using System.Threading;
 using System.Collections.Concurrent;
+using Intrinio.Realtime;
 using Intrinio.Realtime.Equities;
 using Serilog;
 using Serilog.Core;
-
-using Intrinio.Realtime;
 
 namespace SampleApp;
 
@@ -148,11 +147,14 @@ public class EquitiesSampleApp
 		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
 		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
 		// Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
-		// Config.Config config = new Config.Config();
+		// Config config = new Config();
 		// config.Provider = Provider.REALTIME;
-		// config.ApiKey = "";
+		// config.ApiKey = "API_KEY_HERE";
 		// config.Symbols = new[] { "AAPL", "MSFT" };
 		// config.NumThreads = 2;
+		// config.TradesOnly = false;
+		// config.BufferSize = 2048;
+		// config.OverflowBufferSize = 4096;
 		// client = new Client(onTrade, onQuote, config);
 		
 		client = new EquitiesWebSocketClient(onTrade, onQuote);
