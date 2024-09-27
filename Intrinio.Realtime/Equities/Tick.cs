@@ -111,15 +111,9 @@ internal class Tick
         return _trade.HasValue;
     }
 
-    public Trade Trade()
-    {
-        return _trade ?? default;
-    }
+    public Trade Trade { get {return _trade ?? default;} }
     
-    public Quote Quote()
-    {
-        return _quote ?? default;
-    }
+    public Quote Quote { get { return _quote ?? default; } }
 
     public byte[] GetTimeReceivedBytes()
     {
