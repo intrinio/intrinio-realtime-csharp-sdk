@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace Intrinio.Realtime.Equities;
 
 using Intrinio.Realtime.Equities;
@@ -18,7 +20,6 @@ using Serilog.Core;
 public class ReplayClient : IEquitiesWebSocketClient
 {
     #region Data Members
-
     public Action<Trade> onTrade { get; set; }
     public Action<Quote> onQuote { get; set; }
     private readonly Config config;
@@ -44,6 +45,8 @@ public class ReplayClient : IEquitiesWebSocketClient
     private readonly object csvLock;
     private readonly Thread[] threads;
     private readonly Thread replayThread;
+    public UInt64 TradeCount { get { return Interlocked.Read(ref dataTradeCount); } }
+    public UInt64 QuoteCount { get { return Interlocked.Read(ref dataQuoteCount); } }
     #endregion //Data Members
 
     #region Constructors
@@ -100,78 +103,101 @@ public class ReplayClient : IEquitiesWebSocketClient
     #endregion //Constructors
     
     #region Public Methods
-
-    public void Join()
+    
+    public Task Join()
     {
-        //     let symbolsToAdd : HashSet<(string*bool)> =
-        //         config.Symbols
-        //         |> Seq.map(fun (symbol:string) -> (symbol, config.TradesOnly))
-        //         |> fun (symbols:seq<(string*bool)>) -> new HashSet<(string*bool)>(symbols)
-        //     symbolsToAdd.ExceptWith(channels)
-        //     for symbol in symbolsToAdd do join(symbol)
+        HashSet<Channel> symbolsToAdd  = config.Symbols.Select(s => new Channel(s, config.TradesOnly)).ToHashSet();
+        symbolsToAdd.ExceptWith(channels);
+        
+        foreach (Channel channel in symbolsToAdd)
+            join(channel.ticker, channel.tradesOnly);
+        
+        return Task.CompletedTask;
     }
          
-    public void Join(string symbol, bool? tradesOnly)
+    public Task Join(string symbol, bool? tradesOnly)
     {
-        //     let t: bool =
-        //         match tradesOnly with
-        //         | Some(v:bool) -> v || config.TradesOnly
-        //         | None -> false || config.TradesOnly
-        //     if not (channels.Contains((symbol, t)))
-        //     then join(symbol, t)
+        bool t = tradesOnly.HasValue
+            ? tradesOnly.Value || config.TradesOnly
+            : config.TradesOnly;
+        if (!channels.Contains(new Channel(symbol, t)))
+            join(symbol, t);
+        
+        return Task.CompletedTask;
     }
 
-    public void Join(string[] symbols, bool? tradesOnly)
+    public Task Join(string[] symbols, bool? tradesOnly)
     {
-        //     let t: bool =
-        //         match tradesOnly with
-        //         | Some(v:bool) -> v || config.TradesOnly
-        //         | None -> false || config.TradesOnly
-        //     let symbolsToAdd : HashSet<(string*bool)> =
-        //         symbols
-        //         |> Seq.map(fun (symbol:string) -> (symbol,t))
-        //         |> fun (_symbols:seq<(string*bool)>) -> new HashSet<(string*bool)>(_symbols)
-        //     symbolsToAdd.ExceptWith(channels)
-        //     for symbol in symbolsToAdd do join(symbol)
+        bool t = tradesOnly.HasValue
+            ? tradesOnly.Value || config.TradesOnly
+            : config.TradesOnly;
+        HashSet<Channel> symbolsToAdd = symbols.Select(s => new Channel(s, t)).ToHashSet();
+        symbolsToAdd.ExceptWith(channels);
+        foreach (Channel channel in symbolsToAdd)
+            join(channel.ticker, channel.tradesOnly);
+        return Task.CompletedTask;
     }
 
-    public void Leave()
+    public Task Leave()
     {
-        //     for channel in channels do leave(channel)
+        foreach (Channel channel in channels)
+            leave(channel.ticker, channel.tradesOnly);
+        return Task.CompletedTask;
     }
 
-    public void Leave(string symbol)
+    public Task Leave(string symbol)
     {
-        //     let matchingChannels : seq<(string*bool)> = channels |> Seq.where (fun (_symbol:string, _:bool) -> _symbol = symbol)
-        //     for channel in matchingChannels do leave(channel)
+        IEnumerable<Channel> matchingChannels = channels.Where(c => c.ticker == symbol);
+        foreach (Channel channel in matchingChannels)
+            leave(channel.ticker, channel.tradesOnly);
+        return Task.CompletedTask;
     }
 
-    public void Leave(string[] symbols)
+    public Task Leave(string[] symbols)
     {
-        //     let _symbols : HashSet<string> = new HashSet<string>(symbols)
-        //     let matchingChannels : seq<(string*bool)> = channels |> Seq.where(fun (symbol:string, _:bool) -> _symbols.Contains(symbol))
-        //     for channel in matchingChannels do leave(channel)
+        HashSet<string> _symbols = new HashSet<string>(symbols);
+        IEnumerable<Channel> matchingChannels = channels.Where(c => _symbols.Contains(c.ticker));
+        foreach (Channel channel in matchingChannels)
+            leave(channel.ticker, channel.tradesOnly);
+        return Task.CompletedTask;
     }
 
-    public void Stop()
+    public Task Stop()
     {
-        //     for channel in channels do leave(channel)
-        //     ctSource.Cancel ()
-        //     logMessage(LogLevel.INFORMATION, "Websocket - Closing...", [||])
-        //     for thread in threads do thread.Join()
-        //     replayThread.Join()
-        //     logMessage(LogLevel.INFORMATION, "Stopped", [||])
+        foreach (Channel channel in channels)
+            leave(channel.ticker, channel.tradesOnly);
+
+        ctSource.Cancel();
+        logMessage(LogLevel.INFORMATION, "Websocket - Closing...");
+        
+        foreach (Thread thread in threads)
+            thread.Join();
+        
+        replayThread.Join();
+        
+        logMessage(LogLevel.INFORMATION, "Stopped");
+        return Task.CompletedTask;
     }
 
     public ClientStats GetStats()
     {
-        //     new ClientStats(Interlocked.Read(&dataMsgCount), Interlocked.Read(&textMsgCount), data.Count, Interlocked.Read(&dataEventCount), Interlocked.Read(&dataTradeCount), Interlocked.Read(&dataQuoteCount))
+        return new ClientStats(
+            Interlocked.Read(ref dataMsgCount), 
+            Interlocked.Read(ref textMsgCount), 
+            data.Count, 
+            Interlocked.Read(ref dataEventCount), 
+            Int32.MaxValue, 
+            0, 
+            Int32.MaxValue, 
+            0, 
+            0
+        );
     }
 
     [MessageTemplateFormatMethod("messageTemplate")]
     public void Log(string messageTemplate, params object[] propertyValues)
     {
-        //     Log.Information(messageTemplate, propertyValues)
+        Serilog.Log.Information(messageTemplate, propertyValues);
     }
     #endregion //Public Methods
     
@@ -207,49 +233,58 @@ public class ReplayClient : IEquitiesWebSocketClient
 
     private Trade parseTrade(ReadOnlySpan<byte> bytes)
     {
-        //     let symbolLength : int = int32 (bytes.Item(2))
-        //     let conditionLength : int = int32 (bytes.Item(26 + symbolLength))
-        //     {
-        //         Symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength))
-        //         Price = (double (BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4))))
-        //         Size = BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4))
-        //         Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL))
-        //         TotalVolume = BitConverter.ToUInt32(bytes.Slice(22 + symbolLength, 4))
-        //         SubProvider = enum<SubProvider> (int32 (bytes.Item(3 + symbolLength)))
-        //         MarketCenter = BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2))
-        //         Condition = if (conditionLength > 0) then Encoding.ASCII.GetString(bytes.Slice(27 + symbolLength, conditionLength)) else String.Empty
-        //     }
+        int symbolLength = Convert.ToInt32(bytes[2]);
+        int conditionLength = Convert.ToInt32(bytes[26 + symbolLength]);
+        Trade trade = new Trade(
+            Encoding.ASCII.GetString(bytes.Slice(3, symbolLength)),
+            Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4))),
+            BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4)),
+            BitConverter.ToUInt32(bytes.Slice(22 + symbolLength, 4)),
+            DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL)),
+            (SubProvider)Convert.ToInt32(bytes[3 + symbolLength]),
+            BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2)),
+            conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(27 + symbolLength, conditionLength)) : String.Empty
+        );
+        
+        return trade;
     }
 
     private Quote parseQuote(ReadOnlySpan<byte> bytes)
     {
-        //     let symbolLength : int = int32 (bytes.Item(2))
-        //     let conditionLength : int = int32 (bytes.Item(22 + symbolLength))
-        //     {
-        //         Type = enum<QuoteType> (int32 (bytes.Item(0)))
-        //         Symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength))
-        //         Price = (double (BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4))))
-        //         Size = BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4))
-        //         Timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(int64 (BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL))
-        //         SubProvider = enum<SubProvider> (int32 (bytes.Item(3 + symbolLength)))
-        //         MarketCenter = BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2))
-        //         Condition = if (conditionLength > 0) then Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) else String.Empty
-        //     }
+        int symbolLength = Convert.ToInt32(bytes[2]);
+        int conditionLength = Convert.ToInt32(bytes[22 + symbolLength]);
+        
+        Quote quote = new Quote(
+            (QuoteType)(Convert.ToInt32(bytes[0])),
+            Encoding.ASCII.GetString(bytes.Slice(3, symbolLength)),
+            (Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4)))),
+            BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4)),
+            DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL)),
+            (SubProvider)(Convert.ToInt32(bytes[3 + symbolLength])),
+            BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2)),
+            conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) : String.Empty
+        );
+        
+        return quote;
     }
 
     private void writeRowToOpenCsvWithoutLock(IEnumerable<string> row)
     {
-        //     let mutable first : bool = true
-        //     use fs : FileStream = new FileStream(csvFilePath, FileMode.Append);
-        //     use tw : TextWriter = new StreamWriter(fs);
-        //     for s : string in row do
-        //         if (not first)
-        //         then
-        //             tw.Write(",");
-        //         else
-        //             first <- false;
-        //         tw.Write($"\"{s}\"");
-        //     tw.WriteLine();
+        bool first = true;
+        using (FileStream fs = new FileStream(csvFilePath, FileMode.Append))
+        using (TextWriter tw = new StreamWriter(fs))
+        {
+            foreach (string s in row)
+            {
+                if (!first)
+                    tw.Write(",");
+                else
+                    first = false;
+                tw.Write($"\"{s}\"");
+            }
+            
+            tw.WriteLine();
+        }
     }
 
     private void writeRowToOpenCsvWithLock(IEnumerable<string> row)
@@ -262,26 +297,23 @@ public class ReplayClient : IEquitiesWebSocketClient
 
     private string doubleRoundSecRule612(double value)
     {
-        //     if (value >= 1.0)
-        //     then
-        //         value.ToString("0.00")
-        //     else
-        //         value.ToString("0.0000");
+        if (value >= 1.0D)
+            return value.ToString("0.00");
+        
+        return value.ToString("0.0000");
     }
 
     private IEnumerable<string> mapTradeToRow(Trade trade)
     {
-        //     seq{
-        //         yield MessageType.Trade.ToString();
-        //         yield trade.Symbol;
-        //         yield doubleRoundSecRule612(trade.Price);
-        //         yield trade.Size.ToString();
-        //         yield trade.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
-        //         yield trade.SubProvider.ToString();
-        //         yield trade.MarketCenter.ToString();
-        //         yield trade.Condition;
-        //         yield trade.TotalVolume.ToString();   
-        //     }
+        yield return MessageType.Trade.ToString();
+        yield return trade.Symbol;
+        yield return doubleRoundSecRule612(trade.Price);
+        yield return trade.Size.ToString();
+        yield return trade.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
+        yield return trade.SubProvider.ToString();
+        yield return trade.MarketCenter.ToString();
+        yield return trade.Condition;
+        yield return trade.TotalVolume.ToString();   
     }
 
     private void writeTradeToCsv(Trade trade)
@@ -291,16 +323,14 @@ public class ReplayClient : IEquitiesWebSocketClient
 
     private IEnumerable<string> mapQuoteToRow(Quote quote)
     {
-        //     seq{
-        //         yield quote.Type.ToString();
-        //         yield quote.Symbol;
-        //         yield doubleRoundSecRule612(quote.Price);
-        //         yield quote.Size.ToString();
-        //         yield quote.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
-        //         yield quote.SubProvider.ToString();
-        //         yield quote.MarketCenter.ToString();
-        //         yield quote.Condition;   
-        //     }
+        yield return quote.Type.ToString();
+        yield return quote.Symbol;
+        yield return doubleRoundSecRule612(quote.Price);
+        yield return quote.Size.ToString();
+        yield return quote.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
+        yield return quote.SubProvider.ToString();
+        yield return quote.MarketCenter.ToString();
+        yield return quote.Condition;   
     }
 
     private void writeQuoteToCsv(Quote quote)
@@ -405,117 +435,124 @@ public class ReplayClient : IEquitiesWebSocketClient
     /// <returns></returns>returns
     private IEnumerable<Tick> replayTickFileWithDelay(string fullFilePath, int byteBufferSize, CancellationToken ct)
     {
-        //     let start : int64 = DateTime.UtcNow.Ticks;
-        //     let mutable offset : int64 = 0L;
-        //     seq {
-        //         for tick : Tick in replayTickFileWithoutDelay(fullFilePath, byteBufferSize, ct) do
-        //             if (offset = 0L)
-        //             then
-        //                 offset <- start - tick.TimeReceived().Ticks
-        //                 
-        //             if not ct.IsCancellationRequested
-        //             then
-        //                 System.Threading.SpinWait.SpinUntil(fun () -> ((tick.TimeReceived().Ticks + offset) <= DateTime.UtcNow.Ticks));
-        //                 yield tick
-        //     }
+        long start = DateTime.UtcNow.Ticks;
+        long offset = 0L;
+        foreach (Tick tick in replayTickFileWithoutDelay(fullFilePath, byteBufferSize, ct))
+        {
+            if (offset == 0L)
+                offset = start - tick.TimeReceived().Ticks;
+
+            if (!ct.IsCancellationRequested)
+            {
+                SpinWait.SpinUntil(() => (tick.TimeReceived().Ticks + offset) <= DateTime.UtcNow.Ticks);
+                yield return tick;
+            }
+        }
     }
 
     private string mapSubProviderToApiValue(SubProvider subProvider)
     {
-        //     match subProvider with
-        //     | SubProvider.IEX -> "iex"
-        //     | SubProvider.UTP -> "utp_delayed"
-        //     | SubProvider.CTA_A -> "cta_a_delayed"
-        //     | SubProvider.CTA_B -> "cta_b_delayed"
-        //     | SubProvider.OTC -> "otc_delayed"
-        //     | SubProvider.NASDAQ_BASIC -> "nasdaq_basic"
-        //     | _ -> "iex"
+        switch (subProvider)
+        {
+            case SubProvider.IEX: return "iex";
+            case SubProvider.UTP: return "utp_delayed";
+            case SubProvider.CTA_A: return "cta_a_delayed";
+            case SubProvider.CTA_B: return "cta_b_delayed";
+            case SubProvider.OTC: return "otc_delayed";
+            case SubProvider.NASDAQ_BASIC: return "nasdaq_basic";
+            default: return "iex";
+        }
     }
 
     private SubProvider[] mapProviderToSubProviders(Intrinio.Realtime.Equities.Provider provider)
     {
-        //     match provider with
-        //     | Provider.NONE -> [||]
-        //     | Provider.MANUAL -> [||]
-        //     | Provider.REALTIME -> [|SubProvider.IEX|]
-        //     | Provider.DELAYED_SIP -> [|SubProvider.UTP; SubProvider.CTA_A; SubProvider.CTA_B; SubProvider.OTC|]
-        //     | Provider.NASDAQ_BASIC -> [|SubProvider.NASDAQ_BASIC|]
-        //     | _ -> [||]
+        switch (provider)
+        {
+            case Provider.NONE: return Array.Empty<SubProvider>();
+            case Provider.MANUAL: return Array.Empty<SubProvider>();
+            case Provider.REALTIME: return new SubProvider[]{SubProvider.IEX};
+            case Provider.DELAYED_SIP: return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
+            case Provider.NASDAQ_BASIC: return new SubProvider[]{SubProvider.NASDAQ_BASIC};
+            default: return new SubProvider[0];
+        }
     }
 
     private string fetchReplayFile(SubProvider subProvider)
     {
-        //     let api : Intrinio.SDK.Api.SecurityApi = new Intrinio.SDK.Api.SecurityApi()
-        //     if not (api.Configuration.ApiKey.ContainsKey("api_key"))
-        //     then
-        //         api.Configuration.ApiKey.Add("api_key", config.ApiKey)
-        //         
-        //     try
-        //         let result : SecurityReplayFileResult = api.GetSecurityReplayFile(mapSubProviderToApiValue(subProvider), date)
-        //         let decodedUrl : string = result.Url.Replace(@"\u0026", "&")
-        //         let tempDir : string = System.IO.Path.GetTempPath()
-        //         let fileName : string = Path.Combine(tempDir, result.Name)
-        //         
-        //         use outputFile = new System.IO.FileStream(fileName,System.IO.FileMode.Create)
-        //         (
-        //             use httpClient = new HttpClient()
-        //             (
-        //                 httpClient.Timeout <- TimeSpan.FromHours(1)
-        //                 httpClient.BaseAddress <- new Uri(decodedUrl)
-        //                 use response : HttpResponseMessage = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result
-        //                 (
-        //                     use streamToReadFrom : Stream = response.Content.ReadAsStreamAsync().Result
-        //                     (
-        //                         streamToReadFrom.CopyTo outputFile
-        //                     )
-        //                 )
-        //             )
-        //         )
-        //         
-        //         fileName
-        //     with | :? Exception as e ->
-        //              logMessage(LogLevel.ERROR, "Error while fetching {0} file: {1}", [|subProvider.ToString(), e.Message|])
-        //              null
+        Intrinio.SDK.Api.SecurityApi api = new Intrinio.SDK.Api.SecurityApi();
+        
+        if (!api.Configuration.ApiKey.ContainsKey("api_key"))
+            api.Configuration.ApiKey.Add("api_key", config.ApiKey);
+
+        try
+        {
+            SecurityReplayFileResult result = api.GetSecurityReplayFile(mapSubProviderToApiValue(subProvider), date);
+            string decodedUrl = result.Url.Replace(@"\u0026", "&");
+            string tempDir = System.IO.Path.GetTempPath();
+            string fileName = Path.Combine(tempDir, result.Name);
+
+            using (FileStream outputFile = new FileStream(fileName,System.IO.FileMode.Create))
+            using (HttpClient httpClient = new HttpClient())
+            {
+                httpClient.Timeout = TimeSpan.FromHours(1);
+                httpClient.BaseAddress = new Uri(decodedUrl);
+                using (HttpResponseMessage response = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result)
+                using (Stream streamToReadFrom = response.Content.ReadAsStreamAsync().Result)
+                {
+                    streamToReadFrom.CopyTo(outputFile);
+                }
+            }
+            
+            return fileName;
+        }
+        catch (Exception e)
+        {
+            logMessage(LogLevel.ERROR, "Error while fetching {0} file: {1}", subProvider.ToString(), e.Message);
+            return null;
+        }
     }
 
     private void fillNextTicks(IEnumerator<Tick>[] enumerators, Tick[] nextTicks)
     {
-        //     for i = 0 to (nextTicks.Length-1) do
-        //         if nextTicks.[i].IsNone && enumerators.[i].MoveNext()
-        //         then
-        //             nextTicks.[i] <- Some(enumerators.[i].Current)
+        for (int i = 0; i < nextTicks.Length; i++)
+            if (nextTicks[i] == null && enumerators[i].MoveNext())
+                nextTicks[i] = enumerators[i].Current;
     }
 
     private Tick pullNextTick(Tick[] nextTicks)
     {
-        //     let mutable pullIndex : int = 0
-        //     let mutable t : DateTime = DateTime.MaxValue
-        //     for i = 0 to (nextTicks.Length-1) do
-        //         if nextTicks.[i].IsSome && nextTicks.[i].Value.TimeReceived() < t
-        //         then
-        //             pullIndex <- i
-        //             t <- nextTicks.[i].Value.TimeReceived()
-        //     
-        //     let pulledTick = nextTicks.[pullIndex] 
-        //     nextTicks.[pullIndex] <- Option<Tick>.None
-        //     pulledTick
+        int pullIndex = 0;
+        DateTime t = DateTime.MaxValue;
+        for (int i = 0; i < nextTicks.Length; i++)
+        {
+            if (nextTicks[i] != null && nextTicks[i].TimeReceived() < t)
+            {
+                pullIndex = i;
+                t = nextTicks[i].TimeReceived();
+            }
+        }
+
+        Tick pulledTick = nextTicks[pullIndex];
+        nextTicks[pullIndex] = null;
+        return pulledTick;
     }
 
     private bool hasAnyValue(Tick[] nextTicks)
     {
-        //     let mutable hasValue : bool = false
-        //     for i = 0 to (nextTicks.Length-1) do
-        //         if nextTicks.[i].IsSome
-        //         then
-        //             hasValue <- true
-        //     hasValue
+        bool hasValue = false;
+        
+        for (int i = 0; i < nextTicks.Length; i++)
+            if (nextTicks[i] != null)
+                hasValue = true;
+
+        return hasValue;
     }
 
     private IEnumerable<Tick> replayFileGroupWithoutDelay(IEnumerable<Tick>[] tickGroup, CancellationToken ct)
     {
         Tick[] nextTicks = new Tick[tickGroup.Length];
         IEnumerator<Tick>[] enumerators = new IEnumerator<Tick>[tickGroup.Length];
-        for (int i = 0; i < tickGroup.Length)
+        for (int i = 0; i < tickGroup.Length; i++)
         {
             enumerators[i] = tickGroup[i].GetEnumerator();
         }
