@@ -15,24 +15,22 @@
 		<tags>fintech stocks options prices websocket real-time market finance</tags>
 		<dependencies>
 			<group targetFramework="net8.0">
-				<dependency id="FSharp.Core" version="7.0.400" />
-				<dependency id="Microsoft.Extensions.Configuration" version="7.0.0" />
-				<dependency id="Microsoft.Extensions.Configuration.Binder" version="7.0.4" />
-				<dependency id="Microsoft.Extensions.Configuration.Json" version="7.0.0" />
-				<dependency id="Serilog" version="3.0.1" />
-				<dependency id="Serilog.Settings.Configuration" version="7.0.0" />
-				<dependency id="Serilog.Sinks.Console" version="4.1.0" />
-				<dependency id="Serilog.Sinks.File" version="5.0.0" />
-				<dependency id="System.Text.Json" version="7.0.3" />
-				<dependency id="WebSocket4Net" version="0.15.2" />
-				<dependency id="Intrinio.SDK" version="7.3.0" />
+				<dependency id="Microsoft.Extensions.Configuration" version="9.0.0-rc.1.24431.7" />
+				<dependency id="Microsoft.Extensions.Configuration.Binder" version="9.0.0-rc.1.24431.7" />
+				<dependency id="Microsoft.Extensions.Configuration.Json" version="9.0.0-rc.1.24431.7" />
+				<dependency id="Serilog" version="4.0.2-dev-02232" />
+				<dependency id="Serilog.Settings.Configuration" version="8.0.2" />
+				<dependency id="Serilog.Sinks.Console" version="6.0.0" />
+				<dependency id="Serilog.Sinks.File" version="6.0.0" />
+				<dependency id="System.Text.Json" version="9.0.0-rc.1.24431.7" />
+				<dependency id="Intrinio.SDK" version="7.9.0" />
 			</group>
 		</dependencies>
 	</metadata>
 	<files>
-		<file src="SampleApp/bin/Release/net8.0/IntrinioRealtime.dll" target="lib/net8.0" />
-		<file src="SampleApp/bin/Release/net8.0/IntrinioRealtime.xml" target="lib/net8.0" />
-		<file src="SampleApp/bin/Release/net8.0/IntrinioRealtime.pdb" target="lib/net8.0" />
+		<file src="SampleApp/bin/Release/net8.0/Intrinio.Realtime.dll" target="lib/net8.0" />
+		<file src="SampleApp/bin/Release/net8.0/Intrinio.Realtime.xml" target="lib/net8.0" />
+		<file src="SampleApp/bin/Release/net8.0/Intrinio.Realtime.pdb" target="lib/net8.0" />
 		<file src="SampleApp/bin/Release/net8.0/config.json" target="lib/net8.0" />
 		<file src="SampleApp/bin/Release/net8.0/SampleApp.deps.json" target="lib/net8.0" />
 		<file src="SampleApp/bin/Release/net8.0/SampleApp.dll" target="lib/net8.0" />

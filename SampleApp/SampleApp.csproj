@@ -20,7 +20,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Intrinio.Realtime\Intrinio.Realtime.csproj" />
-<!--    <ProjectReference Include="..\IntrinioRealtimeMultiExchange\IntrinioRealtimeMultiExchange.fsproj" />-->
     </ItemGroup>
 
     <ItemGroup>
