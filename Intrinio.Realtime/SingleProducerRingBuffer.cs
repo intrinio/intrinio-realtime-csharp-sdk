@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace Intrinio.Realtime;
 
-public class SingleProducerRingBuffer
+internal class SingleProducerRingBuffer
 {
     #region Data Members
     private readonly byte[] _data;

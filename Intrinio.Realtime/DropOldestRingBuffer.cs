@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace Intrinio.Realtime;
 
-public class DropOldestRingBuffer
+internal class DropOldestRingBuffer
 {
     #region Data Members
     private readonly byte[] _data;

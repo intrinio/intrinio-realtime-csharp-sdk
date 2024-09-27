@@ -11,7 +11,6 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Sockets;
-using Serilog.Core;
 
 public abstract class WebSocketClient
 {
