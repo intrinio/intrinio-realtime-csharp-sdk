@@ -15,6 +15,8 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     private const string LobbyName = "lobby";
     private bool _useOnTrade;
     private bool _useOnQuote;
+    private bool _useOnRefresh;
+    private bool _useOnUnusualActivity;
     private Action<Trade> _onTrade;
 
     /// <summary>
@@ -40,6 +42,34 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         {
             _useOnQuote = !ReferenceEquals(value, null);
             _onQuote = value;
+        }
+    }
+    
+    private Action<Refresh> _onRefresh;
+
+    /// <summary>
+    /// The callback for when a refresh event occurs.
+    /// </summary>
+    public Action<Refresh> OnRefresh
+    {
+        set
+        {
+            _useOnRefresh = !ReferenceEquals(value, null);
+            _onRefresh = value;
+        }
+    }
+
+    private Action<UnusualActivity> _onUnusualActivity;
+
+    /// <summary>
+    /// The callback for when an unusual activity event occurs.
+    /// </summary>
+    public Action<UnusualActivity> OnUnusualActivity
+    {
+        set
+        {
+            _useOnUnusualActivity = !ReferenceEquals(value, null);
+            _onUnusualActivity = value;
         }
     }
 

@@ -30,7 +30,7 @@ public class OptionsSampleApp
 
 	static void OnQuote(Quote quote)
 	{
-		string key = quote.Contract + ":" + quote.Type;
+		string key = quote.Contract;
 		int updateFunc(string _, int prevValue)
 		{
 			if (prevValue + 1 > maxQuoteCount)
@@ -45,7 +45,7 @@ public class OptionsSampleApp
 
 	static void OnTrade(Trade trade)
 	{
-		string key = trade.Symbol;
+		string key = trade.Contract;
 		int updateFunc(string _, int prevValue)
 		{
 			if (prevValue + 1 > maxTradeCount)

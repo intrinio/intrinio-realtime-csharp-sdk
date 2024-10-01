@@ -7,6 +7,8 @@ public interface IOptionsWebSocketClient
 {
     public Action<Trade> OnTrade { set; }
     public Action<Quote> OnQuote { set; }
+    public Action<Refresh> OnRefresh { set; }
+    public Action<UnusualActivity> OnUnusualActivity { set; }
     public Task Join();
     public Task Join(string channel, bool? tradesOnly);
     public Task JoinLobby(bool? tradesOnly);
