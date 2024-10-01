@@ -97,7 +97,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
     /// <param name="config"></param>
-    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config) 
+    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity, Config config) 
         : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
     {
         OnTrade = onTrade;
@@ -114,7 +114,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// Create a new Equities websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
-    public OptionsWebSocketClient(Action<Trade> onTrade) : this(onTrade, null, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade> onTrade) : this(onTrade, null, null, null, Config.LoadConfig())
     {
     }
 
@@ -122,7 +122,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// Create a new Equities websocket client.
     /// </summary>
     /// <param name="onQuote"></param>
-    public OptionsWebSocketClient(Action<Quote> onQuote) : this(null, onQuote, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Quote> onQuote) : this(null, onQuote, null, null, Config.LoadConfig())
     {
     }
     
@@ -131,7 +131,16 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// </summary>
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
-    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote) : this(onTrade, onQuote, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote) : this(onTrade, onQuote, null, null, Config.LoadConfig())
+    {
+    }
+    
+    /// <summary>
+    /// Create a new Equities websocket client.
+    /// </summary>
+    /// <param name="onTrade"></param>
+    /// <param name="onQuote"></param>
+    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity) : this(onTrade, onQuote, onRefresh, onUnusualActivity, Config.LoadConfig())
     {
     }
     #endregion //Constructors
