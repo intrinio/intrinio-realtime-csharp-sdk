@@ -13,12 +13,10 @@ public class OptionsSampleApp
     private static IOptionsWebSocketClient client = null;
 	private static CandleStickClient _candleStickClient = null;
 	private static Timer timer = null;
-	private static readonly ConcurrentDictionary<string, int> trades = new(5, 15_000);
-	private static readonly ConcurrentDictionary<string, int> quotes = new(5, 15_000);
-	private static int maxTradeCount = 0;
-	private static int maxQuoteCount = 0;
-	private static Trade maxCountTrade;
-	private static Quote maxCountQuote;
+	private static UInt64 _tradeEventCount = 0UL;
+	private static UInt64 _quoteEventCount = 0UL;
+	private static UInt64 _refreshEventCount = 0UL;
+	private static UInt64 _unusualActivityEventCount = 0UL;
 	private static UInt64 _tradeCandleStickCount = 0UL;
 	private static UInt64 _tradeCandleStickCountIncomplete = 0UL;
 	private static UInt64 _AskCandleStickCount = 0UL;
@@ -30,32 +28,22 @@ public class OptionsSampleApp
 
 	static void OnQuote(Quote quote)
 	{
-		string key = quote.Contract;
-		int updateFunc(string _, int prevValue)
-		{
-			if (prevValue + 1 > maxQuoteCount)
-			{
-				maxQuoteCount = prevValue + 1;
-				maxCountQuote = quote;
-			}
-			return (prevValue + 1);
-		}
-		quotes.AddOrUpdate(key, 1, updateFunc);
+		Interlocked.Increment(ref _quoteEventCount);
 	}
 
 	static void OnTrade(Trade trade)
 	{
-		string key = trade.Contract;
-		int updateFunc(string _, int prevValue)
-		{
-			if (prevValue + 1 > maxTradeCount)
-			{
-				maxTradeCount = prevValue + 1;
-				maxCountTrade = trade;
-			}
-			return (prevValue + 1);
-		}
-		trades.AddOrUpdate(key, 1, updateFunc);
+		Interlocked.Increment(ref _tradeEventCount);
+	}
+	
+	static void OnRefresh(Refresh refresh)
+	{
+		Interlocked.Increment(ref _refreshEventCount);
+	}
+	
+	static void OnUnusualActivity(UnusualActivity unusualActivity)
+	{
+		Interlocked.Increment(ref _unusualActivityEventCount);
 	}
 	
 	static void OnTradeCandleStick(TradeCandleStick tradeCandleStick)
@@ -88,7 +76,7 @@ public class OptionsSampleApp
 	{
 		IOptionsWebSocketClient client = (IOptionsWebSocketClient) obj;
 		ClientStats stats = client.GetStats();
-		Log("Socket Stats - Data Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, Individual Events: {6}, Trades: {7}, Quotes: {8}",
+		Log("Socket Stats - Data Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, Individual Events: {6}, Trades: {7}, Quotes: {8}, Refreshes: {9}, UnusualActivities: {10}",
 			stats.SocketDataMessages(),
 			stats.SocketTextMessages(),
 			(stats.QueueDepth() * 100) / stats.QueueCapacity(),
@@ -97,15 +85,10 @@ public class OptionsSampleApp
 			stats.OverflowCount(),
 			stats.EventCount(),
 			client.TradeCount,
-			client.QuoteCount);
-		if (maxTradeCount > 0)
-		{
-			Log("Most active trade: {0} ({1} updates)", maxCountTrade, maxTradeCount);
-		}
-		if (maxQuoteCount > 0)
-		{
-			Log("Most active quote: {0} ({1} updates)", maxCountQuote, maxQuoteCount);
-		}
+			client.QuoteCount,
+			client.RefreshCount,
+			client.UnusualActivityCount);
+		
 		if (_useTradeCandleSticks)
 			Log("TRADE CANDLESTICK STATS - TradeCandleSticks = {0}, TradeCandleSticksIncomplete = {1}", _tradeCandleStickCount, _tradeCandleStickCountIncomplete);
 		if (_useQuoteCandleSticks)
@@ -135,6 +118,8 @@ public class OptionsSampleApp
 		Log("Starting sample app");
 		Action<Trade> onTrade = OnTrade;
 		Action<Quote> onQuote = OnQuote;
+		Action<Refresh> onRefresh = OnRefresh;
+		Action<UnusualActivity> onUnusualActivity = OnUnusualActivity;
 		
 		// //Subscribe the candlestick client to trade and/or quote events as well.  It's important any method subscribed this way handles exceptions so as to not cause issues for other subscribers!
 		// _useTradeCandleSticks = true;
@@ -155,9 +140,9 @@ public class OptionsSampleApp
 		// config.TradesOnly = false;
 		// config.BufferSize = 2048;
 		// config.OverflowBufferSize = 4096;
-		// client = new Client(onTrade, onQuote, config);
+		// client = new Client(onTrade, onQuote, onRefresh, onUnusualActivity, config);
 		
-		client = new OptionsWebSocketClient(onTrade, onQuote);
+		client = new OptionsWebSocketClient(onTrade, onQuote, onRefresh, onUnusualActivity);
 		await client.Start();
 		timer = new Timer(TimerCallback, client, 60000, 60000);
 		await client.Join(); //Load symbols from your config or config.json
