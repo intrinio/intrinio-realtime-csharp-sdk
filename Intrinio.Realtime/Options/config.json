@@ -1,0 +1,27 @@
+{
+	"Config": {
+		"ApiKey": "API_KEY_HERE",
+		"NumThreads": 16,
+		"Provider": "OPRA",
+		//"Provider": "MANUAL",
+		//"IPAddress": "1.2.3.4",
+		"BufferSize": 2048,
+		"OverflowBufferSize": 2048,
+		"Delayed": false,
+		"Symbols": [ "GOOG__220408C02870000", "MSFT__220408C00315000", "AAPL__220414C00180000", "SPY", "TSLA" ],
+		//"Symbols": [ "lobby" ]
+	},
+	"Serilog": {
+		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
+		"MinimumLevel": {
+			"Default": "Information",
+			"Override": {
+				"Microsoft": "Warning",
+				"System": "Warning"
+			}
+		},
+		"WriteTo": [
+			{ "Name": "Console" }
+		]
+	}
+}

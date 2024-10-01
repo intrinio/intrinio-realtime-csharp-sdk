@@ -1,6 +1,6 @@
 using System.Linq;
 
-namespace Intrinio.Realtime.Equities;
+namespace Intrinio.Realtime.Options;
 
 using Intrinio.SDK.Model;
 using System;
@@ -12,10 +12,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-public class ReplayClient : IEquitiesWebSocketClient
+public class ReplayClient : IOptionsWebSocketClient
 {
     #region Data Members
-    private const string LobbyName = "lobby";
     public Action<Trade> OnTrade { get; set; }
     public Action<Quote> OnQuote { get; set; }
     private readonly Config _config;
@@ -28,6 +27,8 @@ public class ReplayClient : IEquitiesWebSocketClient
     private ulong _dataEventCount;
     private ulong _dataTradeCount;
     private ulong _dataQuoteCount;
+    private ulong _dataRefreshCount;
+    private ulong _dataUnusualActivityCount;
     private ulong _textMsgCount;
     private readonly HashSet<Channel> _channels;
     private readonly CancellationTokenSource _ctSource;
@@ -41,6 +42,8 @@ public class ReplayClient : IEquitiesWebSocketClient
     private readonly Thread _replayThread;
     public UInt64 TradeCount { get { return Interlocked.Read(ref _dataTradeCount); } }
     public UInt64 QuoteCount { get { return Interlocked.Read(ref _dataQuoteCount); } }
+    public UInt64 RefreshCount { get { return Interlocked.Read(ref _dataRefreshCount); } }
+    public UInt64 UnusualActivityCount { get { return Interlocked.Read(ref _dataUnusualActivityCount); } }
     #endregion //Data Members
 
     #region Constructors
@@ -113,11 +116,6 @@ public class ReplayClient : IEquitiesWebSocketClient
         
         return Task.CompletedTask;
     }
-    
-    public async Task JoinLobby(bool? tradesOnly)
-    {
-        await Join(LobbyName, tradesOnly);
-    }
 
     public Task Join(string[] symbols, bool? tradesOnly)
     {
@@ -144,11 +142,6 @@ public class ReplayClient : IEquitiesWebSocketClient
         foreach (Channel channel in matchingChannels)
             Leave(channel.ticker, channel.tradesOnly);
         return Task.CompletedTask;
-    }
-    
-    public async Task LeaveLobby()
-    {
-        await Leave(LobbyName);
     }
 
     public Task Leave(string[] symbols)
@@ -243,7 +236,7 @@ public class ReplayClient : IEquitiesWebSocketClient
             BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4)),
             BitConverter.ToUInt32(bytes.Slice(22 + symbolLength, 4)),
             DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL)),
-            (SubProvider)Convert.ToInt32(bytes[3 + symbolLength]),
+            //(SubProvider)Convert.ToInt32(bytes[3 + symbolLength]),
             BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2)),
             conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(27 + symbolLength, conditionLength)) : String.Empty
         );
@@ -262,7 +255,7 @@ public class ReplayClient : IEquitiesWebSocketClient
             (Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4)))),
             BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4)),
             DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL)),
-            (SubProvider)(Convert.ToInt32(bytes[3 + symbolLength])),
+            //(SubProvider)(Convert.ToInt32(bytes[3 + symbolLength])),
             BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2)),
             conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) : String.Empty
         );
@@ -312,7 +305,7 @@ public class ReplayClient : IEquitiesWebSocketClient
         yield return DoubleRoundSecRule612(trade.Price);
         yield return trade.Size.ToString();
         yield return trade.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
-        yield return trade.SubProvider.ToString();
+        //yield return trade.SubProvider.ToString();
         yield return trade.MarketCenter.ToString();
         yield return trade.Condition;
         yield return trade.TotalVolume.ToString();   
@@ -326,11 +319,11 @@ public class ReplayClient : IEquitiesWebSocketClient
     private IEnumerable<string> MapQuoteToRow(Quote quote)
     {
         yield return quote.Type.ToString();
-        yield return quote.Symbol;
-        yield return DoubleRoundSecRule612(quote.Price);
-        yield return quote.Size.ToString();
+        yield return quote.Contract;
+        yield return DoubleRoundSecRule612(quote.AskPrice);
+        yield return quote.AskSize.ToString();
         yield return quote.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
-        yield return quote.SubProvider.ToString();
+        //yield return quote.SubProvider.ToString();
         yield return quote.MarketCenter.ToString();
         yield return quote.Condition;   
     }
@@ -418,8 +411,8 @@ public class ReplayClient : IEquitiesWebSocketClient
                             {
                                 case MessageType.Trade:
                                     Trade trade = ParseTrade(eventSpanBuffer);
-                                    if (_channels.Contains(new Channel(LobbyName, true)) 
-                                        || _channels.Contains(new Channel(LobbyName, false)) 
+                                    if (_channels.Contains(new Channel("lobby", true)) 
+                                        || _channels.Contains(new Channel("lobby", false)) 
                                         || _channels.Contains(new Channel(trade.Symbol, true)) 
                                         || _channels.Contains(new Channel(trade.Symbol, false)))
                                     {
@@ -428,10 +421,13 @@ public class ReplayClient : IEquitiesWebSocketClient
                                         yield return new Tick(timeReceived, trade, null);
                                     }
                                     break;
-                                case MessageType.Ask:
-                                case MessageType.Bid:
+                                case MessageType.Refresh:
+                                    throw new NotImplementedException();
+                                case MessageType.UnusualActivity:
+                                    throw new NotImplementedException();
+                                case MessageType.Quote:
                                     Quote quote = ParseQuote(eventSpanBuffer);
-                                    if (_channels.Contains (new Channel(LobbyName, false)) || _channels.Contains (new Channel(quote.Symbol, false)))
+                                    if (_channels.Contains (new Channel("lobby", false)) || _channels.Contains (new Channel(quote.Contract, false)))
                                     {
                                         if (_writeToCsv)
                                             WriteQuoteToCsv(quote);
@@ -483,66 +479,40 @@ public class ReplayClient : IEquitiesWebSocketClient
         }
     }
 
-    private string MapSubProviderToApiValue(SubProvider subProvider)
+    private string FetchReplayFile(Provider provider)
     {
-        switch (subProvider)
-        {
-            case SubProvider.IEX: return "iex";
-            case SubProvider.UTP: return "utp_delayed";
-            case SubProvider.CTA_A: return "cta_a_delayed";
-            case SubProvider.CTA_B: return "cta_b_delayed";
-            case SubProvider.OTC: return "otc_delayed";
-            case SubProvider.NASDAQ_BASIC: return "nasdaq_basic";
-            default: return "iex";
-        }
-    }
-
-    private SubProvider[] MapProviderToSubProviders(Intrinio.Realtime.Equities.Provider provider)
-    {
-        switch (provider)
-        {
-            case Provider.NONE: return Array.Empty<SubProvider>();
-            case Provider.MANUAL: return Array.Empty<SubProvider>();
-            case Provider.REALTIME: return new SubProvider[]{SubProvider.IEX};
-            case Provider.DELAYED_SIP: return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
-            case Provider.NASDAQ_BASIC: return new SubProvider[]{SubProvider.NASDAQ_BASIC};
-            default: return new SubProvider[0];
-        }
-    }
-
-    private string FetchReplayFile(SubProvider subProvider)
-    {
-        Intrinio.SDK.Api.SecurityApi api = new Intrinio.SDK.Api.SecurityApi();
-        
-        if (!api.Configuration.ApiKey.ContainsKey("api_key"))
-            api.Configuration.ApiKey.Add("api_key", _config.ApiKey);
-
-        try
-        {
-            SecurityReplayFileResult result = api.GetSecurityReplayFile(MapSubProviderToApiValue(subProvider), _date);
-            string decodedUrl = result.Url.Replace(@"\u0026", "&");
-            string tempDir = System.IO.Path.GetTempPath();
-            string fileName = Path.Combine(tempDir, result.Name);
-
-            using (FileStream outputFile = new FileStream(fileName,System.IO.FileMode.Create))
-            using (HttpClient httpClient = new HttpClient())
-            {
-                httpClient.Timeout = TimeSpan.FromHours(1);
-                httpClient.BaseAddress = new Uri(decodedUrl);
-                using (HttpResponseMessage response = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result)
-                using (Stream streamToReadFrom = response.Content.ReadAsStreamAsync().Result)
-                {
-                    streamToReadFrom.CopyTo(outputFile);
-                }
-            }
-            
-            return fileName;
-        }
-        catch (Exception e)
-        {
-            LogMessage(LogLevel.ERROR, "Error while fetching {0} file: {1}", subProvider.ToString(), e.Message);
-            return null;
-        }
+        throw new NotImplementedException();
+        // Intrinio.SDK.Api.SecurityApi api = new Intrinio.SDK.Api.SecurityApi();
+        //
+        // if (!api.Configuration.ApiKey.ContainsKey("api_key"))
+        //     api.Configuration.ApiKey.Add("api_key", _config.ApiKey);
+        //
+        // try
+        // {
+        //     SecurityReplayFileResult result = api.GetSecurityReplayFile(provider, _date);
+        //     string decodedUrl = result.Url.Replace(@"\u0026", "&");
+        //     string tempDir = System.IO.Path.GetTempPath();
+        //     string fileName = Path.Combine(tempDir, result.Name);
+        //
+        //     using (FileStream outputFile = new FileStream(fileName,System.IO.FileMode.Create))
+        //     using (HttpClient httpClient = new HttpClient())
+        //     {
+        //         httpClient.Timeout = TimeSpan.FromHours(1);
+        //         httpClient.BaseAddress = new Uri(decodedUrl);
+        //         using (HttpResponseMessage response = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result)
+        //         using (Stream streamToReadFrom = response.Content.ReadAsStreamAsync().Result)
+        //         {
+        //             streamToReadFrom.CopyTo(outputFile);
+        //         }
+        //     }
+        //     
+        //     return fileName;
+        // }
+        // catch (Exception e)
+        // {
+        //     LogMessage(LogLevel.ERROR, "Error while fetching {0} file: {1}", provider.ToString(), e.Message);
+        //     return null;
+        // }
     }
 
     private void FillNextTicks(IEnumerator<Tick>[] enumerators, Tick[] nextTicks)
@@ -623,51 +593,52 @@ public class ReplayClient : IEquitiesWebSocketClient
 
     private void ReplayThreadFn()
     {
-        CancellationToken ct = _ctSource.Token;
-        SubProvider[] subProviders = MapProviderToSubProviders(_config.Provider);
-        string[] replayFiles = new string[subProviders.Length];
-        IEnumerable<Tick>[] allTicks = new IEnumerable<Tick>[subProviders.Length];
-
-        try
-        {
-            for (int i = 0; i < subProviders.Length; i++)
-            {
-                LogMessage(LogLevel.INFORMATION, "Downloading Replay file for {0} on {1}...", subProviders[i].ToString(), _date.Date.ToString());
-                replayFiles[i] = FetchReplayFile(subProviders[i]);
-                LogMessage(LogLevel.INFORMATION, "Downloaded Replay file to: {0}", replayFiles[i]);
-                allTicks[i] = ReplayTickFileWithoutDelay(replayFiles[i], 100, ct);
-            }
-
-            IEnumerable<Tick> aggregatedTicks = _withSimulatedDelay
-                ? ReplayFileGroupWithDelay(allTicks, ct)
-                : ReplayFileGroupWithoutDelay(allTicks, ct);
-
-            foreach (Tick tick in aggregatedTicks)
-            {
-                if (!ct.IsCancellationRequested)
-                {
-                    Interlocked.Increment(ref _dataEventCount);
-                    Interlocked.Increment(ref _dataMsgCount);
-                    _data.Enqueue(tick);
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            LogMessage(LogLevel.ERROR, "Error while replaying file: {0}", e.Message);
-        }
-
-        if (_deleteFileWhenDone)
-        {
-            foreach (string deleteFilePath in replayFiles)
-            {
-                if (File.Exists(deleteFilePath))
-                {
-                    LogMessage(LogLevel.INFORMATION, "Deleting Replay file: {0}", deleteFilePath);
-                    File.Delete(deleteFilePath);
-                }
-            }
-        }
+        throw new NotImplementedException();
+        // CancellationToken ct = _ctSource.Token;
+        // SubProvider[] subProviders = MapProviderToSubProviders(_config.Provider);
+        // string[] replayFiles = new string[subProviders.Length];
+        // IEnumerable<Tick>[] allTicks = new IEnumerable<Tick>[subProviders.Length];
+        //
+        // try
+        // {
+        //     for (int i = 0; i < subProviders.Length; i++)
+        //     {
+        //         LogMessage(LogLevel.INFORMATION, "Downloading Replay file for {0} on {1}...", subProviders[i].ToString(), _date.Date.ToString());
+        //         replayFiles[i] = FetchReplayFile(subProviders[i]);
+        //         LogMessage(LogLevel.INFORMATION, "Downloaded Replay file to: {0}", replayFiles[i]);
+        //         allTicks[i] = ReplayTickFileWithoutDelay(replayFiles[i], 100, ct);
+        //     }
+        //
+        //     IEnumerable<Tick> aggregatedTicks = _withSimulatedDelay
+        //         ? ReplayFileGroupWithDelay(allTicks, ct)
+        //         : ReplayFileGroupWithoutDelay(allTicks, ct);
+        //
+        //     foreach (Tick tick in aggregatedTicks)
+        //     {
+        //         if (!ct.IsCancellationRequested)
+        //         {
+        //             Interlocked.Increment(ref _dataEventCount);
+        //             Interlocked.Increment(ref _dataMsgCount);
+        //             _data.Enqueue(tick);
+        //         }
+        //     }
+        // }
+        // catch (Exception e)
+        // {
+        //     LogMessage(LogLevel.ERROR, "Error while replaying file: {0}", e.Message);
+        // }
+        //
+        // if (_deleteFileWhenDone)
+        // {
+        //     foreach (string deleteFilePath in replayFiles)
+        //     {
+        //         if (File.Exists(deleteFilePath))
+        //         {
+        //             LogMessage(LogLevel.INFORMATION, "Deleting Replay file: {0}", deleteFilePath);
+        //             File.Delete(deleteFilePath);
+        //         }
+        //     }
+        // }
     }
 
     private void Join(string symbol, bool tradesOnly)

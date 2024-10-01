@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
-namespace Intrinio.Realtime.Equities;
+namespace Intrinio.Realtime.Options;
 
-public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
+public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
 {
     #region Data Members
 
@@ -46,8 +46,12 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     private readonly Config _config;
     private UInt64 _dataTradeCount = 0UL;
     private UInt64 _dataQuoteCount = 0UL;
+    private UInt64 _dataRefreshCount = 0UL;
+    private UInt64 _dataUnusualActivityCount = 0UL;
     public UInt64 TradeCount { get { return Interlocked.Read(ref _dataTradeCount); } }
     public UInt64 QuoteCount { get { return Interlocked.Read(ref _dataQuoteCount); } }
+    public UInt64 RefreshCount { get { return Interlocked.Read(ref _dataRefreshCount); } }
+    public UInt64 UnusualActivityCount { get { return Interlocked.Read(ref _dataUnusualActivityCount); } }
 
     private readonly string _logPrefix;
     private const string MessageVersionHeaderKey = "UseNewEquitiesFormat";
@@ -63,7 +67,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
     /// <param name="config"></param>
-    public EquitiesWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config) 
+    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config) 
         : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
     {
         OnTrade = onTrade;
@@ -80,7 +84,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// Create a new Equities websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
-    public EquitiesWebSocketClient(Action<Trade> onTrade) : this(onTrade, null, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade> onTrade) : this(onTrade, null, Config.LoadConfig())
     {
     }
 
@@ -88,7 +92,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// Create a new Equities websocket client.
     /// </summary>
     /// <param name="onQuote"></param>
-    public EquitiesWebSocketClient(Action<Quote> onQuote) : this(null, onQuote, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Quote> onQuote) : this(null, onQuote, Config.LoadConfig())
     {
     }
     
@@ -97,7 +101,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// </summary>
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
-    public EquitiesWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote) : this(onTrade, onQuote, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote) : this(onTrade, onQuote, Config.LoadConfig())
     {
     }
     #endregion //Constructors
@@ -191,14 +195,8 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     {
         switch (_config.Provider)
         {
-            case Provider.REALTIME:
+            case Provider.OPRA:
                 return $"https://realtime-mx.intrinio.com/auth?api_key={_config.ApiKey}";
-                break;
-            case Provider.DELAYED_SIP:
-                return $"https://realtime-delayed-sip.intrinio.com/auth?api_key={_config.ApiKey}";
-                break;
-            case Provider.NASDAQ_BASIC:
-                return $"https://realtime-nasdaq-basic.intrinio.com/auth?api_key={_config.ApiKey}";
                 break;
             case Provider.MANUAL:
                 return $"http://{_config.IPAddress}/auth?api_key={_config.ApiKey}";
@@ -213,14 +211,8 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     {
         switch (_config.Provider)
         {
-            case Provider.REALTIME:
+            case Provider.OPRA:
                 return $"wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
-                break;
-            case Provider.DELAYED_SIP:
-                return $"wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
-                break;
-            case Provider.NASDAQ_BASIC:
-                return $"wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
                 break;
             case Provider.MANUAL:
                 return $"ws://{_config.IPAddress}/socket/websocket?vsn=1.0.0&token={token}";
@@ -240,34 +232,36 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
 
     private Trade ParseTrade(ReadOnlySpan<byte> bytes)
     {
-        int symbolLength = Convert.ToInt32(bytes[2]);
-        int conditionLength = Convert.ToInt32(bytes[26 + symbolLength]);
-        string symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength));
-        double price = Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4)));
-        UInt32 size = BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4));
-        DateTime timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL));
-        SubProvider subProvider = (SubProvider)((int)bytes[3 + symbolLength]);
-        char marketCenter = BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2));
-        string condition = conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(27 + symbolLength, conditionLength)) : String.Empty;
-        UInt64 totalVolume = Convert.ToUInt64(BitConverter.ToUInt32(bytes.Slice(22 + symbolLength, 4)));
-
-        return new Trade(symbol, price, size, totalVolume, timestamp, subProvider, marketCenter, condition);
+        throw new NotImplementedException();
+        // int symbolLength = Convert.ToInt32(bytes[2]);
+        // int conditionLength = Convert.ToInt32(bytes[26 + symbolLength]);
+        // string symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength));
+        // double price = Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4)));
+        // UInt32 size = BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4));
+        // DateTime timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL));
+        // //SubProvider subProvider = (SubProvider)((int)bytes[3 + symbolLength]);
+        // char marketCenter = BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2));
+        // string condition = conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(27 + symbolLength, conditionLength)) : String.Empty;
+        // UInt64 totalVolume = Convert.ToUInt64(BitConverter.ToUInt32(bytes.Slice(22 + symbolLength, 4)));
+        //
+        // return new Trade(symbol, price, size, totalVolume, timestamp, subProvider, marketCenter, condition);
     }
 
     private Quote ParseQuote(ReadOnlySpan<byte> bytes)
     {
-        int symbolLength = Convert.ToInt32(bytes[2]);
-        int conditionLength = Convert.ToInt32(bytes[22 + symbolLength]);
-        QuoteType type = (QuoteType)((int)(bytes[0]));
-        string symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength));
-        double price = Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4)));
-        UInt32 size = BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4));
-        DateTime timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL));
-        SubProvider subProvider = (SubProvider)((int)(bytes[3 + symbolLength]));
-        char marketCenter = BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2));
-        string condition = (conditionLength > 0) ? Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) : String.Empty;
-
-        return new Quote(type, symbol, price, size, timestamp, subProvider, marketCenter, condition);
+        throw new NotImplementedException();
+        // int symbolLength = Convert.ToInt32(bytes[2]);
+        // int conditionLength = Convert.ToInt32(bytes[22 + symbolLength]);
+        // QuoteType type = (QuoteType)((int)(bytes[0]));
+        // string symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength));
+        // double price = Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4)));
+        // UInt32 size = BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4));
+        // DateTime timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL));
+        // //SubProvider subProvider = (SubProvider)((int)(bytes[3 + symbolLength]));
+        // char marketCenter = BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2));
+        // string condition = (conditionLength > 0) ? Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) : String.Empty;
+        //
+        // return new Quote(type, symbol, price, size, timestamp, subProvider, marketCenter, condition);
     }
 
     protected override void HandleMessage(ReadOnlySpan<byte> bytes)
@@ -275,6 +269,20 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         MessageType msgType = (MessageType)Convert.ToInt32(bytes[0]);
         switch (msgType)
         {
+            case MessageType.Quote:
+            {
+                if (_useOnQuote)
+                {
+                    Quote quote = ParseQuote(bytes);
+                    Interlocked.Increment(ref _dataQuoteCount);
+                    try { _onQuote.Invoke(quote); }
+                    catch (Exception e)
+                    {
+                        LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                    }
+                }
+                break;
+            }
             case MessageType.Trade:
             {
                 if (_useOnTrade)
@@ -289,21 +297,10 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
                 }
                 break;
             }
-            case MessageType.Ask:
-            case MessageType.Bid:
-            {
-                if (_useOnQuote)
-                {
-                    Quote quote = ParseQuote(bytes);
-                    Interlocked.Increment(ref _dataQuoteCount);
-                    try { _onQuote.Invoke(quote); }
-                    catch (Exception e)
-                    {
-                        LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
-                    }
-                }
-                break;
-            }
+            case MessageType.Refresh:
+                throw new NotImplementedException(); //TODO
+            case MessageType.UnusualActivity:
+                throw new NotImplementedException(); //TODO
             default:
                 LogMessage(LogLevel.WARNING, "Invalid MessageType: {0}", new object[] {Convert.ToInt32(bytes[0])});
                 break;

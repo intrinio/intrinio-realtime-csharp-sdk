@@ -10,7 +10,6 @@
 
     <ItemGroup>
         <Folder Include="Composite\" />
-        <Folder Include="Options\" />
     </ItemGroup>
 
     <ItemGroup>

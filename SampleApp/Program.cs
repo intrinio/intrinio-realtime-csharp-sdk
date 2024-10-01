@@ -12,6 +12,7 @@ namespace SampleApp
 		static async Task Main(string[] args)
 		{
 			await EquitiesSampleApp.Run(args);
+			//await OptionsSampleApp.Run(args);
 		}		
 	}
 }
