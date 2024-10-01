@@ -84,7 +84,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     public UInt64 UnusualActivityCount { get { return Interlocked.Read(ref _dataUnusualActivityCount); } }
 
     private readonly string _logPrefix;
-    private const string MessageVersionHeaderKey = "UseNewEquitiesFormat";
+    private const string MessageVersionHeaderKey = "UseNewOptionsFormat";
     private const string MessageVersionHeaderValue = "v2";
     private const uint MaxMessageSize = 64u;
     private const string ChannelFormat = "{0}|TradesOnly|{1}";
@@ -92,10 +92,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     
     #region Constuctors
     /// <summary>
-    /// Create a new Equities websocket client.
+    /// Create a new Options websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
+    /// <param name="onRefresh"></param>
+    /// <param name="onUnusualActivity"></param>
     /// <param name="config"></param>
     public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity, Config config) 
         : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
@@ -111,7 +113,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     }
 
     /// <summary>
-    /// Create a new Equities websocket client.
+    /// Create a new Options websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
     public OptionsWebSocketClient(Action<Trade> onTrade) : this(onTrade, null, null, null, Config.LoadConfig())
@@ -119,7 +121,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     }
 
     /// <summary>
-    /// Create a new Equities websocket client.
+    /// Create a new Options websocket client.
     /// </summary>
     /// <param name="onQuote"></param>
     public OptionsWebSocketClient(Action<Quote> onQuote) : this(null, onQuote, null, null, Config.LoadConfig())
@@ -127,7 +129,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     }
     
     /// <summary>
-    /// Create a new Equities websocket client.
+    /// Create a new Options websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
@@ -136,10 +138,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     }
     
     /// <summary>
-    /// Create a new Equities websocket client.
+    /// Create a new Options websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
+    /// <param name="onRefresh"></param>
+    /// <param name="onUnusualActivity"></param>
     public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity) : this(onTrade, onQuote, onRefresh, onUnusualActivity, Config.LoadConfig())
     {
     }
