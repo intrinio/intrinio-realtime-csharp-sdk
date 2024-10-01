@@ -14,7 +14,7 @@ public struct Trade
     private readonly UInt32 _size;
     private readonly UInt64 _timestamp;
     private readonly UInt64 _totalVolume;
-    private readonly string _qualifiers;
+    private readonly Conditions _qualifiers;
     private readonly Int32 _askPriceAtExecution;
     private readonly Int32 _bidPriceAtExecution;
     private readonly Int32 _underlyingPriceAtExecution;
@@ -28,7 +28,7 @@ public struct Trade
     public double UnderlyingPriceAtExecution { get { return (_underlyingPriceAtExecution == Int32.MaxValue) || (_underlyingPriceAtExecution == Int32.MinValue) ? Double.NaN : Helpers.ScaleInt32Price(_underlyingPriceAtExecution, _underlyingPriceType); } }
     public double Timestamp { get { return Helpers.ScaleTimestampToSeconds(_timestamp); } }
     public Exchange Exchange { get { return _exchange; } }
-    public string Qualifiers { get { return _qualifiers; } }
+    public Conditions Qualifiers { get { return _qualifiers; } }
 
     /// <summary>
     /// A 'Trade' is a unit of data representing an individual market trade event.
@@ -45,7 +45,7 @@ public struct Trade
     /// <param name="askPriceAtExecution">The dollar price of the best ask at execution.</param>
     /// <param name="bidPriceAtExecution">The dollar price of the best bid at execution.</param>
     /// <param name="underlyingPriceAtExecution">The dollar price of the underlying security at the time of execution.</param>
-    public Trade(string contract, Exchange exchange, byte priceType, byte underlyingPriceType, int price, UInt32 size, UInt64 timestamp, UInt64 totalVolume, string qualifiers, int askPriceAtExecution, int bidPriceAtExecution, int underlyingPriceAtExecution)
+    public Trade(string contract, Exchange exchange, byte priceType, byte underlyingPriceType, int price, UInt32 size, UInt64 timestamp, UInt64 totalVolume, Conditions qualifiers, int askPriceAtExecution, int bidPriceAtExecution, int underlyingPriceAtExecution)
     {
         
         _contract = contract;
@@ -97,14 +97,14 @@ public struct Trade
                        + ((UInt32)Contract[16] - zeroChar) * 10u 
                        + ((UInt32)Contract[17] - zeroChar) * 1u;
         
-        double part =   Convert.ToDouble((UInt32) Contract[18] - zeroChar) * 0.1D 
+        double part =  Convert.ToDouble((UInt32) Contract[18] - zeroChar) * 0.1D 
                      + Convert.ToDouble((UInt32) Contract[19] - zeroChar) * 0.01D 
                      + Convert.ToDouble((UInt32) Contract[20] - zeroChar) * 0.001D;
         
         return Convert.ToDouble(whole) + part;
     }
     
-    public static Trade CreateUnitTestObject(string contract, Exchange exchange, double price, UInt32 size, UInt64 nanoSecondsSinceUnixEpoch, UInt64 totalVolume, string qualifiers, double askPriceAtExecution, double bidPriceAtExecution, double underlyingPriceAtExecution)
+    public static Trade CreateUnitTestObject(string contract, Exchange exchange, double price, UInt32 size, UInt64 nanoSecondsSinceUnixEpoch, UInt64 totalVolume, Conditions qualifiers, double askPriceAtExecution, double bidPriceAtExecution, double underlyingPriceAtExecution)
     {
         byte priceType = (byte)4;
         int unscaledPrice = Convert.ToInt32(price * 10000.0);
