@@ -111,6 +111,8 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     {
         OnTrade = onTrade;
         OnQuote = onQuote;
+        OnRefresh = onRefresh;
+        OnUnusualActivity = onUnusualActivity;
         _config = config;
         
         if (ReferenceEquals(null, _config))
@@ -217,7 +219,6 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     #endregion //Public Methods
     
     #region Private Methods
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private string GetChannel(string symbol, bool tradesOnly)
     {
@@ -298,66 +299,178 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         return UnusualActivityMessageSize;
     }
 
+    private string FormatContract(ReadOnlySpan<byte> alternateFormattedChars)
+    {
+        //Transform from server format to normal format
+        //From this: AAPL_201016C100.00 or ABC_201016C100.003
+        //Patch: some upstream contracts now have 4 decimals. We are truncating the last decimal for now to fit in this format.
+        //To this:   AAPL__201016C00100000 or ABC___201016C00100003
+        //  strike: 5 whole digits, 3 decimal digits
+        
+        Span<byte> contractChars = stackalloc byte[21];
+        contractChars[0] = (byte)'_';
+        contractChars[1] = (byte)'_';
+        contractChars[2] = (byte)'_';
+        contractChars[3] = (byte)'_';
+        contractChars[4] = (byte)'_';
+        contractChars[5] = (byte)'_';
+        contractChars[6] = (byte)'2';
+        contractChars[7] = (byte)'2';
+        contractChars[8] = (byte)'0';
+        contractChars[9] = (byte)'1';
+        contractChars[10] = (byte)'0';
+        contractChars[11] = (byte)'1';
+        contractChars[12] = (byte)'C';
+        contractChars[13] = (byte)'0';
+        contractChars[14] = (byte)'0';
+        contractChars[15] = (byte)'0';
+        contractChars[16] = (byte)'0';
+        contractChars[17] = (byte)'0';
+        contractChars[18] = (byte)'0';
+        contractChars[19] = (byte)'0';
+        contractChars[20] = (byte)'0';
+
+        int underscoreIndex = alternateFormattedChars.IndexOf((byte)'_');
+        int decimalIndex = alternateFormattedChars.Slice(9).IndexOf((byte)'.') + 9; //ignore decimals in tickersymbol
+
+        alternateFormattedChars.Slice(0, underscoreIndex).CopyTo(contractChars); //copy symbol        
+        alternateFormattedChars.Slice(underscoreIndex + 1, 6).CopyTo(contractChars.Slice(6)); //copy date
+        alternateFormattedChars.Slice(underscoreIndex + 7, 1).CopyTo(contractChars.Slice(12)); //copy put/call
+        alternateFormattedChars.Slice(underscoreIndex + 8, decimalIndex - underscoreIndex - 8).CopyTo(contractChars.Slice(18 - (decimalIndex - underscoreIndex - 8))); //whole number copy
+        alternateFormattedChars.Slice(decimalIndex + 1, Math.Min(3, alternateFormattedChars.Length - decimalIndex - 1)).CopyTo(contractChars.Slice(18)); //decimal number copy. Truncate decimals over 3 digits for now.
+
+        return Encoding.ASCII.GetString(contractChars);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Exchange ParseExchange(char c)
+    {
+        switch (c)
+        {
+            case 'A':
+            case 'a':    
+                return Exchange.NYSE_AMERICAN;
+            case 'B':
+            case 'b':    
+                return Exchange.BOSTON;
+            case 'C':
+            case 'c':    
+                return Exchange.CBOE;
+            case 'D':
+            case 'd':    
+                return Exchange.MIAMI_EMERALD;
+            case 'E':
+            case 'e':    
+                return Exchange.BATS_EDGX;
+            case 'H':
+            case 'h':    
+                return Exchange.ISE_GEMINI;
+            case 'I':
+            case 'i':    
+                return Exchange.ISE;
+            case 'J':
+            case 'j':    
+                return Exchange.MERCURY;
+            case 'M':
+            case 'm':    
+                return Exchange.MIAMI;
+            case 'N':
+            case 'n':
+            case 'P':
+            case 'p':  
+                return Exchange.NYSE_ARCA;
+            case 'O':
+            case 'o':    
+                return Exchange.MIAMI_PEARL;
+            case 'Q':
+            case 'q':    
+                return Exchange.NASDAQ;
+            case 'S':
+            case 's':    
+                return Exchange.MIAX_SAPPHIRE;
+            case 'T':
+            case 't':    
+                return Exchange.NASDAQ_BX;
+            case 'U':
+            case 'u':    
+                return Exchange.MEMX;
+            case 'W':
+            case 'w':    
+                return Exchange.CBOE_C2;
+            case 'X':
+            case 'x':    
+                return Exchange.PHLX;
+            case 'Z':
+            case 'z':    
+                return Exchange.BATS_BZX;
+            default:
+                return Exchange.UNKNOWN;
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Trade ParseTrade(ReadOnlySpan<byte> bytes)
     {
-        throw new NotImplementedException();
-        //Trade
-        // (FormatContract(bytes.Slice(1, int bytes[0])),
-        //  ParseExchange(char(bytes[65])),
-        //  bytes[23],
-        //  bytes[24],
-        //  BitConverter.ToInt32(bytes.Slice(25, 4)),
-        //  BitConverter.ToUInt32(bytes.Slice(29, 4)),
-        //  BitConverter.ToUInt64(bytes.Slice(33, 8)),
-        //  BitConverter.ToUInt64(bytes.Slice(41, 8)),
-        //  struct(bytes[61], bytes[62], bytes[63], bytes[64]),
-        //  BitConverter.ToInt32(bytes.Slice(49, 4)),
-        //  BitConverter.ToInt32(bytes.Slice(53, 4)),
-        //  BitConverter.ToInt32(bytes.Slice(57, 4)))
+        Conditions conditions = new Conditions();
+        bytes.Slice(61, 4).CopyTo(conditions);
+        
+        return new Trade(FormatContract(bytes.Slice(1, (int)bytes[0])),
+            ParseExchange((char)bytes[65]),
+            bytes[23],
+            bytes[24],
+            BitConverter.ToInt32(bytes.Slice(25, 4)),
+            BitConverter.ToUInt32(bytes.Slice(29, 4)),
+            BitConverter.ToUInt64(bytes.Slice(33, 8)),
+            BitConverter.ToUInt64(bytes.Slice(41, 8)),
+            conditions,
+            BitConverter.ToInt32(bytes.Slice(49, 4)),
+            BitConverter.ToInt32(bytes.Slice(53, 4)),
+            BitConverter.ToInt32(bytes.Slice(57, 4))
+        );
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Quote ParseQuote(ReadOnlySpan<byte> bytes)
     {
-        throw new NotImplementedException();
-        //Quote
-        // (FormatContract(bytes.Slice(1, int bytes[0])),
-        //  bytes[23],
-        //  BitConverter.ToInt32(bytes.Slice(24, 4)),
-        //  BitConverter.ToUInt32(bytes.Slice(28, 4)),
-        //  BitConverter.ToInt32(bytes.Slice(32, 4)),
-        //  BitConverter.ToUInt32(bytes.Slice(36, 4)),
-        //  BitConverter.ToUInt64(bytes.Slice(40, 8)))
+        return new Quote(FormatContract(bytes.Slice(1, (int)bytes[0])),
+            bytes[23],
+            BitConverter.ToInt32(bytes.Slice(24, 4)),
+            BitConverter.ToUInt32(bytes.Slice(28, 4)),
+            BitConverter.ToInt32(bytes.Slice(32, 4)),
+            BitConverter.ToUInt32(bytes.Slice(36, 4)),
+            BitConverter.ToUInt64(bytes.Slice(40, 8))
+        );
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Refresh ParseRefresh(ReadOnlySpan<byte> bytes)
     {
-        throw new NotImplementedException();
-        //Refresh
-        // (FormatContract(bytes.Slice(1, int bytes[0])),
-        //  bytes[23],
-        //  BitConverter.ToUInt32(bytes.Slice(24, 4)),
-        //  BitConverter.ToInt32(bytes.Slice(28, 4)),
-        //  BitConverter.ToInt32(bytes.Slice(32, 4)),
-        //  BitConverter.ToInt32(bytes.Slice(36, 4)),
-        //  BitConverter.ToInt32(bytes.Slice(40, 4)))
+        return new Refresh(FormatContract(bytes.Slice(1, (int)bytes[0])), 
+            bytes[23],
+            BitConverter.ToUInt32(bytes.Slice(24, 4)),
+            BitConverter.ToInt32(bytes.Slice(28, 4)),
+            BitConverter.ToInt32(bytes.Slice(32, 4)),
+            BitConverter.ToInt32(bytes.Slice(36, 4)),
+            BitConverter.ToInt32(bytes.Slice(40, 4))
+        );
     }
     
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private UnusualActivity ParseUnusualActivity(ReadOnlySpan<byte> bytes)
     {
-        throw new NotImplementedException();
-        //UnusualActivity
-        // (FormatContract(bytes.Slice(1, int bytes[0])),
-        //  enum<UAType> (int bytes[22]),
-        //  enum<UASentiment> (int bytes[23]),
-        //  bytes[24],
-        //  bytes[25],             
-        //  BitConverter.ToUInt64(bytes.Slice(26, 8)),
-        //  BitConverter.ToUInt32(bytes.Slice(34, 4)),
-        //  BitConverter.ToInt32(bytes.Slice(38, 4)),
-        //  BitConverter.ToInt32(bytes.Slice(42, 4)),
-        //  BitConverter.ToInt32(bytes.Slice(46, 4)),
-        //  BitConverter.ToInt32(bytes.Slice(50, 4)),
-        //  BitConverter.ToUInt64(bytes.Slice(54, 8)))
+        return new UnusualActivity(FormatContract(bytes.Slice(1, (int)bytes[0])),
+            (UAType)((int)bytes[22]),
+            (UASentiment)((int)bytes[23]),
+            bytes[24],
+            bytes[25],             
+            BitConverter.ToUInt64(bytes.Slice(26, 8)),
+            BitConverter.ToUInt32(bytes.Slice(34, 4)),
+            BitConverter.ToInt32(bytes.Slice(38, 4)),
+            BitConverter.ToInt32(bytes.Slice(42, 4)),
+            BitConverter.ToInt32(bytes.Slice(46, 4)),
+            BitConverter.ToInt32(bytes.Slice(50, 4)),
+            BitConverter.ToUInt64(bytes.Slice(54, 8))
+        );
     }
 
     protected override void HandleMessage(ReadOnlySpan<byte> bytes)
