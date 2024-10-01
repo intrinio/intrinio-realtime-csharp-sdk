@@ -9,9 +9,11 @@ public interface IOptionsWebSocketClient
     public Action<Quote> OnQuote { set; }
     public Task Join();
     public Task Join(string channel, bool? tradesOnly);
+    public Task JoinLobby(bool? tradesOnly);
     public Task Join(string[] channels, bool? tradesOnly);
     public Task Leave();
     public Task Leave(string channel);
+    public Task LeaveLobby();
     public Task Leave(string[] channels);
     public Task Stop();
     public Task Start();

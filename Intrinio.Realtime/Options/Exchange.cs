@@ -21,5 +21,5 @@ public enum Exchange
     MEMX = 'U',
     CBOE_C2 = 'W',
     PHLX = 'X',
-    BATS_BZX = 'Z',
+    BATS_BZX = 'Z'
 }
