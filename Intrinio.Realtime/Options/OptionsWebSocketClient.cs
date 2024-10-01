@@ -13,6 +13,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     #region Data Members
 
     private const string LobbyName = "lobby";
+    private const uint MaxMessageSize = 75u;
+    private const int MessageTypeIndex = 22;
+    private const int TradeMessageSize = 72;
+    private const int QuoteMessageSize = 52;
+    private const int RefreshMessageSize = 52;
+    private const int UnusualActivityMessageSize = 74;
     private bool _useOnTrade;
     private bool _useOnQuote;
     private bool _useOnRefresh;
@@ -86,7 +92,8 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     private readonly string _logPrefix;
     private const string MessageVersionHeaderKey = "UseNewOptionsFormat";
     private const string MessageVersionHeaderValue = "v2";
-    private const uint MaxMessageSize = 64u;
+    private const string DelayHeaderKey = "delay";
+    private const string DelayHeaderValue = "true";
     private const string ChannelFormat = "{0}|TradesOnly|{1}";
     #endregion //Data Members
     
@@ -239,7 +246,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         switch (_config.Provider)
         {
             case Provider.OPRA:
-                return $"https://realtime-mx.intrinio.com/auth?api_key={_config.ApiKey}";
+                return $"https://realtime-options.intrinio.com/auth?api_key={_config.ApiKey}";
                 break;
             case Provider.MANUAL:
                 return $"http://{_config.IPAddress}/auth?api_key={_config.ApiKey}";
@@ -252,13 +259,14 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
 
     protected override string GetWebSocketUrl(string token)
     {
+        string delayedPart = _config.Delayed ? "&delayed=true" : String.Empty;
         switch (_config.Provider)
         {
             case Provider.OPRA:
-                return $"wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
+                return $"wss://realtime-options.intrinio.com/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
                 break;
             case Provider.MANUAL:
-                return $"ws://{_config.IPAddress}/socket/websocket?vsn=1.0.0&token={token}";
+                return $"ws://{_config.IPAddress}/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
                 break;
             default:
                 throw new ArgumentException("Provider not specified!");
@@ -270,83 +278,131 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     {
         List<KeyValuePair<string, string>> headers = new List<KeyValuePair<string, string>>();
         headers.Add(new KeyValuePair<string, string>(MessageVersionHeaderKey, MessageVersionHeaderValue));
+        if (_config.Delayed)
+            headers.Add(new KeyValuePair<string, string>(DelayHeaderKey, DelayHeaderValue));
         return headers;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected override int GetNextChunkLength(ReadOnlySpan<byte> bytes)
+    {
+        byte msgType = bytes[MessageTypeIndex]; //in the bytes, symbol length is first, then symbol, then msg type.
+
+        //using if-else vs switch for hotpathing
+        if (msgType == 1u)
+            return QuoteMessageSize;
+        if (msgType == 0u)
+            return TradeMessageSize;
+        if (msgType == 2u)
+            return RefreshMessageSize;
+        return UnusualActivityMessageSize;
     }
 
     private Trade ParseTrade(ReadOnlySpan<byte> bytes)
     {
         throw new NotImplementedException();
-        // int symbolLength = Convert.ToInt32(bytes[2]);
-        // int conditionLength = Convert.ToInt32(bytes[26 + symbolLength]);
-        // string symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength));
-        // double price = Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4)));
-        // UInt32 size = BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4));
-        // DateTime timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL));
-        // //SubProvider subProvider = (SubProvider)((int)bytes[3 + symbolLength]);
-        // char marketCenter = BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2));
-        // string condition = conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(27 + symbolLength, conditionLength)) : String.Empty;
-        // UInt64 totalVolume = Convert.ToUInt64(BitConverter.ToUInt32(bytes.Slice(22 + symbolLength, 4)));
-        //
-        // return new Trade(symbol, price, size, totalVolume, timestamp, subProvider, marketCenter, condition);
+        //Trade
+        // (FormatContract(bytes.Slice(1, int bytes[0])),
+        //  ParseExchange(char(bytes[65])),
+        //  bytes[23],
+        //  bytes[24],
+        //  BitConverter.ToInt32(bytes.Slice(25, 4)),
+        //  BitConverter.ToUInt32(bytes.Slice(29, 4)),
+        //  BitConverter.ToUInt64(bytes.Slice(33, 8)),
+        //  BitConverter.ToUInt64(bytes.Slice(41, 8)),
+        //  struct(bytes[61], bytes[62], bytes[63], bytes[64]),
+        //  BitConverter.ToInt32(bytes.Slice(49, 4)),
+        //  BitConverter.ToInt32(bytes.Slice(53, 4)),
+        //  BitConverter.ToInt32(bytes.Slice(57, 4)))
     }
 
     private Quote ParseQuote(ReadOnlySpan<byte> bytes)
     {
         throw new NotImplementedException();
-        // int symbolLength = Convert.ToInt32(bytes[2]);
-        // int conditionLength = Convert.ToInt32(bytes[22 + symbolLength]);
-        // QuoteType type = (QuoteType)((int)(bytes[0]));
-        // string symbol = Encoding.ASCII.GetString(bytes.Slice(3, symbolLength));
-        // double price = Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4)));
-        // UInt32 size = BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4));
-        // DateTime timestamp = DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL));
-        // //SubProvider subProvider = (SubProvider)((int)(bytes[3 + symbolLength]));
-        // char marketCenter = BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2));
-        // string condition = (conditionLength > 0) ? Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) : String.Empty;
-        //
-        // return new Quote(type, symbol, price, size, timestamp, subProvider, marketCenter, condition);
+        //Quote
+        // (FormatContract(bytes.Slice(1, int bytes[0])),
+        //  bytes[23],
+        //  BitConverter.ToInt32(bytes.Slice(24, 4)),
+        //  BitConverter.ToUInt32(bytes.Slice(28, 4)),
+        //  BitConverter.ToInt32(bytes.Slice(32, 4)),
+        //  BitConverter.ToUInt32(bytes.Slice(36, 4)),
+        //  BitConverter.ToUInt64(bytes.Slice(40, 8)))
+    }
+
+    private Refresh ParseRefresh(ReadOnlySpan<byte> bytes)
+    {
+        throw new NotImplementedException();
+        //Refresh
+        // (FormatContract(bytes.Slice(1, int bytes[0])),
+        //  bytes[23],
+        //  BitConverter.ToUInt32(bytes.Slice(24, 4)),
+        //  BitConverter.ToInt32(bytes.Slice(28, 4)),
+        //  BitConverter.ToInt32(bytes.Slice(32, 4)),
+        //  BitConverter.ToInt32(bytes.Slice(36, 4)),
+        //  BitConverter.ToInt32(bytes.Slice(40, 4)))
+    }
+    
+    private UnusualActivity ParseUnusualActivity(ReadOnlySpan<byte> bytes)
+    {
+        throw new NotImplementedException();
+        //UnusualActivity
+        // (FormatContract(bytes.Slice(1, int bytes[0])),
+        //  enum<UAType> (int bytes[22]),
+        //  enum<UASentiment> (int bytes[23]),
+        //  bytes[24],
+        //  bytes[25],             
+        //  BitConverter.ToUInt64(bytes.Slice(26, 8)),
+        //  BitConverter.ToUInt32(bytes.Slice(34, 4)),
+        //  BitConverter.ToInt32(bytes.Slice(38, 4)),
+        //  BitConverter.ToInt32(bytes.Slice(42, 4)),
+        //  BitConverter.ToInt32(bytes.Slice(46, 4)),
+        //  BitConverter.ToInt32(bytes.Slice(50, 4)),
+        //  BitConverter.ToUInt64(bytes.Slice(54, 8)))
     }
 
     protected override void HandleMessage(ReadOnlySpan<byte> bytes)
     { 
-        MessageType msgType = (MessageType)Convert.ToInt32(bytes[0]);
-        switch (msgType)
+        byte msgType = bytes[MessageTypeIndex];
+        
+        if (msgType == 1u && _useOnQuote)
         {
-            case MessageType.Quote:
+            Quote quote = ParseQuote(bytes);
+            Interlocked.Increment(ref _dataQuoteCount);
+            try { _onQuote.Invoke(quote); }
+            catch (Exception e)
             {
-                if (_useOnQuote)
-                {
-                    Quote quote = ParseQuote(bytes);
-                    Interlocked.Increment(ref _dataQuoteCount);
-                    try { _onQuote.Invoke(quote); }
-                    catch (Exception e)
-                    {
-                        LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
-                    }
-                }
-                break;
+                LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
             }
-            case MessageType.Trade:
+        }
+        if (msgType == 0u && _useOnTrade)
+        {
+            Trade trade = ParseTrade(bytes);
+            Interlocked.Increment(ref _dataTradeCount);
+            try { _onTrade.Invoke(trade); }
+            catch (Exception e)
             {
-                if (_useOnTrade)
-                {
-                    Trade trade = ParseTrade(bytes);
-                    Interlocked.Increment(ref _dataTradeCount);
-                    try { _onTrade.Invoke(trade); }
-                    catch (Exception e)
-                    {
-                        LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
-                    }
-                }
-                break;
+                LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
             }
-            case MessageType.Refresh:
-                throw new NotImplementedException(); //TODO
-            case MessageType.UnusualActivity:
-                throw new NotImplementedException(); //TODO
-            default:
-                LogMessage(LogLevel.WARNING, "Invalid MessageType: {0}", new object[] {Convert.ToInt32(bytes[0])});
-                break;
+        }
+        if (msgType == 2u && _useOnRefresh)
+        {
+            Refresh refresh = ParseRefresh(bytes);
+            Interlocked.Increment(ref _dataRefreshCount);
+            try { _onRefresh.Invoke(refresh); }
+            catch (Exception e)
+            {
+                LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnRefresh: {0}; {1}", new object[]{e.Message, e.StackTrace});
+            }
+        }
+        if (msgType > 2u && _useOnUnusualActivity)
+        {
+            UnusualActivity unusualActivity = ParseUnusualActivity(bytes);
+            Interlocked.Increment(ref _dataUnusualActivityCount);
+            try { _onUnusualActivity.Invoke(unusualActivity); }
+            catch (Exception e)
+            {
+                LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnUnusualActivity: {0}; {1}", new object[]{e.Message, e.StackTrace});
+            }
         }
     }
     

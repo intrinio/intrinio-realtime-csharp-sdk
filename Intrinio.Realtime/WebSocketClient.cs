@@ -254,6 +254,7 @@ public abstract class WebSocketClient
     protected abstract byte[] MakeJoinMessage(string channel);
     protected abstract byte[] MakeLeaveMessage(string channel);
     protected abstract void HandleMessage(ReadOnlySpan<byte> bytes);
+    protected abstract int GetNextChunkLength(ReadOnlySpan<byte> bytes);
     
     #endregion //Abstract Methods
     
@@ -374,7 +375,7 @@ public abstract class WebSocketClient
                         int msgLength = 1; //default value in case corrupt array so we don't reprocess same bytes over and over. 
                         try
                         {
-                            msgLength = Convert.ToInt32(datum[startIndex + 1]);
+                            msgLength = GetNextChunkLength(datum.Slice(startIndex));
                             ReadOnlySpan<byte> chunk = datum.Slice(startIndex, msgLength);
                             HandleMessage(chunk);
                         }

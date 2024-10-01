@@ -231,6 +231,12 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected override int GetNextChunkLength(ReadOnlySpan<byte> bytes)
+    {
+        return Convert.ToInt32(bytes[1]);
+    }
+
     protected override List<KeyValuePair<string, string>> GetCustomSocketHeaders()
     {
         List<KeyValuePair<string, string>> headers = new List<KeyValuePair<string, string>>();
