@@ -205,7 +205,7 @@ public class CandleStickClient
         {
             try
             {
-                TradeCandleStick historical = GetHistoricalTradeCandleStick(freshCandle.Symbol, freshCandle.OpenTimestamp, freshCandle.CloseTimestamp, freshCandle.Interval);
+                TradeCandleStick historical = GetHistoricalTradeCandleStick(freshCandle.Contract, freshCandle.OpenTimestamp, freshCandle.CloseTimestamp, freshCandle.Interval);
                 if (ReferenceEquals(historical,null))
                     return freshCandle;
                 historical.MarkIncomplete();
@@ -231,7 +231,7 @@ public class CandleStickClient
         {
             try
             {
-                QuoteCandleStick historical = GetHistoricalQuoteCandleStick.Invoke(freshCandle.Symbol, freshCandle.OpenTimestamp, freshCandle.CloseTimestamp, freshCandle.QuoteType, freshCandle.Interval);
+                QuoteCandleStick historical = GetHistoricalQuoteCandleStick.Invoke(freshCandle.Contract, freshCandle.OpenTimestamp, freshCandle.CloseTimestamp, freshCandle.QuoteType, freshCandle.Interval);
                 if (ReferenceEquals(historical,null))
                     return freshCandle;
                 historical.MarkIncomplete();
@@ -484,7 +484,7 @@ public class CandleStickClient
                         {
                             try
                             {
-                                TradeCandleStick historical = GetHistoricalTradeCandleStick.Invoke(bucket.TradeCandleStick.Symbol, bucket.TradeCandleStick.OpenTimestamp, bucket.TradeCandleStick.CloseTimestamp, bucket.TradeCandleStick.Interval);
+                                TradeCandleStick historical = GetHistoricalTradeCandleStick.Invoke(bucket.TradeCandleStick.Contract, bucket.TradeCandleStick.OpenTimestamp, bucket.TradeCandleStick.CloseTimestamp, bucket.TradeCandleStick.Interval);
                                 if (ReferenceEquals(historical,null))
                                 {
                                     bucket.TradeCandleStick.MarkComplete();
@@ -516,7 +516,7 @@ public class CandleStickClient
                         {
                             try
                             {
-                                QuoteCandleStick historical = GetHistoricalQuoteCandleStick.Invoke(bucket.AskCandleStick.Symbol, bucket.AskCandleStick.OpenTimestamp, bucket.AskCandleStick.CloseTimestamp, bucket.AskCandleStick.QuoteType, bucket.AskCandleStick.Interval);
+                                QuoteCandleStick historical = GetHistoricalQuoteCandleStick.Invoke(bucket.AskCandleStick.Contract, bucket.AskCandleStick.OpenTimestamp, bucket.AskCandleStick.CloseTimestamp, bucket.AskCandleStick.QuoteType, bucket.AskCandleStick.Interval);
                                 if (ReferenceEquals(historical,null))
                                 {
                                     bucket.AskCandleStick.MarkComplete();
@@ -549,7 +549,7 @@ public class CandleStickClient
                         {
                             try
                             {
-                                QuoteCandleStick historical = GetHistoricalQuoteCandleStick.Invoke(bucket.BidCandleStick.Symbol, bucket.BidCandleStick.OpenTimestamp, bucket.BidCandleStick.CloseTimestamp, bucket.BidCandleStick.QuoteType, bucket.BidCandleStick.Interval);
+                                QuoteCandleStick historical = GetHistoricalQuoteCandleStick.Invoke(bucket.BidCandleStick.Contract, bucket.BidCandleStick.OpenTimestamp, bucket.BidCandleStick.CloseTimestamp, bucket.BidCandleStick.QuoteType, bucket.BidCandleStick.Interval);
                                 if (ReferenceEquals(historical,null))
                                 {
                                     bucket.BidCandleStick.MarkComplete();

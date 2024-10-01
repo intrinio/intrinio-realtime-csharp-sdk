@@ -1,4 +1,4 @@
-namespace Intrinio.Realtime.Equities;
+namespace Intrinio.Realtime;
 
 public enum IntervalType
 {

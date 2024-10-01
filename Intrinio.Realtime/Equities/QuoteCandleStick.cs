@@ -2,76 +2,32 @@ namespace Intrinio.Realtime.Equities;
 
 using System;
 
-public class QuoteCandleStick :IEquatable<QuoteCandleStick>, IComparable, IComparable<QuoteCandleStick>
+public class QuoteCandleStick : CandleStick, IEquatable<QuoteCandleStick>, IComparable, IComparable<QuoteCandleStick>
 {
     private readonly string _symbol;
-    private readonly double _openTimestamp;
-    private readonly double _closeTimestamp;
     private readonly QuoteType _quoteType;
-    private readonly IntervalType _interval;
     
     public string Symbol
     {
         get { return _symbol; }
     }
-    public double High { get; set; }
-    public double Low { get; set; }
-    public double Close { get; set; }
-    public double Open { get; set; }
-
     public QuoteType QuoteType
     {
         get { return _quoteType; }
     }
-    public double OpenTimestamp
-    {
-        get { return _openTimestamp; }
-    }
-    public double CloseTimestamp
-    {
-        get { return _closeTimestamp; }
-    }
-    public double FirstTimestamp { get; set; }
-    public double LastTimestamp { get; set; }
-    public bool Complete { get; set; }
-    public double Change { get; set; }
-    public IntervalType Interval
-    {
-        get { return _interval; }
-    }
-
-    public QuoteCandleStick(string symbol, double price, QuoteType quoteType, double openTimestamp, double closeTimestamp, IntervalType interval, double quoteTime)
+    
+    public QuoteCandleStick(string symbol, UInt32 volume, double price, QuoteType quoteType, double openTimestamp, double closeTimestamp, IntervalType interval, double quoteTime)
+        : base(volume, price, openTimestamp, closeTimestamp, interval, quoteTime)
     {
         _symbol = symbol;
-        High = price;
-        Low = price;
-        Close = price;
-        Open = price;
         _quoteType = quoteType;
-        _openTimestamp = openTimestamp;
-        _closeTimestamp = closeTimestamp;
-        FirstTimestamp = quoteTime;
-        LastTimestamp = quoteTime;
-        Complete = false;
-        Change = 0.0;
-        _interval = interval;
     }
     
-    public QuoteCandleStick(string symbol, double high, double low, double closePrice, double openPrice, QuoteType quoteType, double openTimestamp, double closeTimestamp, double firstTimestamp, double lastTimestamp, bool complete, double change, IntervalType interval)
+    public QuoteCandleStick(string symbol, UInt32 volume, double high, double low, double closePrice, double openPrice, QuoteType quoteType, double openTimestamp, double closeTimestamp, double firstTimestamp, double lastTimestamp, bool complete, double average, double change, IntervalType interval)
+        : base(volume, high, low, closePrice, openPrice, openTimestamp, closeTimestamp, firstTimestamp, lastTimestamp, complete, average, change, interval)
     {
         _symbol = symbol;
-        High = high;
-        Low = low;
-        Close = closePrice;
-        Open = openPrice;
         _quoteType = quoteType;
-        _openTimestamp = openTimestamp;
-        _closeTimestamp = closeTimestamp;
-        FirstTimestamp = firstTimestamp;
-        LastTimestamp = lastTimestamp;
-        Complete = complete;
-        Change = change;
-        _interval = interval;
     }
 
     public override bool Equals(object other)
@@ -169,37 +125,5 @@ public class QuoteCandleStick :IEquatable<QuoteCandleStick>, IComparable, ICompa
     public override string ToString()
     {
         return $"QuoteCandleStick (Symbol: {Symbol}, QuoteType: {QuoteType.ToString()}, High: {High.ToString("f3")}, Low: {Low.ToString("f3")}, Close: {Close.ToString("f3")}, Open: {Open.ToString("f3")}, OpenTimestamp: {OpenTimestamp.ToString("f6")}, CloseTimestamp: {CloseTimestamp.ToString("f6")}, Change: {Change.ToString("f6")}, Complete: {Complete.ToString()})";
-    }
-
-    public void Merge(QuoteCandleStick candle)
-    {
-        High = High > candle.High ? High : candle.High;
-        Low = Low < candle.Low ? Low : candle.Low;
-        Close = LastTimestamp > candle.LastTimestamp ? Close : candle.Close;
-        Open = FirstTimestamp < candle.FirstTimestamp ? Open : candle.Open;
-        FirstTimestamp = candle.FirstTimestamp < FirstTimestamp ? candle.FirstTimestamp : FirstTimestamp;
-        LastTimestamp = candle.LastTimestamp > LastTimestamp ? candle.LastTimestamp : LastTimestamp;
-        Change = (Close - Open) / Open;
-    }
-            
-    internal void Update(double price, double time)
-    {
-        High = price > High ? price : High;
-        Low = price < Low ? price : Low;
-        Close = time > LastTimestamp ? price : Close;
-        Open = time < FirstTimestamp ? price : Open;
-        FirstTimestamp = time < FirstTimestamp ? time : FirstTimestamp;
-        LastTimestamp = time > LastTimestamp ? time : LastTimestamp;
-        Change = (Close - Open) / Open;
-    }
-
-    internal void MarkComplete()
-    {
-        Complete = true;
-    }
-
-    internal void MarkIncomplete()
-    {
-        Complete = false;
     }
 }

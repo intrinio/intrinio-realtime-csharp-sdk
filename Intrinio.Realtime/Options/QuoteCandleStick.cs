@@ -1,77 +1,34 @@
+using System.Globalization;
+
 namespace Intrinio.Realtime.Options;
 
 using System;
 
-public class QuoteCandleStick :IEquatable<QuoteCandleStick>, IComparable, IComparable<QuoteCandleStick>
+public class QuoteCandleStick : CandleStick, IEquatable<QuoteCandleStick>, IComparable, IComparable<QuoteCandleStick>
 {
-    private readonly string _symbol;
-    private readonly double _openTimestamp;
-    private readonly double _closeTimestamp;
+    private readonly string _contract;
     private readonly QuoteType _quoteType;
-    private readonly IntervalType _interval;
-    
-    public string Symbol
+    public string Contract
     {
-        get { return _symbol; }
+        get { return _contract; }
     }
-    public double High { get; set; }
-    public double Low { get; set; }
-    public double Close { get; set; }
-    public double Open { get; set; }
-
     public QuoteType QuoteType
     {
         get { return _quoteType; }
     }
-    public double OpenTimestamp
+    
+    public QuoteCandleStick(string contract, UInt32 volume, double price, QuoteType quoteType, double openTimestamp, double closeTimestamp, IntervalType interval, double quoteTime)
+        :base(volume, price, openTimestamp, closeTimestamp, interval, quoteTime)
     {
-        get { return _openTimestamp; }
-    }
-    public double CloseTimestamp
-    {
-        get { return _closeTimestamp; }
-    }
-    public double FirstTimestamp { get; set; }
-    public double LastTimestamp { get; set; }
-    public bool Complete { get; set; }
-    public double Change { get; set; }
-    public IntervalType Interval
-    {
-        get { return _interval; }
-    }
-
-    public QuoteCandleStick(string symbol, double price, QuoteType quoteType, double openTimestamp, double closeTimestamp, IntervalType interval, double quoteTime)
-    {
-        _symbol = symbol;
-        High = price;
-        Low = price;
-        Close = price;
-        Open = price;
+        _contract = contract;
         _quoteType = quoteType;
-        _openTimestamp = openTimestamp;
-        _closeTimestamp = closeTimestamp;
-        FirstTimestamp = quoteTime;
-        LastTimestamp = quoteTime;
-        Complete = false;
-        Change = 0.0;
-        _interval = interval;
     }
     
-    public QuoteCandleStick(string symbol, double high, double low, double closePrice, double openPrice, QuoteType quoteType, double openTimestamp, double closeTimestamp, double firstTimestamp, double lastTimestamp, bool complete, double change, IntervalType interval)
+    public QuoteCandleStick(string contract, UInt32 volume, double high, double low, double closePrice, double openPrice, QuoteType quoteType, double openTimestamp, double closeTimestamp, double firstTimestamp, double lastTimestamp, bool complete, double average, double change, IntervalType interval)
+        : base(volume, high, low, closePrice, openPrice, openTimestamp, closeTimestamp, firstTimestamp, lastTimestamp, complete, average, change, interval)
     {
-        _symbol = symbol;
-        High = high;
-        Low = low;
-        Close = closePrice;
-        Open = openPrice;
+        _contract = contract;
         _quoteType = quoteType;
-        _openTimestamp = openTimestamp;
-        _closeTimestamp = closeTimestamp;
-        FirstTimestamp = firstTimestamp;
-        LastTimestamp = lastTimestamp;
-        Complete = complete;
-        Change = change;
-        _interval = interval;
     }
 
     public override bool Equals(object other)
@@ -81,7 +38,7 @@ public class QuoteCandleStick :IEquatable<QuoteCandleStick>, IComparable, ICompa
                    (!(ReferenceEquals(other, null)))
                    && (!(ReferenceEquals(this, other)))
                    && (other is QuoteCandleStick)
-                   && (Symbol.Equals(((QuoteCandleStick)other).Symbol))
+                   && (Contract.Equals(((QuoteCandleStick)other).Contract))
                    && (Interval.Equals(((QuoteCandleStick)other).Interval))
                    && (QuoteType.Equals(((QuoteCandleStick)other).QuoteType))
                    && (OpenTimestamp.Equals(((QuoteCandleStick)other).OpenTimestamp))
@@ -90,7 +47,7 @@ public class QuoteCandleStick :IEquatable<QuoteCandleStick>, IComparable, ICompa
 
     public override int GetHashCode()
     {
-        return Symbol.GetHashCode() ^ Interval.GetHashCode() ^ OpenTimestamp.GetHashCode() ^ QuoteType.GetHashCode();
+        return Contract.GetHashCode() ^ Interval.GetHashCode() ^ OpenTimestamp.GetHashCode() ^ QuoteType.GetHashCode();
     }
 
     public bool Equals(QuoteCandleStick other)
@@ -99,7 +56,7 @@ public class QuoteCandleStick :IEquatable<QuoteCandleStick>, IComparable, ICompa
                || (
                    (!(ReferenceEquals(other, null)))
                    && (!(ReferenceEquals(this, other)))
-                   && (Symbol.Equals(other.Symbol))
+                   && (Contract.Equals(other.Contract))
                    && (Interval.Equals(other.Interval))
                    && (QuoteType.Equals(other.QuoteType))
                    && (OpenTimestamp.Equals(other.OpenTimestamp))
@@ -116,7 +73,7 @@ public class QuoteCandleStick :IEquatable<QuoteCandleStick>, IComparable, ICompa
                 true => 1,
                 false => (other is QuoteCandleStick) switch
                 {
-                    true => Symbol.CompareTo(((QuoteCandleStick)other).Symbol) switch
+                    true => Contract.CompareTo(((QuoteCandleStick)other).Contract) switch
                             {
                                 < 0 => -1,
                                 > 0 => 1,
@@ -146,7 +103,7 @@ public class QuoteCandleStick :IEquatable<QuoteCandleStick>, IComparable, ICompa
             false => Object.ReferenceEquals(other, null) switch
             {
                 true => 1,
-                false => Symbol.CompareTo(other.Symbol) switch
+                false => Contract.CompareTo(other.Contract) switch
                 {
                     < 0 => -1,
                     > 0 => 1,
@@ -168,38 +125,43 @@ public class QuoteCandleStick :IEquatable<QuoteCandleStick>, IComparable, ICompa
 
     public override string ToString()
     {
-        return $"QuoteCandleStick (Symbol: {Symbol}, QuoteType: {QuoteType.ToString()}, High: {High.ToString("f3")}, Low: {Low.ToString("f3")}, Close: {Close.ToString("f3")}, Open: {Open.ToString("f3")}, OpenTimestamp: {OpenTimestamp.ToString("f6")}, CloseTimestamp: {CloseTimestamp.ToString("f6")}, Change: {Change.ToString("f6")}, Complete: {Complete.ToString()})";
+        return $"QuoteCandleStick (Contract: {Contract}, QuoteType: {QuoteType.ToString()}, High: {High.ToString("f3")}, Low: {Low.ToString("f3")}, Close: {Close.ToString("f3")}, Open: {Open.ToString("f3")}, OpenTimestamp: {OpenTimestamp.ToString("f6")}, CloseTimestamp: {CloseTimestamp.ToString("f6")}, Change: {Change.ToString("f6")}, Complete: {Complete.ToString()})";
+    }
+    
+    public string GetUnderlyingSymbol()
+    {
+        return Contract.Substring(0, 6).TrimEnd('_');
     }
 
-    public void Merge(QuoteCandleStick candle)
+    public DateTime GetExpirationDate()
     {
-        High = High > candle.High ? High : candle.High;
-        Low = Low < candle.Low ? Low : candle.Low;
-        Close = LastTimestamp > candle.LastTimestamp ? Close : candle.Close;
-        Open = FirstTimestamp < candle.FirstTimestamp ? Open : candle.Open;
-        FirstTimestamp = candle.FirstTimestamp < FirstTimestamp ? candle.FirstTimestamp : FirstTimestamp;
-        LastTimestamp = candle.LastTimestamp > LastTimestamp ? candle.LastTimestamp : LastTimestamp;
-        Change = (Close - Open) / Open;
-    }
-            
-    internal void Update(double price, double time)
-    {
-        High = price > High ? price : High;
-        Low = price < Low ? price : Low;
-        Close = time > LastTimestamp ? price : Close;
-        Open = time < FirstTimestamp ? price : Open;
-        FirstTimestamp = time < FirstTimestamp ? time : FirstTimestamp;
-        LastTimestamp = time > LastTimestamp ? time : LastTimestamp;
-        Change = (Close - Open) / Open;
+        return DateTime.ParseExact(Contract.Substring(6, 6), "yyMMdd", CultureInfo.InvariantCulture);
     }
 
-    internal void MarkComplete()
+    public bool IsCall()
     {
-        Complete = true;
+        return Contract[12] == 'C';
+    }
+    
+    public bool IsPut()
+    {
+        return Contract[12] == 'P';
     }
 
-    internal void MarkIncomplete()
+    public double GetStrikePrice()
     {
-        Complete = false;
+        const UInt32 zeroChar = (UInt32)'0';
+        
+        UInt32 whole =   ((UInt32)Contract[13] - zeroChar) * 10_000u
+                         + ((UInt32)Contract[14] - zeroChar) * 1_000u
+                         + ((UInt32)Contract[15] - zeroChar) * 100u
+                         + ((UInt32)Contract[16] - zeroChar) * 10u 
+                         + ((UInt32)Contract[17] - zeroChar) * 1u;
+        
+        double part =   Convert.ToDouble((UInt32) Contract[18] - zeroChar) * 0.1D 
+                        + Convert.ToDouble((UInt32) Contract[19] - zeroChar) * 0.01D 
+                        + Convert.ToDouble((UInt32) Contract[20] - zeroChar) * 0.001D;
+        
+        return Convert.ToDouble(whole) + part;
     }
 }
