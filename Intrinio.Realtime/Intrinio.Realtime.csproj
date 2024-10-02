@@ -9,10 +9,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Folder Include="Composite\" />
-    </ItemGroup>
-
-    <ItemGroup>
       <Content Update="Equities\config.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
