@@ -45,7 +45,7 @@ public class Config
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal string TranslateContract(string contract)
+    internal static string TranslateContract(string contract)
     {
         if ((contract.Length <= 9) || (contract.IndexOf(".")>=9))
         {

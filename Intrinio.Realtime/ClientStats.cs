@@ -27,48 +27,21 @@ public class ClientStats
         _overflowCount = overflowCount;
     }
 
-    public UInt64 SocketDataMessages()
-    {
-        return _socketDataMessages;
-    }
-    
-    public UInt64 SocketTextMessages()
-    {
-        return _socketTextMessages;
-    }
-    
-    public int QueueDepth()
-    {
-        return _queueDepth;
-    }
-    
-    public int QueueCapacity()
-    {
-        return _queueCapacity;
-    }
-    
-    public int OverflowQueueDepth()
-    {
-        return _overflowQueueDepth;
-    }
-    
-    public int OverflowQueueCapacity()
-    {
-        return _overflowQueueCapacity;
-    }
-    
-    public UInt64 EventCount()
-    {
-        return _eventCount;
-    }
+    public UInt64 SocketDataMessages { get { return _socketDataMessages; } }
 
-    public int DroppedCount()
-    {
-        return _droppedCount;
-    }
+    public UInt64 SocketTextMessages { get { return _socketTextMessages; } }
+    
+    public int QueueDepth { get { return _queueDepth; } }
+    
+    public int QueueCapacity { get { return _queueCapacity; } }
+    
+    public int OverflowQueueDepth { get { return _overflowQueueDepth; } }
+    
+    public int OverflowQueueCapacity { get { return _overflowQueueCapacity; } }
+    
+    public UInt64 EventCount { get { return _eventCount; } }
 
-    public int OverflowCount()
-    {
-        return _overflowCount;
-    }
+    public int DroppedCount { get { return _droppedCount; } }
+
+    public int OverflowCount { get { return _overflowCount; } }
 }

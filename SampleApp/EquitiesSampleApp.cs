@@ -89,13 +89,13 @@ public class EquitiesSampleApp
 		IEquitiesWebSocketClient client = (IEquitiesWebSocketClient) obj;
 		ClientStats stats = client.GetStats();
 		Log("Socket Stats - Data Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, Individual Events: {6}, Trades: {7}, Quotes: {8}",
-			stats.SocketDataMessages(),
-			stats.SocketTextMessages(),
-			(stats.QueueDepth() * 100) / stats.QueueCapacity(),
-			(stats.OverflowQueueDepth() * 100) / stats.OverflowQueueCapacity(),
-			stats.DroppedCount(),
-			stats.OverflowCount(),
-			stats.EventCount(),
+			stats.SocketDataMessages,
+			stats.SocketTextMessages,
+			(stats.QueueDepth * 100) / stats.QueueCapacity,
+			(stats.OverflowQueueDepth * 100) / stats.OverflowQueueCapacity,
+			stats.DroppedCount,
+			stats.OverflowCount,
+			stats.EventCount,
 			client.TradeCount,
 			client.QuoteCount);
 		if (maxTradeCount > 0)

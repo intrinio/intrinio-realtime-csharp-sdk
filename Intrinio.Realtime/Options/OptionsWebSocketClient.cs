@@ -523,22 +523,28 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     {
         string symbol = GetSymbolFromChannel(channel);
         bool tradesOnly = GetTradesOnlyFromChannel(channel);
+        byte mask = 0;
+        if (_useOnTrade) SetUsesTrade(ref mask);
+        if (_useOnQuote && !tradesOnly) SetUsesQuote(ref mask);
+        if (_useOnRefresh) SetUsesRefresh(ref mask);
+        if (_useOnUnusualActivity) SetUsesUA(ref mask);
         switch (symbol)
         {
             case LobbyName:
             {
                 byte[] message = new byte[11]; //1 + 1 + 9
                 message[0] = Convert.ToByte(74); //type: join (74uy) or leave (76uy)
-                message[1] = tradesOnly ? Convert.ToByte(1) : Convert.ToByte(0);
+                message[1] = mask;
                 Encoding.ASCII.GetBytes("$FIREHOSE").CopyTo(message, 2);
                 return message;
             }
             default:
             {
-                byte[] message = new byte[2 + symbol.Length]; //1 + 1 + symbol.Length
+                string translatedSymbol = Config.TranslateContract(symbol);
+                byte[] message = new byte[2 + translatedSymbol.Length]; //1 + 1 + symbol.Length
                 message[0] = Convert.ToByte(74); //type: join (74uy) or leave (76uy)
-                message[1] = tradesOnly ? Convert.ToByte(1) : Convert.ToByte(0);
-                Encoding.ASCII.GetBytes(symbol).CopyTo(message, 2);
+                message[1] = mask;
+                Encoding.ASCII.GetBytes(translatedSymbol).CopyTo(message, 2);
                 return message;
             }
         }
@@ -559,12 +565,18 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
             }
             default:
             {
-                byte[] message = new byte[1 + symbol.Length]; //1 + symbol.Length
+                string translatedSymbol = Config.TranslateContract(symbol);
+                byte[] message = new byte[2 + translatedSymbol.Length]; //1 + symbol.Length
                 message[0] = Convert.ToByte(76); //type: join (74uy) or leave (76uy)
-                Encoding.ASCII.GetBytes(symbol).CopyTo(message, 1);
+                Encoding.ASCII.GetBytes(translatedSymbol).CopyTo(message, 2);
                 return message;
             }
         }
     }
+
+    private static void SetUsesTrade(ref byte bitMask) { bitMask = (byte)(bitMask | 0b1); }
+    private static void SetUsesQuote(ref byte bitMask) { bitMask = (byte)(bitMask | 0b10); }
+    private static void SetUsesRefresh(ref byte bitMask) { bitMask = (byte)(bitMask | 0b100); }
+    private static void SetUsesUA(ref byte bitMask) { bitMask = (byte)(bitMask | 0b1000); }
     #endregion //Private Methods
 }
