@@ -1,7 +1,7 @@
 {
 	"Config": {
 		"ApiKey": "API_KEY_HERE",
-		"NumThreads": 2,
+		"NumThreads": 4,
 		"Provider": "REALTIME",
 		//"Provider": "DELAYED_SIP",
 		//"Provider": "NASDAQ_BASIC",

@@ -6,6 +6,9 @@ namespace Intrinio.Realtime.Composite;
 
 using System;
 
+/// <summary>
+/// Not for Use yet. Subject to change.
+/// </summary>
 public interface IDataCache
 {
     double? GetsupplementaryDatum(string key);

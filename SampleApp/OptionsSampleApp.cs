@@ -124,7 +124,7 @@ public class OptionsSampleApp
 		// //Subscribe the candlestick client to trade and/or quote events as well.  It's important any method subscribed this way handles exceptions so as to not cause issues for other subscribers!
 		// _useTradeCandleSticks = true;
 		// _useQuoteCandleSticks = true;
-		// _candleStickClient = new CandleStickClient(OnTradeCandleStick, OnQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, false);
+		// _candleStickClient = new CandleStickClient(OnTradeCandleStick, OnQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0);
 		// onTrade += _candleStickClient.OnTrade;
 		// onQuote += _candleStickClient.OnQuote;
 		// _candleStickClient.Start();
@@ -136,7 +136,7 @@ public class OptionsSampleApp
 		// config.Provider = Provider.REALTIME;
 		// config.ApiKey = "API_KEY_HERE";
 		// config.Symbols = new[] { "AAPL", "MSFT" };
-		// config.NumThreads = 2;
+		// config.NumThreads = 16;
 		// config.TradesOnly = false;
 		// config.BufferSize = 2048;
 		// config.OverflowBufferSize = 4096;
@@ -146,15 +146,8 @@ public class OptionsSampleApp
 		await client.Start();
 		timer = new Timer(TimerCallback, client, 60000, 60000);
 		await client.Join(); //Load symbols from your config or config.json
+		// await client.JoinLobby(false); //Firehose
 		// await client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
-		
-		// //You can also simulate a trading day by replaying a particular day's data. You can do this with the actual time between events, or without.
-		// DateTime yesterday = DateTime.Today - TimeSpan.FromDays(1);
-		// client = new ReplayClient(onTrade, onQuote, yesterday, false, true, false, "data.csv"); //A client to replay a previous day's data
-		// await client.Start();
-		// timer = new Timer(TimerCallback, replayClient, 10000, 10000);
-		// await client.Join(); //Load symbols from your config or config.json
-		// // await client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
 		Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
 	}

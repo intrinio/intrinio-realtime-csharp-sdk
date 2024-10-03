@@ -5,10 +5,10 @@
 		"Provider": "OPRA",
 		//"Provider": "MANUAL",
 		//"IPAddress": "1.2.3.4",
-		"BufferSize": 2048,
-		"OverflowBufferSize": 2048,
+		"BufferSize": 4096,
+		"OverflowBufferSize": 8192,
 		"Delayed": false,
-		"Symbols": [ "GOOG__220408C02870000", "MSFT__220408C00315000", "AAPL__220414C00180000", "SPY", "TSLA" ],
+		"Symbols": [ "GOOG__220408C02870000", "MSFT__220408C00315000", "AAPL__220414C00180000", "SPY", "TSLA" ]
 		//"Symbols": [ "lobby" ]
 	},
 	"Serilog": {

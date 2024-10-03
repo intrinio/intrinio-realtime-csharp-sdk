@@ -1,14 +1,15 @@
 {
 	"Config": {
 		"ApiKey": "API_KEY_HERE",
-		"NumThreads": 2,
+		"NumThreads": 8,
+		//"Provider": "OPRA",
 		"Provider": "REALTIME",
 		//"Provider": "DELAYED_SIP",
 		//"Provider": "NASDAQ_BASIC",
 		//"Provider": "MANUAL",
 		//"IPAddress": "1.2.3.4",
-		"BufferSize": 2048,
-		"OverflowBufferSize": 2048,
+		"BufferSize": 4096,
+		"OverflowBufferSize": 8192,
 		"Symbols": [ "AAPL", "MSFT", "TSLA" ]
 		//"Symbols": [ "lobby" ]
 	},
