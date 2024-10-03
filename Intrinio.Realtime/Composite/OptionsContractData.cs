@@ -37,8 +37,8 @@ public class OptionsContractData : IOptionsContractData
         this._latestTradeCandleStick = latestTradeCandleStick;
         this._latestAskQuoteCandleStick = latestAskQuoteCandleStick;
         this._latestBidQuoteCandleStick = latestBidQuoteCandleStick;
-        this._supplementaryData = new ConcurrentDictionary<String, double>();
-        this._readonlySupplementaryData = new ReadOnlyDictionary<string, double>(_supplementaryData);
+        this._supplementaryData = new ConcurrentDictionary<String, double?>();
+        this._readonlySupplementaryData = new ReadOnlyDictionary<string, double?>(_supplementaryData);
     }
 
     public String Contract { get { return this.contract; } }

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Intrinio.Realtime.Composite;
@@ -7,50 +8,52 @@ using System;
 
 public interface IDataCache
 {
-    double? GetsupplementaryDatum(String key);
-    Task<bool> SetsupplementaryDatum(String key, double datum);
-    ConcurrentDictionary<String, double> GetAllSupplementaryData();
+    double? GetsupplementaryDatum(string key);
+    Task<bool> SetsupplementaryDatum(string key, double? datum);
+    IReadOnlyDictionary<string, double?> AllSupplementaryData { get; }
     
-    ISecurityData GetSecurityData(String tickerSymbol);
-    ConcurrentDictionary<String, ISecurityData> GetAllSecurityData();
+    ISecurityData GetSecurityData(string tickerSymbol);
+    IReadOnlyDictionary<string, ISecurityData> AllSecurityData { get; }
     
-    Intrinio.Realtime.Equities.Trade? GetEquityTrade(String tickerSymbol);
+    Intrinio.Realtime.Equities.Trade? GetLatestEquityTrade(string tickerSymbol);
     Task<bool> SetEquityTrade(Intrinio.Realtime.Equities.Trade trade);
     
-    Intrinio.Realtime.Equities.Quote? GetEquityQuote(String tickerSymbol);
+    Intrinio.Realtime.Equities.Quote? GetLatestEquityQuote(string tickerSymbol);
     Task<bool> SetEquityQuote(Intrinio.Realtime.Equities.Quote quote);
     
-    Intrinio.Realtime.Equities.TradeCandleStick? GetEquityTradeCandleStick(String tickerSymbol);
+    Intrinio.Realtime.Equities.TradeCandleStick? GetLatestEquityTradeCandleStick(string tickerSymbol);
     Task<bool> SetEquityTradeCandleStick(Intrinio.Realtime.Equities.TradeCandleStick tradeCandleStick);
     
-    Intrinio.Realtime.Equities.QuoteCandleStick? GetEquityQuoteCandleStick(String tickerSymbol, Intrinio.Realtime.Equities.QuoteType quoteType);
+    Intrinio.Realtime.Equities.QuoteCandleStick? GetLatestEquityAskQuoteCandleStick(string tickerSymbol);
+    Intrinio.Realtime.Equities.QuoteCandleStick? GetLatestEquityBidQuoteCandleStick(string tickerSymbol);
     Task<bool> SetEquityQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick quoteCandleStick);
     
-    IOptionsContractData GetOptionsContractData(String tickerSymbol, String contract);
+    IOptionsContractData GetOptionsContractData(string tickerSymbol, string contract);
     
-    Intrinio.Realtime.Options.Trade? GetOptionsTrade(String tickerSymbol, String contract);
+    Intrinio.Realtime.Options.Trade? GetLatestOptionsTrade(string tickerSymbol, string contract);
     Task<bool> SetOptionsTrade(Intrinio.Realtime.Options.Trade trade);
     
-    Intrinio.Realtime.Options.Quote? GetOptionsQuote(String tickerSymbol, String contract);
+    Intrinio.Realtime.Options.Quote? GetLatestOptionsQuote(string tickerSymbol, string contract);
     Task<bool> SetOptionsQuote(Intrinio.Realtime.Options.Quote quote);
     
-    Intrinio.Realtime.Options.Refresh? GetOptionsRefresh(String tickerSymbol, String contract);
+    Intrinio.Realtime.Options.Refresh? GetLatestOptionsRefresh(string tickerSymbol, string contract);
     Task<bool> SetOptionsRefresh(Intrinio.Realtime.Options.Refresh refresh);
     
-    Intrinio.Realtime.Options.UnusualActivity? GetOptionsUnusualActivity(String tickerSymbol, String contract);
+    Intrinio.Realtime.Options.UnusualActivity? GetLatestOptionsUnusualActivity(string tickerSymbol, string contract);
     Task<bool> SetOptionsUnusualActivity(Intrinio.Realtime.Options.UnusualActivity unusualActivity);
     
-    Intrinio.Realtime.Options.TradeCandleStick? GetOptionsTradeCandleStick(String tickerSymbol, String contract);
+    Intrinio.Realtime.Options.TradeCandleStick? GetLatestOptionsTradeCandleStick(string tickerSymbol, string contract);
     Task<bool> SetOptionsTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick tradeCandleStick);
     
-    Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsQuoteCandleStick(String tickerSymbol, String contract, Intrinio.Realtime.Options.QuoteType quoteType);
-    Task<bool> SetOptionsQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick quote);
+    Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsAskQuoteCandleStick(string tickerSymbol);
+    Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsBidQuoteCandleStick(string tickerSymbol);
+    Task<bool> SetOptionsQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick quoteCandleStick);
     
-    double? GetSecuritySupplementalDatum(String tickerSymbol, String key);
-    Task<bool> SetSecuritySupplementalDatum(String tickerSymbol, String key, double datum);
+    double? GetSecuritySupplementalDatum(string tickerSymbol, string key);
+    Task<bool> SetSecuritySupplementalDatum(string tickerSymbol, string key, double? datum);
     
-    double? GetOptionsContractSupplementalDatum(String tickerSymbol, String contract, String key);
-    Task<bool> SetOptionSupplementalDatum(String tickerSymbol, String contract, String key, double datum);
+    double? GetOptionsContractSupplementalDatum(string tickerSymbol, string contract, string key);
+    Task<bool> SetOptionSupplementalDatum(string tickerSymbol, string contract, string key, double? datum);
     
     void SetOnSupplementalDatumUpdated(OnSupplementalDatumUpdated onSupplementalDatumUpdated);
     void SetOnSecuritySupplementalDatumUpdated(OnSecuritySupplementalDatumUpdated onSecuritySupplementalDatumUpdated);

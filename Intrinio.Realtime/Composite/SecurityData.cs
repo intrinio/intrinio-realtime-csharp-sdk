@@ -25,7 +25,7 @@ public class SecurityData : ISecurityData{
         this.readonlySupplementaryData = java.util.Collections.unmodifiableMap(supplementaryData);
     }
 
-    public String GetTickerSymbol(){
+    public String TickerSymbol(){
         return _tickerSymbol;
     }
 
