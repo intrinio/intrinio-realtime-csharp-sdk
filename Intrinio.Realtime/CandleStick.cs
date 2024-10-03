@@ -81,7 +81,7 @@ public abstract class CandleStick
         Change = (Close - Open) / Open;
     }
             
-    internal void Update(UInt32 volume, double price, double time)
+    public void Update(UInt32 volume, double price, double time)
     {
         Average = ((Convert.ToDouble(Volume) * Average) + (Convert.ToDouble(volume) * price)) / (Convert.ToDouble(Volume + volume));
         Volume += volume;
@@ -94,12 +94,12 @@ public abstract class CandleStick
         Change = (Close - Open) / Open;
     }
 
-    internal void MarkComplete()
+    public void MarkComplete()
     {
         Complete = true;
     }
 
-    internal void MarkIncomplete()
+    public void MarkIncomplete()
     {
         Complete = false;
     }
