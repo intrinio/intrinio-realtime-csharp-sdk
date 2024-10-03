@@ -1,14 +1,15 @@
 {
 	"Config": {
-		"ApiKey": "",
-		"NumThreads": 2,
-		"Provider": "REALTIME",
-		//"Provider": "DELAYED_SIP",
-		//"Provider": "NASDAQ_BASIC",
+		"ApiKey": "API_KEY_HERE",
+		"NumThreads": 16,
+		"Provider": "OPRA",
 		//"Provider": "MANUAL",
-		"Symbols": [ "AAPL", "MSFT", "GOOG" ]
+		//"IPAddress": "1.2.3.4",
+		"BufferSize": 4096,
+		"OverflowBufferSize": 8192,
+		"Delayed": false,
+		"Symbols": [ "GOOG__220408C02870000", "MSFT__220408C00315000", "AAPL__220414C00180000", "SPY", "TSLA" ]
 		//"Symbols": [ "lobby" ]
-		//"IPAddress": "1.2.3.4"
 	},
 	"Serilog": {
 		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],

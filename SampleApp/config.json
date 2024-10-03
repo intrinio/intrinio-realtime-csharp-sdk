@@ -1,0 +1,29 @@
+{
+	"Config": {
+		"ApiKey": "API_KEY_HERE",
+		"NumThreads": 8,
+		//"Provider": "OPRA",
+		"Provider": "REALTIME",
+		//"Provider": "DELAYED_SIP",
+		//"Provider": "NASDAQ_BASIC",
+		//"Provider": "MANUAL",
+		//"IPAddress": "1.2.3.4",
+		"BufferSize": 4096,
+		"OverflowBufferSize": 8192,
+		"Symbols": [ "AAPL", "MSFT", "TSLA" ]
+		//"Symbols": [ "lobby" ]
+	},
+	"Serilog": {
+		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
+		"MinimumLevel": {
+			"Default": "Information",
+			"Override": {
+				"Microsoft": "Warning",
+				"System": "Warning"
+			}
+		},
+		"WriteTo": [
+			{ "Name": "Console" }
+		]
+	}
+}
