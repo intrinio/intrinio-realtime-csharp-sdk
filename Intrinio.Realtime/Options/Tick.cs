@@ -13,7 +13,7 @@ public class Tick
     private readonly Refresh? _refresh;
     private readonly UnusualActivity? _unusualActivity;
 
-    public Tick(DateTime timeReceived, Trade trade, Quote quote, Refresh refresh, UnusualActivity unusualActivity)
+    public Tick(DateTime timeReceived, Trade? trade, Quote? quote, Refresh? refresh, UnusualActivity? unusualActivity)
     {
         _timeReceived = timeReceived;
         _trade = trade;
