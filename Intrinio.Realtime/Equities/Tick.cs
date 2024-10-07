@@ -3,7 +3,7 @@ namespace Intrinio.Realtime.Equities;
 using System;
 using System.Text;
 
-internal class Tick
+public class Tick
 {
     private readonly DateTime _timeReceived;
     private readonly Trade? _trade;
