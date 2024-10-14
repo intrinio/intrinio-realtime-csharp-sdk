@@ -388,7 +388,7 @@ public class CandleStickClient
     {
         double ts = ConvertToUnixTimestamp(quote.Timestamp);
 
-        if (bucket.BidCandleStick != null && !Double.IsNaN(quote.AskPrice))
+        if (bucket.BidCandleStick != null && !Double.IsNaN(quote.BidPrice))
         {
             if (bucket.BidCandleStick.CloseTimestamp < ts)
             {
@@ -398,7 +398,7 @@ public class CandleStickClient
             }
             else if(bucket.BidCandleStick.OpenTimestamp <= ts)
             {
-                bucket.BidCandleStick.Update(quote.BidSize, quote.AskPrice, ts);
+                bucket.BidCandleStick.Update(quote.BidSize, quote.BidPrice, ts);
                 if (_broadcastPartialCandles)
                     OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
             }
@@ -407,7 +407,7 @@ public class CandleStickClient
                 AddBidToLostAndFound(quote);
             }        
         }
-        else if (bucket.BidCandleStick == null && !Double.IsNaN(quote.AskPrice))
+        else if (bucket.BidCandleStick == null && !Double.IsNaN(quote.BidPrice))
         {
             bucket.BidCandleStick = CreateNewBidCandle(quote, ts);
             if (_broadcastPartialCandles)
