@@ -19,12 +19,12 @@ public interface IOptionsContractData {
     Intrinio.Realtime.Options.QuoteCandleStick? LatestAskQuoteCandleStick { get; }
     Intrinio.Realtime.Options.QuoteCandleStick? LatestBidQuoteCandleStick { get; }
     
-    Task<bool> SetTrade(Intrinio.Realtime.Options.Trade trade);
-    Task<bool> SetQuote(Intrinio.Realtime.Options.Quote quote);
-    Task<bool> SetRefresh(Intrinio.Realtime.Options.Refresh refresh);
-    Task<bool> SetUnusualActivity(Intrinio.Realtime.Options.UnusualActivity unusualActivity);
-    Task<bool> SetTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick tradeCandleStick);
-    Task<bool> SetQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick quoteCandleStick);
+    Task<bool> SetTrade(Intrinio.Realtime.Options.Trade? trade);
+    Task<bool> SetQuote(Intrinio.Realtime.Options.Quote? quote);
+    Task<bool> SetRefresh(Intrinio.Realtime.Options.Refresh? refresh);
+    Task<bool> SetUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity);
+    Task<bool> SetTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick);
+    Task<bool> SetQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick);
     
     double? GetSupplementaryDatum(string key);
     Task<bool> SetSupplementaryDatum(string key, double? datum);

@@ -3,9 +3,9 @@ namespace Intrinio.Realtime.Composite;
 using System;
 using System.Threading.Tasks;
 
-public delegate Task OnSupplementalDatumUpdated(String key, double datum, IDataCache dataCache);
-public delegate Task OnSecuritySupplementalDatumUpdated(String key, double datum, ISecurityData securityData, IDataCache dataCache);
-public delegate Task OnOptionsContractSupplementalDatumUpdated(String key, double datum, IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache);
+public delegate Task OnSupplementalDatumUpdated(string key, double? datum, IDataCache dataCache);
+public delegate Task OnSecuritySupplementalDatumUpdated(string key, double? datum, ISecurityData securityData, IDataCache dataCache);
+public delegate Task OnOptionsContractSupplementalDatumUpdated(string key, double? datum, IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache);
 
 public delegate Task OnEquitiesTradeUpdated(ISecurityData securityData, IDataCache dataCache);
 public delegate Task OnEquitiesQuoteUpdated(ISecurityData SecurityData, IDataCache DataCache);

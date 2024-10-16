@@ -24,7 +24,7 @@ public interface ISecurityData {
     
     IOptionsContractData GetOptionsContractData(string contract);
     IReadOnlyDictionary<string, IOptionsContractData> AllOptionsContractData { get; }
-    List<string> GetContractNames(string ticker);
+    List<string> GetContractNames();
     
     Task<bool> SetEquitiesTrade(Intrinio.Realtime.Equities.Trade trade);
     Task<bool> SetEquitiesQuote(Intrinio.Realtime.Equities.Quote quote);
