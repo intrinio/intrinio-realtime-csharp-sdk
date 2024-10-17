@@ -34,6 +34,8 @@ public interface ISecurityData {
     Task<bool> SetEquitiesQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick? quoteCandleStick);
 
     IOptionsContractData GetOptionsContractData(string contract);
+    
+    IReadOnlyDictionary<string, IOptionsContractData> AllOptionsContractData { get; }
 
     List<string> GetContractNames();
 

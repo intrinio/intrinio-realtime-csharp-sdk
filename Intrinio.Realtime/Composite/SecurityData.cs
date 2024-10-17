@@ -20,7 +20,7 @@ internal class SecurityData : ISecurityData{
     private Intrinio.Realtime.Equities.QuoteCandleStick? _latestAskQuoteCandleStick;
     private Intrinio.Realtime.Equities.QuoteCandleStick? _latestBidQuoteCandleStick;
     private readonly ConcurrentDictionary<string, OptionsContractData> _contracts;
-    private readonly IReadOnlyDictionary<string, OptionsContractData> _readonlyContracts;
+    private readonly IReadOnlyDictionary<string, IOptionsContractData> _readonlyContracts;
     private readonly ConcurrentDictionary<string, double?> _supplementaryData;
     private readonly IReadOnlyDictionary<string, double?> _readonlySupplementaryData;
 
@@ -39,7 +39,7 @@ internal class SecurityData : ISecurityData{
         _latestAskQuoteCandleStick = latestAskQuoteCandleStick;
         _latestBidQuoteCandleStick = latestBidQuoteCandleStick;
         _contracts = new ConcurrentDictionary<string, OptionsContractData>();
-        _readonlyContracts = new ReadOnlyDictionary<string, OptionsContractData>(_contracts);
+        _readonlyContracts = new ReadOnlyDictionary<string, IOptionsContractData>((IDictionary<string, IOptionsContractData>)_contracts);
         _supplementaryData = new ConcurrentDictionary<string, double?>();
         _readonlySupplementaryData = new ReadOnlyDictionary<string, double?>(_supplementaryData);
     }
@@ -230,6 +230,8 @@ internal class SecurityData : ISecurityData{
     {
         return _contracts.TryGetValue(contract, out OptionsContractData optionsContractData) ? optionsContractData : null;
     }
+
+    public IReadOnlyDictionary<string, IOptionsContractData> AllOptionsContractData { get { return _readonlyContracts; } }
     
     public List<string> GetContractNames()
     {
