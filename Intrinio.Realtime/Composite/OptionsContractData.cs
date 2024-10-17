@@ -10,7 +10,7 @@ namespace Intrinio.Realtime.Composite;
 /// <summary>
 /// Not for Use yet. Subject to change.
 /// </summary>
-public class OptionsContractData : IOptionsContractData
+internal class OptionsContractData : IOptionsContractData
 {
     private readonly String _contract;
     private Intrinio.Realtime.Options.Trade? _latestTrade;

@@ -11,8 +11,10 @@ using System;
 /// </summary>
 public interface IDataCache
 {
-    double? GetsupplementaryDatum(string key);
-    Task<bool> SetsupplementaryDatum(string key, double? datum);
+    double? GetSupplementaryDatum(string key);
+
+    Task<bool> SetSupplementaryDatum(string key, double? datum);
+
     IReadOnlyDictionary<string, double?> AllSupplementaryData { get; }
     
     ISecurityData GetSecurityData(string tickerSymbol);

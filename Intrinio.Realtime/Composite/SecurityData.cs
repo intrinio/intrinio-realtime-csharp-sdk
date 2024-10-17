@@ -3,16 +3,19 @@ using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
+using Intrinio.Realtime.Options;
 
 namespace Intrinio.Realtime.Composite;
 
 using System;
 using System.Threading.Tasks;
 
-public class SecurityData : ISecurityData{
-    private readonly String _tickerSymbol;
+internal class SecurityData : ISecurityData{
+    private readonly string _tickerSymbol;
     private Intrinio.Realtime.Equities.Trade? _latestTrade;
-    private Intrinio.Realtime.Equities.Quote? _latestQuote;
+    private Intrinio.Realtime.Equities.Quote? _latestAskQuote;
+    private Intrinio.Realtime.Equities.Quote? _latestBidQuote;
     private Intrinio.Realtime.Equities.TradeCandleStick? _latestTradeCandleStick;
     private Intrinio.Realtime.Equities.QuoteCandleStick? _latestAskQuoteCandleStick;
     private Intrinio.Realtime.Equities.QuoteCandleStick? _latestBidQuoteCandleStick;
@@ -21,30 +24,31 @@ public class SecurityData : ISecurityData{
     private readonly ConcurrentDictionary<string, double?> _supplementaryData;
     private readonly IReadOnlyDictionary<string, double?> _readonlySupplementaryData;
 
-    public SecurityData(String tickerSymbol,
+    public SecurityData(string tickerSymbol,
                         Intrinio.Realtime.Equities.Trade? latestTrade,
-                        Intrinio.Realtime.Equities.Quote? latestQuote,
+                        Intrinio.Realtime.Equities.Quote? latestAskQuote,
+                        Intrinio.Realtime.Equities.Quote? latestBidQuote,
                         Intrinio.Realtime.Equities.TradeCandleStick? latestTradeCandleStick,
                         Intrinio.Realtime.Equities.QuoteCandleStick? latestAskQuoteCandleStick,
                         Intrinio.Realtime.Equities.QuoteCandleStick? latestBidQuoteCandleStick){
         _tickerSymbol = tickerSymbol;
         _latestTrade = latestTrade;
-        _latestQuote = latestQuote;
+        _latestAskQuote = latestAskQuote;
+        _latestBidQuote = latestBidQuote;
         _latestTradeCandleStick = latestTradeCandleStick;
         _latestAskQuoteCandleStick = latestAskQuoteCandleStick;
         _latestBidQuoteCandleStick = latestBidQuoteCandleStick;
-        _contracts = new ConcurrentDictionary<String, OptionsContractData>();
+        _contracts = new ConcurrentDictionary<string, OptionsContractData>();
         _readonlyContracts = new ReadOnlyDictionary<string, OptionsContractData>(_contracts);
         _supplementaryData = new ConcurrentDictionary<string, double?>();
         _readonlySupplementaryData = new ReadOnlyDictionary<string, double?>(_supplementaryData);
     }
     
-    public String TickerSymbol(){
-        return _tickerSymbol;
-    }
+    public string TickerSymbol{ get { return _tickerSymbol;} }
     
     public Intrinio.Realtime.Equities.Trade? LatestEquitiesTrade { get{return _latestTrade;} }
-    public Intrinio.Realtime.Equities.Quote? LatestEquitiesQuote { get{return _latestQuote;} }
+    public Intrinio.Realtime.Equities.Quote? LatestEquitiesAskQuote { get{return _latestAskQuote;} }
+    public Intrinio.Realtime.Equities.Quote? LatestEquitiesBidQuote { get{return _latestBidQuote;} }
     
     public Intrinio.Realtime.Equities.TradeCandleStick? LatestEquitiesTradeCandleStick { get{return _latestTradeCandleStick;} }
     public Intrinio.Realtime.Equities.QuoteCandleStick? LatestEquitiesAskQuoteCandleStick { get{return _latestAskQuoteCandleStick;} }
@@ -106,11 +110,26 @@ public class SecurityData : ISecurityData{
 
     public Task<bool> SetEquitiesQuote(Intrinio.Realtime.Equities.Quote? quote)
     {
-        //dirty set
-        if ((!_latestQuote.HasValue) || (quote.HasValue && quote.Value.Timestamp > _latestQuote.Value.Timestamp))
+        if (quote.HasValue)
         {
-            _latestQuote = quote;
-            return Task.FromResult(true);
+            if (quote.Value.Type == Equities.QuoteType.Ask)
+            {
+                if ((!_latestAskQuote.HasValue) || (quote.Value.Timestamp > _latestAskQuote.Value.Timestamp))
+                {
+                    _latestAskQuote = quote;
+                    return Task.FromResult(true);
+                }
+                return Task.FromResult(false);
+            }
+            else //Bid
+            {
+                if ((!_latestBidQuote.HasValue) || (quote.Value.Timestamp > _latestBidQuote.Value.Timestamp))
+                {
+                    _latestBidQuote = quote;
+                    return Task.FromResult(true);
+                }
+                return Task.FromResult(false);
+            }
         }
         return Task.FromResult(false);
     }
@@ -207,166 +226,340 @@ public class SecurityData : ISecurityData{
         return isSet;
     }
     
+    public IOptionsContractData GetOptionsContractData(string contract)
+    {
+        return _contracts.TryGetValue(contract, out OptionsContractData optionsContractData) ? optionsContractData : null;
+    }
     
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    public List<string> GetContractNames()
+    {
+        return _contracts.Values.Select(c => c.Contract).ToList();
+    }
     
+    public Intrinio.Realtime.Options.Trade? GetOptionsContractTrade(string contract)
+    {
+        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        {
+            return optionsContractData.LatestTrade;
+        }
+            
+        return null;
+    }
     
+    public async Task<bool> SetOptionsContractTrade(Intrinio.Realtime.Options.Trade? trade)
+    {
+        if (trade.HasValue)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = trade.Value.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, trade, null, null, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetTrade(trade);
+        }
+
+        return false;
+    }
     
+    internal async Task<bool> SetOptionsContractTrade(Intrinio.Realtime.Options.Trade? trade, OnOptionsTradeUpdated onOptionsTradeUpdated, IDataCache dataCache)
+    {
+        if (trade.HasValue)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = trade.Value.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, trade, null, null, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(trade.Value.Contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetTrade(trade, onOptionsTradeUpdated, this, dataCache);
+        }
+
+        return false;
+    }
     
+    public Intrinio.Realtime.Options.Quote? GetOptionsContractQuote(string contract)
+    {
+        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        {
+            return optionsContractData.LatestQuote;
+        }
+            
+        return null;
+    }
     
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    public async Task<bool> SetOptionsContractQuote(Intrinio.Realtime.Options.Quote? quote)
+    {
+        if (quote.HasValue)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = quote.Value.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, quote, null, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetQuote(quote);
+        }
 
-    public OptionsContractData GetOptionsContractData(String contract){
-        return _contracts.getOrDefault(contract, null);
+        return false;
+    }
+    
+    internal async Task<bool> SetOptionsContractQuote(Intrinio.Realtime.Options.Quote? quote, OnOptionsQuoteUpdated onOptionsQuoteUpdated, IDataCache dataCache)
+    {
+        if (quote.HasValue)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = quote.Value.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, quote, null, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(quote.Value.Contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetQuote(quote, onOptionsQuoteUpdated, this, dataCache);
+        }
+
+        return false;
+    }
+    
+    public Intrinio.Realtime.Options.Refresh? GetOptionsContractRefresh(string contract)
+    {
+        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        {
+            return optionsContractData.LatestRefresh;
+        }
+            
+        return null;
+    }
+    
+    public async Task<bool> SetOptionsContractRefresh(Intrinio.Realtime.Options.Refresh? refresh)
+    {
+        if (refresh.HasValue)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = refresh.Value.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, refresh, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetRefresh(refresh);
+        }
+
+        return false;
+    }
+    
+    internal async Task<bool> SetOptionsContractRefresh(Intrinio.Realtime.Options.Refresh? refresh, OnOptionsRefreshUpdated onOptionsRefreshUpdated, IDataCache dataCache)
+    {
+        if (refresh.HasValue)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = refresh.Value.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, refresh, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetRefresh(refresh, onOptionsRefreshUpdated, this, dataCache);
+        }
+
+        return false;
+    }
+    
+    public Intrinio.Realtime.Options.UnusualActivity? GetOptionsContractUnusualActivity(string contract)
+    {
+        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        {
+            return optionsContractData.LatestUnusualActivity;
+        }
+            
+        return null;
+    }
+    
+    public async Task<bool> SetOptionsContractUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity)
+    {
+        if (unusualActivity.HasValue)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = unusualActivity.Value.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, unusualActivity, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetUnusualActivity(unusualActivity);
+        }
+
+        return false;
+    }
+    
+    internal async Task<bool> SetOptionsContractUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity, OnOptionsUnusualActivityUpdated onOptionsUnusualActivityUpdated, IDataCache dataCache)
+    {
+        if (unusualActivity.HasValue)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = unusualActivity.Value.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, unusualActivity, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetUnusualActivity(unusualActivity, onOptionsUnusualActivityUpdated, this, dataCache);
+        }
+
+        return false;
+    }
+    
+    public Intrinio.Realtime.Options.TradeCandleStick? GetOptionsContractTradeCandleStick(string contract)
+    {
+        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        {
+            return optionsContractData.LatestTradeCandleStick;
+        }
+            
+        return null;
+    }
+    
+    public async Task<bool> SetOptionsContractTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick)
+    {
+        if (tradeCandleStick != null)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = tradeCandleStick.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, null, tradeCandleStick, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetTradeCandleStick(tradeCandleStick);
+        }
+
+        return false;
+    }
+    
+    internal async Task<bool> SetOptionsContractTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick, OnOptionsTradeCandleStickUpdated onOptionsTradeCandleStickUpdated, IDataCache dataCache)
+    {
+        if (tradeCandleStick != null)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = tradeCandleStick.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null,  null, tradeCandleStick, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetTradeCandleStick(tradeCandleStick, onOptionsTradeCandleStickUpdated, this, dataCache);
+        }
+
+        return false;
+    }
+    
+    public Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsContractBidQuoteCandleStick(string contract)
+    {
+        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        {
+            return optionsContractData.LatestBidQuoteCandleStick;
+        }
+            
+        return null;
+    }
+    
+    public Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsContractAskQuoteCandleStick(string contract)
+    {
+        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        {
+            return optionsContractData.LatestAskQuoteCandleStick;
+        }
+            
+        return null;
+    }
+    
+    public async Task<bool> SetOptionsContractQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick)
+    {
+        if (quoteCandleStick != null)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = quoteCandleStick.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, null, null, quoteCandleStick.QuoteType == QuoteType.Ask ? quoteCandleStick : null, quoteCandleStick.QuoteType == QuoteType.Bid ? quoteCandleStick : null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetQuoteCandleStick(quoteCandleStick);
+        }
+
+        return false;
+    }
+    
+    internal async Task<bool> SetOptionsContractQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick, OnOptionsQuoteCandleStickUpdated onOptionsQuoteCandleStickUpdated, IDataCache dataCache)
+    {
+        if (quoteCandleStick != null)
+        {
+            OptionsContractData currentOptionsContractData;
+            string contract = quoteCandleStick.Contract;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null,  null, null, quoteCandleStick.QuoteType == QuoteType.Ask ? quoteCandleStick : null, quoteCandleStick.QuoteType == QuoteType.Bid ? quoteCandleStick : null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetQuoteCandleStick(quoteCandleStick, onOptionsQuoteCandleStickUpdated, this, dataCache);
+        }
+
+        return false;
+    }
+    
+    public double? GetOptionsContractSupplementalDatum(string contract, string key)
+    {
+        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+            return optionsContractData.GetSupplementaryDatum(key);
+        return null;
     }
 
-    public IDictionary<String, OptionsContractData> GetAllOptionsContractData(){
-        return _readonlyContracts;
+    public async Task<bool> SetOptionsContractSupplementalDatum(string contract, string key, double? datum)
+    {
+        if (!String.IsNullOrWhiteSpace(contract))
+        {
+            OptionsContractData currentOptionsContractData;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetSupplementaryDatum(key, datum);
+        }
+
+        return false;
     }
 
-    public List<String> GetContractNames(){
-        return _contracts.values().stream().map(OptionsContractData::getContract).collect(Collectors.toList());
-    }
+    internal async Task<bool> SetOptionsContractSupplementalDatum(string contract, string key, double datum, OnOptionsContractSupplementalDatumUpdated onOptionsContractSupplementalDatumUpdated, IDataCache dataCache)
+    {
+        if (!String.IsNullOrWhiteSpace(contract))
+        {
+            OptionsContractData currentOptionsContractData;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await currentOptionsContractData.SetSupplementaryDatum(key, datum, onOptionsContractSupplementalDatumUpdated, this, dataCache);
+        }
 
-    public Intrinio.Realtime.Options.Trade GetOptionsContractTrade(String contract){
-        if (_contracts.containsKey(contract))
-            return _contracts.get(contract).getTrade();
-        else return null;
+        return false;
     }
-
-    public Task<bool> SetOptionsContractTrade(Intrinio.Realtime.Options.Trade trade){
-        //dirty set
-        if (_contracts.containsKey(trade.contract())){
-            return _contracts.get(trade.contract()).setTrade(trade);
-        }
-        else{
-            OptionsContractData data = new OptionsContractData(trade.contract(), trade, null, null);
-            OptionsContractData possiblyNewerData = _contracts.putIfAbsent(trade.contract(), data);
-            if (possiblyNewerData != null)
-                return possiblyNewerData.setTrade(trade);
-            return true;
-        }
-    }
-
-    public Task<bool> SetOptionsTrade(Intrinio.Realtime.Options.Trade trade, OnOptionsTradeUpdated onOptionsTradeUpdated, DataCache dataCache){
-        OptionsContractData currentOptionsContractData;
-        String contract = trade.contract();
-        if (_contracts.containsKey(contract)) {
-            currentOptionsContractData = _contracts.get(contract);
-        }
-        else {
-            OptionsContractData newData = new OptionsContractData(contract, trade, null, null);
-            OptionsContractData possiblyNewerData = _contracts.putIfAbsent(contract, newData);
-            currentOptionsContractData = possiblyNewerData == null ? newData : possiblyNewerData;
-        }
-        return currentOptionsContractData.setTrade(trade, onOptionsTradeUpdated, this, dataCache);
-    }
-
-    public Intrinio.Realtime.Options.Quote GetOptionsContractQuote(String contract){
-        if (_contracts.containsKey(contract))
-            return _contracts.get(contract).getQuote();
-        else return null;
-    }
-
-    public Task<bool> SetOptionsContractQuote(Intrinio.Realtime.Options.Quote quote){
-        //dirty set
-        if (_contracts.containsKey(quote.contract())){
-            return _contracts.get(quote.contract()).setQuote(quote);
-        }
-        else{
-            OptionsContractData data = new OptionsContractData(quote.contract(), null, quote, null);
-            OptionsContractData possiblyNewerData = _contracts.putIfAbsent(quote.contract(), data);
-            if (possiblyNewerData != null)
-                return possiblyNewerData.setQuote(quote);
-            return true;
-        }
-    }
-
-    public Task<bool> SetOptionsQuote(Intrinio.Realtime.Options.Quote quote, OnOptionsQuoteUpdated onOptionsQuoteUpdated, DataCache dataCache){
-        OptionsContractData currentOptionsContractData;
-        String contract = quote.contract();
-        if (_contracts.containsKey(contract)) {
-            currentOptionsContractData = _contracts.get(contract);
-        }
-        else {
-            OptionsContractData newData = new OptionsContractData(contract, null, quote, null);
-            OptionsContractData possiblyNewerData = _contracts.putIfAbsent(contract, newData);
-            currentOptionsContractData = possiblyNewerData == null ? newData : possiblyNewerData;
-        }
-        return currentOptionsContractData.setQuote(quote, onOptionsQuoteUpdated, this, dataCache);
-    }
-
-    public Intrinio.Realtime.Options.Refresh GetOptionsContractRefresh(String contract){
-        if (_contracts.containsKey(contract))
-            return _contracts.get(contract).getRefresh();
-        else return null;
-    }
-
-    public Task<bool> SetOptionsContractRefresh(Intrinio.Realtime.Options.Refresh refresh){
-        //dirty set
-        String contract = refresh.contract();
-        if (_contracts.containsKey(contract)){
-            return _contracts.get(contract).setRefresh(refresh);
-        }
-        else{
-            OptionsContractData data = new OptionsContractData(contract, null, null, refresh);
-            OptionsContractData possiblyNewerData = _contracts.putIfAbsent(contract, data);
-            if (possiblyNewerData != null)
-                return possiblyNewerData.setRefresh(refresh);
-            return true;
-        }
-    }
-
-    public Task<bool> SetOptionsRefresh(Intrinio.Realtime.Options.Refresh refresh, OnOptionsRefreshUpdated onOptionsRefreshUpdated, DataCache dataCache){
-        OptionsContractData currentOptionsContractData;
-        String contract = refresh.contract();
-        if (_contracts.containsKey(contract)) {
-            currentOptionsContractData = _contracts.get(contract);
-        }
-        else {
-            OptionsContractData newData = new OptionsContractData(contract, null, null, refresh);
-            OptionsContractData possiblyNewerData = _contracts.putIfAbsent(contract, newData);
-            currentOptionsContractData = possiblyNewerData == null ? newData : possiblyNewerData;
-        }
-        return currentOptionsContractData.setRefresh(refresh, onOptionsRefreshUpdated, this, dataCache);
-    }
-
-    public Double GetOptionsContractSupplementalDatum(String contract, String key){
-        if (_contracts.containsKey(contract))
-            return _contracts.get(contract).getSupplementaryDatum(key);
-        else return null;
-    }
-
-    public Task<bool> SetOptionsContractSupplementalDatum(String contract, String key, double datum){
-        OptionsContractData currentOptionsContractData;
-        if (_contracts.containsKey(contract)) {
-            currentOptionsContractData = _contracts.get(contract);
-        }
-        else {
-            OptionsContractData newData = new OptionsContractData(contract, null, null, null);
-            OptionsContractData possiblyNewerData = _contracts.putIfAbsent(contract, newData);
-            currentOptionsContractData = possiblyNewerData == null ? newData : possiblyNewerData;
-        }
-        return currentOptionsContractData.setSupplementaryDatum(key, datum);
-    }
-
-    private Task<bool> SetOptionsContractSupplementalDatum(String contract, String key, double datum, OnOptionsContractSupplementalDatumUpdated onOptionsContractSupplementalDatumUpdated, DataCache dataCache){
-        OptionsContractData currentOptionsContractData;
-        if (_contracts.containsKey(contract)) {
-            currentOptionsContractData = _contracts.get(contract);
-        }
-        else {
-            OptionsContractData newData = new OptionsContractData(contract, null, null, null);
-            OptionsContractData possiblyNewerData = _contracts.putIfAbsent(contract, newData);
-            currentOptionsContractData = possiblyNewerData == null ? newData : possiblyNewerData;
-        }
-        return currentOptionsContractData.setSupplementaryDatum(key, datum, onOptionsContractSupplementalDatumUpdated, this, dataCache);
-    }
-
-    //region Private Methods
-    private void Log(String message){
-        System.out.println(message);
-    }
-
-    //endregion Private Methods
 }
