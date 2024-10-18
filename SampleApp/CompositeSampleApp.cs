@@ -306,33 +306,41 @@ public class CompositeSampleApp
 		_equitiesCandleStickClient = new Intrinio.Realtime.Equities.CandleStickClient(OnEquitiesTradeCandleStick, OnEquitiesQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, false);
 		_equitiesCandleStickClient.Start();
 
-		Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
-		Intrinio.Realtime.Options.Config optionsConfig = new Intrinio.Realtime.Options.Config();
-		optionsConfig.Provider = Intrinio.Realtime.Options.Provider.OPRA;
-		optionsConfig.ApiKey = "API_KEY_HERE";
-		optionsConfig.Symbols = Array.Empty<string>();
-		optionsConfig.NumThreads = 16;
-		optionsConfig.TradesOnly = false;
-		optionsConfig.BufferSize = 2048;
-		optionsConfig.OverflowBufferSize = 8192;
-		optionsConfig.Delayed = false;
-		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsConfig);
+		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
+		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
+		// Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
+		// Intrinio.Realtime.Options.Config optionsConfig = new Intrinio.Realtime.Options.Config();
+		// optionsConfig.Provider = Intrinio.Realtime.Options.Provider.OPRA;
+		// optionsConfig.ApiKey = "API_KEY_HERE";
+		// optionsConfig.Symbols = Array.Empty<string>();
+		// optionsConfig.NumThreads = 16;
+		// optionsConfig.TradesOnly = false;
+		// optionsConfig.BufferSize = 2048;
+		// optionsConfig.OverflowBufferSize = 8192;
+		// optionsConfig.Delayed = false;
+		//_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsConfig);
+		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity);
 		await _optionsClient.Start();
-		await _optionsClient.JoinLobby(false); //Firehose
+		await _optionsClient.Join();
+		//await _optionsClient.JoinLobby(false); //Firehose
 		// await _optionsClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
-		//Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
-		Intrinio.Realtime.Equities.Config equitiesConfig = new Intrinio.Realtime.Equities.Config();
-		equitiesConfig.Provider = Intrinio.Realtime.Equities.Provider.NASDAQ_BASIC;
-		equitiesConfig.ApiKey = "API_KEY_HERE";
-		equitiesConfig.Symbols = Array.Empty<string>();
-		equitiesConfig.NumThreads = 8;
-		equitiesConfig.TradesOnly = false;
-		equitiesConfig.BufferSize = 2048;
-		equitiesConfig.OverflowBufferSize = 4096;
-		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesConfig);
+		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
+		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
+		// //Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
+		// Intrinio.Realtime.Equities.Config equitiesConfig = new Intrinio.Realtime.Equities.Config();
+		// equitiesConfig.Provider = Intrinio.Realtime.Equities.Provider.NASDAQ_BASIC;
+		// equitiesConfig.ApiKey = "API_KEY_HERE";
+		// equitiesConfig.Symbols = Array.Empty<string>();
+		// equitiesConfig.NumThreads = 8;
+		// equitiesConfig.TradesOnly = false;
+		// equitiesConfig.BufferSize = 2048;
+		// equitiesConfig.OverflowBufferSize = 4096;
+		//_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesConfig);
+		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote);
 		await _equitiesClient.Start();
-		await _equitiesClient.JoinLobby(false); //Firehose
+		await _equitiesClient.Join();
+		//await _equitiesClient.JoinLobby(false); //Firehose
 		// await _equitiesClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
 		timer = new Timer(TimerCallback, null, 60000, 60000);
