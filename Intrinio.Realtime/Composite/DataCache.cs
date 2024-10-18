@@ -126,7 +126,9 @@ public class DataCache : IDataCache
     
     public Intrinio.Realtime.Equities.Trade? GetLatestEquityTrade(string tickerSymbol)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.LatestEquitiesTrade
+            : null;
     }
     
     public async Task<bool> SetEquityTrade(Intrinio.Realtime.Equities.Trade? trade)
@@ -136,12 +138,16 @@ public class DataCache : IDataCache
     
     public Intrinio.Realtime.Equities.Quote? GetLatestEquityAskQuote(string tickerSymbol)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.LatestEquitiesAskQuote
+            : null;
     }
     
     public Intrinio.Realtime.Equities.Quote? GetLatestEquityBidQuote(string tickerSymbol)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.LatestEquitiesBidQuote
+            : null;
     }
     
     public async Task<bool> SetEquityQuote(Intrinio.Realtime.Equities.Quote? quote)
@@ -151,7 +157,9 @@ public class DataCache : IDataCache
     
     public Intrinio.Realtime.Equities.TradeCandleStick? GetLatestEquityTradeCandleStick(string tickerSymbol)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.LatestEquitiesTradeCandleStick
+            : null;
     }
     
     public async Task<bool> SetEquityTradeCandleStick(Intrinio.Realtime.Equities.TradeCandleStick? tradeCandleStick)
@@ -161,12 +169,16 @@ public class DataCache : IDataCache
     
     public Intrinio.Realtime.Equities.QuoteCandleStick? GetLatestEquityAskQuoteCandleStick(string tickerSymbol)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.LatestEquitiesAskQuoteCandleStick
+            : null;
     }
     
     public Intrinio.Realtime.Equities.QuoteCandleStick? GetLatestEquityBidQuoteCandleStick(string tickerSymbol)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.LatestEquitiesBidQuoteCandleStick
+            : null;
     }
     
     public async Task<bool> SetEquityQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick? quoteCandleStick)
@@ -180,7 +192,9 @@ public class DataCache : IDataCache
 
     public Intrinio.Realtime.Options.Trade? GetLatestOptionsTrade(string tickerSymbol, string contract)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.GetOptionsContractTrade(contract)
+            : null;
     }
     
     public async Task<bool> SetOptionsTrade(Intrinio.Realtime.Options.Trade? trade)
@@ -190,7 +204,9 @@ public class DataCache : IDataCache
     
     public Intrinio.Realtime.Options.Quote? GetLatestOptionsQuote(string tickerSymbol, string contract)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.GetOptionsContractQuote(contract)
+            : null;
     }
     
     public async Task<bool> SetOptionsQuote(Intrinio.Realtime.Options.Quote? quote)
@@ -200,7 +216,9 @@ public class DataCache : IDataCache
     
     public Intrinio.Realtime.Options.Refresh? GetLatestOptionsRefresh(string tickerSymbol, string contract)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.GetOptionsContractRefresh(contract)
+            : null;
     }
     
     public async Task<bool> SetOptionsRefresh(Intrinio.Realtime.Options.Refresh? refresh)
@@ -210,7 +228,9 @@ public class DataCache : IDataCache
     
     public Intrinio.Realtime.Options.UnusualActivity? GetLatestOptionsUnusualActivity(string tickerSymbol, string contract)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.GetOptionsContractUnusualActivity(contract)
+            : null;
     }
     
     public async Task<bool> SetOptionsUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity)
@@ -220,7 +240,9 @@ public class DataCache : IDataCache
     
     public Intrinio.Realtime.Options.TradeCandleStick? GetLatestOptionsTradeCandleStick(string tickerSymbol, string contract)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.GetOptionsContractTradeCandleStick(contract)
+            : null;
     }
     
     public async Task<bool> SetOptionsTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick)
@@ -230,12 +252,16 @@ public class DataCache : IDataCache
     
     public Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsAskQuoteCandleStick(string tickerSymbol, string contract)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.GetOptionsContractAskQuoteCandleStick(contract)
+            : null;
     }
     
     public Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsBidQuoteCandleStick(string tickerSymbol, string contract)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.GetOptionsContractBidQuoteCandleStick(contract)
+            : null;
     }
     
     public async Task<bool> SetOptionsQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick)
