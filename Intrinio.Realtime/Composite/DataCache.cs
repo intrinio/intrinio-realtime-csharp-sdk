@@ -95,22 +95,30 @@ public class DataCache : IDataCache
 
     public double? GetSecuritySupplementalDatum(string tickerSymbol, string key)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.GetSupplementaryDatum(key)
+            : null;
     }
     
     public async Task<bool> SetSecuritySupplementalDatum(string tickerSymbol, string key, double? datum)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? await securityData.SetSupplementaryDatum(key, datum, _onSecuritySupplementalDatumUpdated, this)
+            : false;
     }
     
     public double? GetOptionsContractSupplementalDatum(string tickerSymbol, string contract, string key)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.GetOptionsContractSupplementalDatum(contract, key)
+            : null;
     }
     
     public async Task<bool> SetOptionSupplementalDatum(string tickerSymbol, string contract, string key, double? datum)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? await securityData.SetOptionsContractSupplementalDatum(contract, key, datum, _onOptionsContractSupplementalDatumUpdated, this)
+            : false;
     }
     
     #endregion //Supplementary Data
@@ -122,15 +130,19 @@ public class DataCache : IDataCache
         return _securities.GetValueOrDefault(tickerSymbol, null);
     }
     
-    public IReadOnlyDictionary<string, ISecurityData> AllSecurityData { get; }
+    public IReadOnlyDictionary<string, ISecurityData> AllSecurityData { get{return _readonlySecurities} }
     public IOptionsContractData? GetOptionsContractData(string tickerSymbol, string contract)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.GetOptionsContractData(contract)
+            : null;
     }
     
     public IReadOnlyDictionary<string, IOptionsContractData> GetAllOptionsContractData(string tickerSymbol)
     {
-        
+        return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
+            ? securityData.AllOptionsContractData
+            : null;
     }
     
     #endregion //Sub-caches
