@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Intrinio.Realtime.Composite;
 
-public class DataCache : IDataCache
+internal class DataCache : IDataCache
 {
     #region Data Members
 
