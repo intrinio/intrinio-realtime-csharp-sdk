@@ -258,72 +258,21 @@ public class DataCache : IDataCache
     
     #region Delegates
     
-    void SetOnSupplementalDatumUpdated(OnSupplementalDatumUpdated onSupplementalDatumUpdated)
-    {
-        
-    }
+    public OnSupplementalDatumUpdated SetOnSupplementalDatumUpdated { get; set; }
+    public OnSecuritySupplementalDatumUpdated SetOnSecuritySupplementalDatumUpdated { get; set; }
+    public OnOptionsContractSupplementalDatumUpdated SetOnOptionsContractSupplementalDatumUpdated { get; set; }
     
-    void SetOnSecuritySupplementalDatumUpdated(OnSecuritySupplementalDatumUpdated onSecuritySupplementalDatumUpdated)
-    {
-        
-    }
+    public OnEquitiesTradeUpdated SetOnEquitiesTradeUpdated { get; set; }
+    public OnEquitiesQuoteUpdated SetOnEquitiesQuoteUpdated { get; set; }
+    public OnEquitiesTradeCandleStickUpdated SetOnEquitiesTradeCandleStickUpdated { get; set; }
+    public OnEquitiesQuoteCandleStickUpdated SetOnEquitiesQuoteCandleStickUpdated { get; set; }
     
-    void SetOnOptionSupplementalDatumUpdated(OnOptionsContractSupplementalDatumUpdated onOptionsContractSupplementalDatumUpdated)
-    {
-        
-    }
-    
-    
-    void SetOnEquitiesTradeUpdated(OnEquitiesTradeUpdated onEquitiesTradeUpdated)
-    {
-        
-    }
-    
-    void SetOnEquitiesQuoteUpdated(OnEquitiesQuoteUpdated onEquitiesQuoteUpdated)
-    {
-        
-    }
-    
-    void SetOnEquitiesTradeCandleStickUpdated(OnEquitiesTradeCandleStickUpdated onEquitiesTradeCandleStickUpdated)
-    {
-        
-    }
-    
-    void SetOnEquitiesQuoteCandleStickUpdated(OnEquitiesQuoteCandleStickUpdated onEquitiesQuoteCandleStickUpdated)
-    {
-        
-    }
-    
-    
-    void SetOnOptionsTradeUpdated(OnOptionsTradeUpdated onOptionsTradeUpdated)
-    {
-        
-    }
-    
-    void SetOnOptionsQuoteUpdated(OnOptionsQuoteUpdated onOptionsQuoteUpdated)
-    {
-        
-    }
-    
-    void SetOnOptionsRefreshUpdated(OnOptionsRefreshUpdated onOptionsRefreshUpdated)
-    {
-        
-    }
-    
-    void SetOnOptionsUnusualActivityUpdated(OnOptionsUnusualActivityUpdated onOptionsUnusualActivityUpdated)
-    {
-        
-    }
-    
-    void SetOnOptionsTradeCandleStickUpdated(OnOptionsTradeCandleStickUpdated onOptionsTradeCandleStickUpdated)
-    {
-        
-    }
-    
-    void SetOnOptionsQuoteCandleStickUpdated(OnOptionsQuoteCandleStickUpdated onOptionsQuoteCandleStickUpdated)
-    {
-        
-    }
+    public OnOptionsTradeUpdated SetOnOptionsTradeUpdated { get; set; }
+    public OnOptionsQuoteUpdated SetOnOptionsQuoteUpdated { get; set; }
+    public OnOptionsRefreshUpdated SetOnOptionsRefreshUpdated { get; set; }
+    public OnOptionsUnusualActivityUpdated SetOnOptionsUnusualActivityUpdated { get; set; }
+    public OnOptionsTradeCandleStickUpdated SetOnOptionsTradeCandleStickUpdated { get; set; }
+    public OnOptionsQuoteCandleStickUpdated SetOnOptionsQuoteCandleStickUpdated { get; set; }
     
     #endregion //Delegates
 }

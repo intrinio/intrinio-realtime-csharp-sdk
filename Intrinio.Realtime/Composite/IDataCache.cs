@@ -78,21 +78,21 @@ public interface IDataCache
     
     #region Delegates
     
-    void SetOnSupplementalDatumUpdated(OnSupplementalDatumUpdated onSupplementalDatumUpdated);
-    void SetOnSecuritySupplementalDatumUpdated(OnSecuritySupplementalDatumUpdated onSecuritySupplementalDatumUpdated);
-    void SetOnOptionSupplementalDatumUpdated(OnOptionsContractSupplementalDatumUpdated onOptionsContractSupplementalDatumUpdated);
+    OnSupplementalDatumUpdated SetOnSupplementalDatumUpdated { get; set; }
+    OnSecuritySupplementalDatumUpdated SetOnSecuritySupplementalDatumUpdated { get; set; }
+    OnOptionsContractSupplementalDatumUpdated SetOnOptionsContractSupplementalDatumUpdated { get; set; }
     
-    void SetOnEquitiesTradeUpdated(OnEquitiesTradeUpdated onEquitiesTradeUpdated);
-    void SetOnEquitiesQuoteUpdated(OnEquitiesQuoteUpdated onEquitiesQuoteUpdated);
-    void SetOnEquitiesTradeCandleStickUpdated(OnEquitiesTradeCandleStickUpdated onEquitiesTradeCandleStickUpdated);
-    void SetOnEquitiesQuoteCandleStickUpdated(OnEquitiesQuoteCandleStickUpdated onEquitiesQuoteCandleStickUpdated);
+    OnEquitiesTradeUpdated SetOnEquitiesTradeUpdated { get; set; }
+    OnEquitiesQuoteUpdated SetOnEquitiesQuoteUpdated { get; set; }
+    OnEquitiesTradeCandleStickUpdated SetOnEquitiesTradeCandleStickUpdated { get; set; }
+    OnEquitiesQuoteCandleStickUpdated SetOnEquitiesQuoteCandleStickUpdated { get; set; }
     
-    void SetOnOptionsTradeUpdated(OnOptionsTradeUpdated onOptionsTradeUpdated);
-    void SetOnOptionsQuoteUpdated(OnOptionsQuoteUpdated onOptionsQuoteUpdated);
-    void SetOnOptionsRefreshUpdated(OnOptionsRefreshUpdated onOptionsRefreshUpdated);
-    void SetOnOptionsUnusualActivityUpdated(OnOptionsUnusualActivityUpdated onOptionsUnusualActivityUpdated);
-    void SetOnOptionsTradeCandleStickUpdated(OnOptionsTradeCandleStickUpdated onOptionsTradeCandleStickUpdated);
-    void SetOnOptionsQuoteCandleStickUpdated(OnOptionsQuoteCandleStickUpdated onOptionsQuoteCandleStickUpdated);
+    OnOptionsTradeUpdated SetOnOptionsTradeUpdated { get; set; }
+    OnOptionsQuoteUpdated SetOnOptionsQuoteUpdated { get; set; }
+    OnOptionsRefreshUpdated SetOnOptionsRefreshUpdated { get; set; }
+    OnOptionsUnusualActivityUpdated SetOnOptionsUnusualActivityUpdated { get; set; }
+    OnOptionsTradeCandleStickUpdated SetOnOptionsTradeCandleStickUpdated { get; set; }
+    OnOptionsQuoteCandleStickUpdated SetOnOptionsQuoteCandleStickUpdated { get; set; }
     
     #endregion //Delegates
 }
