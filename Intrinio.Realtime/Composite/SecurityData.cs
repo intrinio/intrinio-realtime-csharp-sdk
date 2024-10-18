@@ -209,7 +209,7 @@ internal class SecurityData : ISecurityData{
         return Task.FromResult(false);
     }
 
-    internal async Task<bool> SetEquitiesQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick? quoteCandleStick, OnEquitiesQuoteCandleStickUpdated? onEquitiesQuoteCandleStickUpdated, ISecurityData securityData, IDataCache dataCache)
+    internal async Task<bool> SetEquitiesQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick? quoteCandleStick, OnEquitiesQuoteCandleStickUpdated? onEquitiesQuoteCandleStickUpdated, IDataCache dataCache)
     {
         bool isSet = await this.SetEquitiesQuoteCandleStick(quoteCandleStick);
         if (isSet && onEquitiesQuoteCandleStickUpdated != null)
