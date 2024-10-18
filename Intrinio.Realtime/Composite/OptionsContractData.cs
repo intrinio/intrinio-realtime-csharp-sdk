@@ -71,7 +71,7 @@ internal class OptionsContractData : IOptionsContractData
         return Task.FromResult(false);
     }
 
-    internal async Task<bool> SetTrade(Intrinio.Realtime.Options.Trade? trade, OnOptionsTradeUpdated? onOptionsTradeUpdated, ISecurityData securityData, IDataCache dataCache)
+    public async Task<bool> SetTrade(Intrinio.Realtime.Options.Trade? trade, OnOptionsTradeUpdated? onOptionsTradeUpdated, ISecurityData securityData, IDataCache dataCache)
     {
         bool isSet = await SetTrade(trade);
         if (isSet && onOptionsTradeUpdated != null)
@@ -99,7 +99,7 @@ internal class OptionsContractData : IOptionsContractData
         return Task.FromResult(false);
     }
 
-    internal async Task<bool> SetQuote(Intrinio.Realtime.Options.Quote? quote, OnOptionsQuoteUpdated? onOptionsQuoteUpdated, ISecurityData securityData, IDataCache dataCache)
+    public async Task<bool> SetQuote(Intrinio.Realtime.Options.Quote? quote, OnOptionsQuoteUpdated? onOptionsQuoteUpdated, ISecurityData securityData, IDataCache dataCache)
     {
         bool isSet = await this.SetQuote(quote);
         if (isSet && onOptionsQuoteUpdated != null)
@@ -122,7 +122,7 @@ internal class OptionsContractData : IOptionsContractData
         return Task.FromResult(true);
     }
 
-    internal async Task<bool> SetRefresh(Intrinio.Realtime.Options.Refresh? refresh, OnOptionsRefreshUpdated? onOptionsRefreshUpdated, ISecurityData securityData, IDataCache dataCache)
+    public async Task<bool> SetRefresh(Intrinio.Realtime.Options.Refresh? refresh, OnOptionsRefreshUpdated? onOptionsRefreshUpdated, ISecurityData securityData, IDataCache dataCache)
     {
         bool isSet = await this.SetRefresh(refresh);
         if (isSet && onOptionsRefreshUpdated != null)
@@ -145,7 +145,7 @@ internal class OptionsContractData : IOptionsContractData
         return Task.FromResult(true);
     }
 
-    internal async Task<bool> SetUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity, OnOptionsUnusualActivityUpdated? onOptionsUnusualActivityUpdated, ISecurityData securityData, IDataCache dataCache)
+    public async Task<bool> SetUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity, OnOptionsUnusualActivityUpdated? onOptionsUnusualActivityUpdated, ISecurityData securityData, IDataCache dataCache)
     {
         bool isSet = await this.SetUnusualActivity(unusualActivity);
         if (isSet && onOptionsUnusualActivityUpdated != null)
@@ -173,7 +173,7 @@ internal class OptionsContractData : IOptionsContractData
         return Task.FromResult(false);
     }
 
-    internal async Task<bool> SetTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick, OnOptionsTradeCandleStickUpdated? onOptionsTradeCandleStickUpdated, ISecurityData securityData, IDataCache dataCache)
+    public async Task<bool> SetTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick, OnOptionsTradeCandleStickUpdated? onOptionsTradeCandleStickUpdated, ISecurityData securityData, IDataCache dataCache)
     {
         bool isSet = await SetTradeCandleStick(tradeCandleStick);
         if (isSet && onOptionsTradeCandleStickUpdated != null)
@@ -220,7 +220,7 @@ internal class OptionsContractData : IOptionsContractData
         return Task.FromResult(false);
     }
 
-    internal async Task<bool> SetQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick, OnOptionsQuoteCandleStickUpdated? onOptionsQuoteCandleStickUpdated, ISecurityData securityData, IDataCache dataCache)
+    public async Task<bool> SetQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick, OnOptionsQuoteCandleStickUpdated? onOptionsQuoteCandleStickUpdated, ISecurityData securityData, IDataCache dataCache)
     {
         bool isSet = await this.SetQuoteCandleStick(quoteCandleStick);
         if (isSet && onOptionsQuoteCandleStickUpdated != null)
@@ -247,7 +247,7 @@ internal class OptionsContractData : IOptionsContractData
         return Task.FromResult(datum == _supplementaryData.AddOrUpdate(key, datum, (string key, double? oldValue) => update(key, oldValue, datum)));
     }
 
-    internal async Task<bool> SetSupplementaryDatum(string key, double? datum, OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated, ISecurityData securityData, IDataCache dataCache, SupplementalDatumUpdate update)
+    public async Task<bool> SetSupplementaryDatum(string key, double? datum, OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated, ISecurityData securityData, IDataCache dataCache, SupplementalDatumUpdate update)
     {
         bool result = await SetSupplementaryDatum(key, datum, update);
         if (result && onOptionsContractSupplementalDatumUpdated != null)

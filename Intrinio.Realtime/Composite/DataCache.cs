@@ -77,9 +77,19 @@ internal class DataCache : IDataCache
     
     public async Task<bool> SetSecuritySupplementalDatum(string tickerSymbol, string key, double? datum, SupplementalDatumUpdate update)
     {
-        return _securities.TryGetValue(tickerSymbol, out ISecurityData securityData)
-            ? await ((SecurityData)securityData).SetSupplementaryDatum(key, datum, SecuritySupplementalDatumUpdatedCallback, this, update)
-            : false;
+        if (!String.IsNullOrWhiteSpace(tickerSymbol))
+        {
+            ISecurityData securityData;
+            
+            if (!_securities.TryGetValue(tickerSymbol, out securityData))
+            {
+                SecurityData newDatum = new SecurityData(tickerSymbol, null, null, null, null, null, null);
+                securityData = _securities.AddOrUpdate(tickerSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await ((SecurityData)securityData).SetSupplementaryDatum(key, datum, SecuritySupplementalDatumUpdatedCallback, this, update);
+        }
+
+        return false;
     }
     
     public double? GetOptionsContractSupplementalDatum(string tickerSymbol, string contract, string key)
@@ -91,9 +101,20 @@ internal class DataCache : IDataCache
     
     public async Task<bool> SetOptionSupplementalDatum(string tickerSymbol, string contract, string key, double? datum, SupplementalDatumUpdate update)
     {
-        return _securities.TryGetValue(tickerSymbol, out ISecurityData securityData)
-            ? await ((SecurityData)securityData).SetOptionsContractSupplementalDatum(contract, key, datum, OptionsContractSupplementalDatumUpdatedCallback, this, update)
-            : false;
+        if (!String.IsNullOrWhiteSpace(tickerSymbol))
+        {
+            ISecurityData securityData;
+            
+            if (!_securities.TryGetValue(tickerSymbol, out securityData))
+            {
+                SecurityData newDatum = new SecurityData(tickerSymbol, null, null, null, null, null, null);
+                securityData = _securities.AddOrUpdate(tickerSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return await ((SecurityData)securityData).SetOptionsContractSupplementalDatum(contract, key, datum, OptionsContractSupplementalDatumUpdatedCallback, this, update);
+        }
+
+        return false;
+        
     }
     
     #endregion //Supplementary Data
