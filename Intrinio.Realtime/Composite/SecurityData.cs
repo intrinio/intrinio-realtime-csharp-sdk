@@ -56,14 +56,14 @@ internal class SecurityData : ISecurityData{
     
     public double? GetSupplementaryDatum(string key) { return _supplementaryData.GetValueOrDefault(key, null); }
 
-    public Task<bool> SetSupplementaryDatum(string key, double? datum)
+    public Task<bool> SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update)
     {
-        return Task.FromResult(datum == _supplementaryData.AddOrUpdate(key, datum, (key, oldValue) => datum));
+        return Task.FromResult(datum == _supplementaryData.AddOrUpdate(key, datum, (string key, double? oldValue) => update(key, oldValue, datum)));
     }
 
-    internal async Task<bool> SetSupplementaryDatum(string key, double? datum, OnSecuritySupplementalDatumUpdated? onSecuritySupplementalDatumUpdated, IDataCache dataCache)
+    internal async Task<bool> SetSupplementaryDatum(string key, double? datum, OnSecuritySupplementalDatumUpdated? onSecuritySupplementalDatumUpdated, IDataCache dataCache, SupplementalDatumUpdate update)
     {
-        bool result = await SetSupplementaryDatum(key, datum);
+        bool result = await SetSupplementaryDatum(key, datum, update);
         if (result && onSecuritySupplementalDatumUpdated != null)
         {
             try
@@ -531,7 +531,7 @@ internal class SecurityData : ISecurityData{
         return null;
     }
 
-    public async Task<bool> SetOptionsContractSupplementalDatum(string contract, string key, double? datum)
+    public async Task<bool> SetOptionsContractSupplementalDatum(string contract, string key, double? datum, SupplementalDatumUpdate update)
     {
         if (!String.IsNullOrWhiteSpace(contract))
         {
@@ -542,13 +542,13 @@ internal class SecurityData : ISecurityData{
                 OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, null, null, null, null);
                 currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await currentOptionsContractData.SetSupplementaryDatum(key, datum);
+            return await currentOptionsContractData.SetSupplementaryDatum(key, datum, update);
         }
 
         return false;
     }
 
-    internal async Task<bool> SetOptionsContractSupplementalDatum(string contract, string key, double? datum, OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated, IDataCache dataCache)
+    internal async Task<bool> SetOptionsContractSupplementalDatum(string contract, string key, double? datum, OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated, IDataCache dataCache, SupplementalDatumUpdate update)
     {
         if (!String.IsNullOrWhiteSpace(contract))
         {
@@ -559,7 +559,7 @@ internal class SecurityData : ISecurityData{
                 OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, null, null, null, null);
                 currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await currentOptionsContractData.SetSupplementaryDatum(key, datum, onOptionsContractSupplementalDatumUpdated, this, dataCache);
+            return await currentOptionsContractData.SetSupplementaryDatum(key, datum, onOptionsContractSupplementalDatumUpdated, this, dataCache, update);
         }
 
         return false;

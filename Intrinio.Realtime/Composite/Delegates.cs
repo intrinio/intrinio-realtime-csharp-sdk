@@ -18,3 +18,5 @@ public delegate Task OnOptionsRefreshUpdated(IOptionsContractData optionsContrac
 public delegate Task OnOptionsUnusualActivityUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData);
 public delegate Task OnOptionsTradeCandleStickUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData);
 public delegate Task OnOptionsQuoteCandleStickUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData);
+
+public delegate double? SupplementalDatumUpdate(string key, double? oldValue, double? newValue);

@@ -27,6 +27,6 @@ public interface IOptionsContractData {
     Task<bool> SetQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick);
     
     double? GetSupplementaryDatum(string key);
-    Task<bool> SetSupplementaryDatum(string key, double? datum);
+    Task<bool> SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update);
     IReadOnlyDictionary<string, double?> AllSupplementaryData { get; }
 }

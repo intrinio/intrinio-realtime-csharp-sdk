@@ -14,15 +14,15 @@ public interface IDataCache
     
     double? GetSupplementaryDatum(string key);
 
-    Task<bool> SetSupplementaryDatum(string key, double? datum);
+    Task<bool> SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update);
 
     IReadOnlyDictionary<string, double?> AllSupplementaryData { get; }
     
     double? GetSecuritySupplementalDatum(string tickerSymbol, string key);
-    Task<bool> SetSecuritySupplementalDatum(string tickerSymbol, string key, double? datum);
+    Task<bool> SetSecuritySupplementalDatum(string tickerSymbol, string key, double? datum, SupplementalDatumUpdate update);
     
     double? GetOptionsContractSupplementalDatum(string tickerSymbol, string contract, string key);
-    Task<bool> SetOptionSupplementalDatum(string tickerSymbol, string contract, string key, double? datum);
+    Task<bool> SetOptionSupplementalDatum(string tickerSymbol, string contract, string key, double? datum, SupplementalDatumUpdate update);
     
     #endregion //Supplementary Data
     

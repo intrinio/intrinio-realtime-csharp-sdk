@@ -21,7 +21,7 @@ public interface ISecurityData {
 
     double? GetSupplementaryDatum(string key);
 
-    Task<bool> SetSupplementaryDatum(string key, double? datum);
+    Task<bool> SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update);
 
     IReadOnlyDictionary<string, double?> AllSupplementaryData { get; }
 
@@ -67,5 +67,5 @@ public interface ISecurityData {
 
     double? GetOptionsContractSupplementalDatum(string contract, string key);
 
-    Task<bool> SetOptionsContractSupplementalDatum(string contract, string key, double? datum);
+    Task<bool> SetOptionsContractSupplementalDatum(string contract, string key, double? datum, SupplementalDatumUpdate update);
 }

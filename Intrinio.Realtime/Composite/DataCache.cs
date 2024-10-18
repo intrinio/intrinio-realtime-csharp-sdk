@@ -49,9 +49,9 @@ public class DataCache : IDataCache
 
     public double? GetSupplementaryDatum(string key) { return _supplementaryData.GetValueOrDefault(key, null); }
 
-    public async Task<bool> SetSupplementaryDatum(string key, double? datum)
+    public async Task<bool> SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update)
     {
-        bool result = datum == _supplementaryData.AddOrUpdate(key, datum, (key, oldValue) => datum);
+        bool result = datum == _supplementaryData.AddOrUpdate(key, datum, (string key, double? oldValue) => update(key, oldValue, datum));
         if (result && SupplementalDatumUpdatedCallback != null)
         {
             try
@@ -75,10 +75,10 @@ public class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetSecuritySupplementalDatum(string tickerSymbol, string key, double? datum)
+    public async Task<bool> SetSecuritySupplementalDatum(string tickerSymbol, string key, double? datum, SupplementalDatumUpdate update)
     {
         return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
-            ? await securityData.SetSupplementaryDatum(key, datum, SecuritySupplementalDatumUpdatedCallback, this)
+            ? await securityData.SetSupplementaryDatum(key, datum, SecuritySupplementalDatumUpdatedCallback, this, update)
             : false;
     }
     
@@ -89,10 +89,10 @@ public class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetOptionSupplementalDatum(string tickerSymbol, string contract, string key, double? datum)
+    public async Task<bool> SetOptionSupplementalDatum(string tickerSymbol, string contract, string key, double? datum, SupplementalDatumUpdate update)
     {
         return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
-            ? await securityData.SetOptionsContractSupplementalDatum(contract, key, datum, OptionsContractSupplementalDatumUpdatedCallback, this)
+            ? await securityData.SetOptionsContractSupplementalDatum(contract, key, datum, OptionsContractSupplementalDatumUpdatedCallback, this, update)
             : false;
     }
     

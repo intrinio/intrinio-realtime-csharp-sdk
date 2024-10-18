@@ -242,14 +242,14 @@ internal class OptionsContractData : IOptionsContractData
         return _supplementaryData.GetValueOrDefault(key, null);
     }
 
-    public Task<bool> SetSupplementaryDatum(string key, double? datum)
+    public Task<bool> SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update)
     {
-        return Task.FromResult(datum == _supplementaryData.AddOrUpdate(key, datum, (key, oldValue) => datum));
+        return Task.FromResult(datum == _supplementaryData.AddOrUpdate(key, datum, (string key, double? oldValue) => update(key, oldValue, datum)));
     }
 
-    internal async Task<bool> SetSupplementaryDatum(string key, double? datum, OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated, ISecurityData securityData, IDataCache dataCache)
+    internal async Task<bool> SetSupplementaryDatum(string key, double? datum, OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated, ISecurityData securityData, IDataCache dataCache, SupplementalDatumUpdate update)
     {
-        bool result = await SetSupplementaryDatum(key, datum);
+        bool result = await SetSupplementaryDatum(key, datum, update);
         if (result && onOptionsContractSupplementalDatumUpdated != null)
         {
             try
