@@ -19,7 +19,7 @@ internal class SecurityData : ISecurityData{
     private Intrinio.Realtime.Equities.TradeCandleStick? _latestTradeCandleStick;
     private Intrinio.Realtime.Equities.QuoteCandleStick? _latestAskQuoteCandleStick;
     private Intrinio.Realtime.Equities.QuoteCandleStick? _latestBidQuoteCandleStick;
-    private readonly ConcurrentDictionary<string, OptionsContractData> _contracts;
+    private readonly ConcurrentDictionary<string, IOptionsContractData> _contracts;
     private readonly IReadOnlyDictionary<string, IOptionsContractData> _readonlyContracts;
     private readonly ConcurrentDictionary<string, double?> _supplementaryData;
     private readonly IReadOnlyDictionary<string, double?> _readonlySupplementaryData;
@@ -38,8 +38,8 @@ internal class SecurityData : ISecurityData{
         _latestTradeCandleStick = latestTradeCandleStick;
         _latestAskQuoteCandleStick = latestAskQuoteCandleStick;
         _latestBidQuoteCandleStick = latestBidQuoteCandleStick;
-        _contracts = new ConcurrentDictionary<string, OptionsContractData>();
-        _readonlyContracts = new ReadOnlyDictionary<string, IOptionsContractData>((IDictionary<string, IOptionsContractData>)_contracts);
+        _contracts = new ConcurrentDictionary<string, IOptionsContractData>();
+        _readonlyContracts = _contracts;
         _supplementaryData = new ConcurrentDictionary<string, double?>();
         _readonlySupplementaryData = new ReadOnlyDictionary<string, double?>(_supplementaryData);
     }
@@ -228,7 +228,7 @@ internal class SecurityData : ISecurityData{
     
     public IOptionsContractData? GetOptionsContractData(string contract)
     {
-        return _contracts.TryGetValue(contract, out OptionsContractData optionsContractData) ? optionsContractData : null;
+        return _contracts.TryGetValue(contract, out IOptionsContractData optionsContractData) ? optionsContractData : null;
     }
 
     public IReadOnlyDictionary<string, IOptionsContractData> AllOptionsContractData { get { return _readonlyContracts; } }
@@ -240,7 +240,7 @@ internal class SecurityData : ISecurityData{
     
     public Intrinio.Realtime.Options.Trade? GetOptionsContractTrade(string contract)
     {
-        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        if (_contracts.TryGetValue(contract, out IOptionsContractData optionsContractData))
         {
             return optionsContractData.LatestTrade;
         }
@@ -252,7 +252,7 @@ internal class SecurityData : ISecurityData{
     {
         if (trade.HasValue)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = trade.Value.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -270,7 +270,7 @@ internal class SecurityData : ISecurityData{
     {
         if (trade.HasValue)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = trade.Value.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -278,7 +278,7 @@ internal class SecurityData : ISecurityData{
                 OptionsContractData newDatum = new OptionsContractData(contract, trade, null, null, null, null, null, null);
                 currentOptionsContractData = _contracts.AddOrUpdate(trade.Value.Contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await currentOptionsContractData.SetTrade(trade, onOptionsTradeUpdated, this, dataCache);
+            return await ((OptionsContractData)currentOptionsContractData).SetTrade(trade, onOptionsTradeUpdated, this, dataCache);
         }
 
         return false;
@@ -286,7 +286,7 @@ internal class SecurityData : ISecurityData{
     
     public Intrinio.Realtime.Options.Quote? GetOptionsContractQuote(string contract)
     {
-        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        if (_contracts.TryGetValue(contract, out IOptionsContractData optionsContractData))
         {
             return optionsContractData.LatestQuote;
         }
@@ -298,7 +298,7 @@ internal class SecurityData : ISecurityData{
     {
         if (quote.HasValue)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = quote.Value.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -316,7 +316,7 @@ internal class SecurityData : ISecurityData{
     {
         if (quote.HasValue)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = quote.Value.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -324,7 +324,7 @@ internal class SecurityData : ISecurityData{
                 OptionsContractData newDatum = new OptionsContractData(contract, null, quote, null, null, null, null, null);
                 currentOptionsContractData = _contracts.AddOrUpdate(quote.Value.Contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await currentOptionsContractData.SetQuote(quote, onOptionsQuoteUpdated, this, dataCache);
+            return await ((OptionsContractData)currentOptionsContractData).SetQuote(quote, onOptionsQuoteUpdated, this, dataCache);
         }
 
         return false;
@@ -332,7 +332,7 @@ internal class SecurityData : ISecurityData{
     
     public Intrinio.Realtime.Options.Refresh? GetOptionsContractRefresh(string contract)
     {
-        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        if (_contracts.TryGetValue(contract, out IOptionsContractData optionsContractData))
         {
             return optionsContractData.LatestRefresh;
         }
@@ -344,7 +344,7 @@ internal class SecurityData : ISecurityData{
     {
         if (refresh.HasValue)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = refresh.Value.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -362,7 +362,7 @@ internal class SecurityData : ISecurityData{
     {
         if (refresh.HasValue)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = refresh.Value.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -370,7 +370,7 @@ internal class SecurityData : ISecurityData{
                 OptionsContractData newDatum = new OptionsContractData(contract, null, null, refresh, null, null, null, null);
                 currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await currentOptionsContractData.SetRefresh(refresh, onOptionsRefreshUpdated, this, dataCache);
+            return await ((OptionsContractData)currentOptionsContractData).SetRefresh(refresh, onOptionsRefreshUpdated, this, dataCache);
         }
 
         return false;
@@ -378,7 +378,7 @@ internal class SecurityData : ISecurityData{
     
     public Intrinio.Realtime.Options.UnusualActivity? GetOptionsContractUnusualActivity(string contract)
     {
-        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        if (_contracts.TryGetValue(contract, out IOptionsContractData optionsContractData))
         {
             return optionsContractData.LatestUnusualActivity;
         }
@@ -390,7 +390,7 @@ internal class SecurityData : ISecurityData{
     {
         if (unusualActivity.HasValue)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = unusualActivity.Value.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -408,7 +408,7 @@ internal class SecurityData : ISecurityData{
     {
         if (unusualActivity.HasValue)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = unusualActivity.Value.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -416,7 +416,7 @@ internal class SecurityData : ISecurityData{
                 OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, unusualActivity, null, null, null);
                 currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await currentOptionsContractData.SetUnusualActivity(unusualActivity, onOptionsUnusualActivityUpdated, this, dataCache);
+            return await ((OptionsContractData)currentOptionsContractData).SetUnusualActivity(unusualActivity, onOptionsUnusualActivityUpdated, this, dataCache);
         }
 
         return false;
@@ -424,7 +424,7 @@ internal class SecurityData : ISecurityData{
     
     public Intrinio.Realtime.Options.TradeCandleStick? GetOptionsContractTradeCandleStick(string contract)
     {
-        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        if (_contracts.TryGetValue(contract, out IOptionsContractData optionsContractData))
         {
             return optionsContractData.LatestTradeCandleStick;
         }
@@ -436,7 +436,7 @@ internal class SecurityData : ISecurityData{
     {
         if (tradeCandleStick != null)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = tradeCandleStick.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -454,7 +454,7 @@ internal class SecurityData : ISecurityData{
     {
         if (tradeCandleStick != null)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = tradeCandleStick.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -462,7 +462,7 @@ internal class SecurityData : ISecurityData{
                 OptionsContractData newDatum = new OptionsContractData(contract, null, null, null,  null, tradeCandleStick, null, null);
                 currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await currentOptionsContractData.SetTradeCandleStick(tradeCandleStick, onOptionsTradeCandleStickUpdated, this, dataCache);
+            return await ((OptionsContractData)currentOptionsContractData).SetTradeCandleStick(tradeCandleStick, onOptionsTradeCandleStickUpdated, this, dataCache);
         }
 
         return false;
@@ -470,7 +470,7 @@ internal class SecurityData : ISecurityData{
     
     public Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsContractBidQuoteCandleStick(string contract)
     {
-        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        if (_contracts.TryGetValue(contract, out IOptionsContractData optionsContractData))
         {
             return optionsContractData.LatestBidQuoteCandleStick;
         }
@@ -480,7 +480,7 @@ internal class SecurityData : ISecurityData{
     
     public Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsContractAskQuoteCandleStick(string contract)
     {
-        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        if (_contracts.TryGetValue(contract, out IOptionsContractData optionsContractData))
         {
             return optionsContractData.LatestAskQuoteCandleStick;
         }
@@ -492,7 +492,7 @@ internal class SecurityData : ISecurityData{
     {
         if (quoteCandleStick != null)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = quoteCandleStick.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -510,7 +510,7 @@ internal class SecurityData : ISecurityData{
     {
         if (quoteCandleStick != null)
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             string contract = quoteCandleStick.Contract;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
@@ -518,7 +518,7 @@ internal class SecurityData : ISecurityData{
                 OptionsContractData newDatum = new OptionsContractData(contract, null, null, null,  null, null, quoteCandleStick.QuoteType == QuoteType.Ask ? quoteCandleStick : null, quoteCandleStick.QuoteType == QuoteType.Bid ? quoteCandleStick : null);
                 currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await currentOptionsContractData.SetQuoteCandleStick(quoteCandleStick, onOptionsQuoteCandleStickUpdated, this, dataCache);
+            return await ((OptionsContractData)currentOptionsContractData).SetQuoteCandleStick(quoteCandleStick, onOptionsQuoteCandleStickUpdated, this, dataCache);
         }
 
         return false;
@@ -526,7 +526,7 @@ internal class SecurityData : ISecurityData{
     
     public double? GetOptionsContractSupplementalDatum(string contract, string key)
     {
-        if (_contracts.TryGetValue(contract, out OptionsContractData optionsContractData))
+        if (_contracts.TryGetValue(contract, out IOptionsContractData optionsContractData))
             return optionsContractData.GetSupplementaryDatum(key);
         return null;
     }
@@ -535,7 +535,7 @@ internal class SecurityData : ISecurityData{
     {
         if (!String.IsNullOrWhiteSpace(contract))
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
             {
@@ -552,14 +552,14 @@ internal class SecurityData : ISecurityData{
     {
         if (!String.IsNullOrWhiteSpace(contract))
         {
-            OptionsContractData currentOptionsContractData;
+            IOptionsContractData currentOptionsContractData;
             
             if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
             {
                 OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, null, null, null, null);
                 currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await currentOptionsContractData.SetSupplementaryDatum(key, datum, onOptionsContractSupplementalDatumUpdated, this, dataCache, update);
+            return await ((OptionsContractData)currentOptionsContractData).SetSupplementaryDatum(key, datum, onOptionsContractSupplementalDatumUpdated, this, dataCache, update);
         }
 
         return false;
