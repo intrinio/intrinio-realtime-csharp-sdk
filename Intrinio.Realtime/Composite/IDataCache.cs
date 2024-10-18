@@ -78,21 +78,21 @@ public interface IDataCache
     
     #region Delegates
     
-    OnSupplementalDatumUpdated SetOnSupplementalDatumUpdated { get; set; }
-    OnSecuritySupplementalDatumUpdated SetOnSecuritySupplementalDatumUpdated { get; set; }
-    OnOptionsContractSupplementalDatumUpdated SetOnOptionsContractSupplementalDatumUpdated { get; set; }
+    OnSupplementalDatumUpdated? SupplementalDatumUpdatedCallback { get; set; }
+    OnSecuritySupplementalDatumUpdated? SecuritySupplementalDatumUpdatedCallback { get; set; }
+    OnOptionsContractSupplementalDatumUpdated? OptionsContractSupplementalDatumUpdatedCallback { get; set; }
     
-    OnEquitiesTradeUpdated SetOnEquitiesTradeUpdated { get; set; }
-    OnEquitiesQuoteUpdated SetOnEquitiesQuoteUpdated { get; set; }
-    OnEquitiesTradeCandleStickUpdated SetOnEquitiesTradeCandleStickUpdated { get; set; }
-    OnEquitiesQuoteCandleStickUpdated SetOnEquitiesQuoteCandleStickUpdated { get; set; }
+    OnEquitiesTradeUpdated? EquitiesTradeUpdatedCallback { get; set; }
+    OnEquitiesQuoteUpdated? EquitiesQuoteUpdatedCallback { get; set; }
+    OnEquitiesTradeCandleStickUpdated? EquitiesTradeCandleStickUpdatedCallback { get; set; }
+    OnEquitiesQuoteCandleStickUpdated? EquitiesQuoteCandleStickUpdatedCallback { get; set; }
     
-    OnOptionsTradeUpdated SetOnOptionsTradeUpdated { get; set; }
-    OnOptionsQuoteUpdated SetOnOptionsQuoteUpdated { get; set; }
-    OnOptionsRefreshUpdated SetOnOptionsRefreshUpdated { get; set; }
-    OnOptionsUnusualActivityUpdated SetOnOptionsUnusualActivityUpdated { get; set; }
-    OnOptionsTradeCandleStickUpdated SetOnOptionsTradeCandleStickUpdated { get; set; }
-    OnOptionsQuoteCandleStickUpdated SetOnOptionsQuoteCandleStickUpdated { get; set; }
+    OnOptionsTradeUpdated? OptionsTradeUpdatedCallback { get; set; }
+    OnOptionsQuoteUpdated? OptionsQuoteUpdatedCallback { get; set; }
+    OnOptionsRefreshUpdated? OptionsRefreshUpdatedCallback { get; set; }
+    OnOptionsUnusualActivityUpdated? OptionsUnusualActivityUpdatedCallback { get; set; }
+    OnOptionsTradeCandleStickUpdated? OptionsTradeCandleStickUpdatedCallback { get; set; }
+    OnOptionsQuoteCandleStickUpdated? OptionsQuoteCandleStickUpdatedCallback { get; set; }
     
     #endregion //Delegates
 }

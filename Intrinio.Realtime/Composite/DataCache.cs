@@ -15,57 +15,32 @@ public class DataCache : IDataCache
     private readonly ConcurrentDictionary<string, double?> _supplementaryData;
     private readonly IReadOnlyDictionary<string, double?> _readonlySupplementaryData;
     
-    private OnSupplementalDatumUpdated? _onSupplementalDatumUpdated;
-    private OnSecuritySupplementalDatumUpdated? _onSecuritySupplementalDatumUpdated;
-    private OnOptionsContractSupplementalDatumUpdated? _onOptionsContractSupplementalDatumUpdated;
-    private OnEquitiesTradeUpdated? _onEquitiesTradeUpdated;
-    private OnEquitiesQuoteUpdated? _onEquitiesQuoteUpdated;
-    private OnEquitiesTradeCandleStickUpdated? _onEquitiesTradeCandleStickUpdated;
-    private OnEquitiesQuoteCandleStickUpdated? _onEquitiesQuoteCandleStickUpdated;
-    private OnOptionsTradeUpdated? _onOptionsTradeUpdated;
-    private OnOptionsQuoteUpdated? _onOptionsQuoteUpdated;
-    private OnOptionsRefreshUpdated? _onOptionsRefreshUpdated;
-    private OnOptionsUnusualActivityUpdated? _onOptionsUnusualActivityUpdated;
-    private OnOptionsTradeCandleStickUpdated? _onOptionsTradeCandleStickUpdated;
-    private OnOptionsQuoteCandleStickUpdated? _onOptionsQuoteCandleStickUpdated;
-
+    public OnSupplementalDatumUpdated? SupplementalDatumUpdatedCallback { get; set; }
+    public OnSecuritySupplementalDatumUpdated? SecuritySupplementalDatumUpdatedCallback { get; set; }
+    public OnOptionsContractSupplementalDatumUpdated? OptionsContractSupplementalDatumUpdatedCallback { get; set; }
+    
+    public OnEquitiesTradeUpdated? EquitiesTradeUpdatedCallback { get; set; }
+    public OnEquitiesQuoteUpdated? EquitiesQuoteUpdatedCallback { get; set; }
+    public OnEquitiesTradeCandleStickUpdated? EquitiesTradeCandleStickUpdatedCallback { get; set; }
+    public OnEquitiesQuoteCandleStickUpdated? EquitiesQuoteCandleStickUpdatedCallback { get; set; }
+    
+    public OnOptionsTradeUpdated? OptionsTradeUpdatedCallback { get; set; }
+    public OnOptionsQuoteUpdated? OptionsQuoteUpdatedCallback { get; set; }
+    public OnOptionsRefreshUpdated? OptionsRefreshUpdatedCallback { get; set; }
+    public OnOptionsUnusualActivityUpdated? OptionsUnusualActivityUpdatedCallback { get; set; }
+    public OnOptionsTradeCandleStickUpdated? OptionsTradeCandleStickUpdatedCallback { get; set; }
+    public OnOptionsQuoteCandleStickUpdated? OptionsQuoteCandleStickUpdatedCallback { get; set; }
+    
     #endregion //Data Members
     
     #region Constructors
 
-    public DataCache(OnSupplementalDatumUpdated? onSupplementalDatumUpdated = null,
-                        OnSecuritySupplementalDatumUpdated? onSecuritySupplementalDatumUpdated = null,
-                        OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated = null,
-                        OnEquitiesTradeUpdated? onEquitiesTradeUpdated = null,
-                        OnEquitiesQuoteUpdated? onEquitiesQuoteUpdated = null,
-                        OnEquitiesTradeCandleStickUpdated? onEquitiesTradeCandleStickUpdated = null,
-                        OnEquitiesQuoteCandleStickUpdated? onEquitiesQuoteCandleStickUpdated = null,
-                        OnOptionsTradeUpdated? onOptionsTradeUpdated = null,
-                        OnOptionsQuoteUpdated? onOptionsQuoteUpdated = null,
-                        OnOptionsRefreshUpdated? onOptionsRefreshUpdated = null,
-                        OnOptionsUnusualActivityUpdated? onOptionsUnusualActivityUpdated = null,
-                        OnOptionsTradeCandleStickUpdated? onOptionsTradeCandleStickUpdated = null,
-                        OnOptionsQuoteCandleStickUpdated? onOptionsQuoteCandleStickUpdated = null
-    )
+    public DataCache()
     {
         _securities = new ConcurrentDictionary<string, SecurityData>();
         _readonlySecurities = new ReadOnlyDictionary<string, ISecurityData>((IDictionary<string, ISecurityData>)_securities);
         _supplementaryData = new ConcurrentDictionary<string, double?>();
         _readonlySupplementaryData = new ReadOnlyDictionary<string, double?>(_supplementaryData);
-        
-        _onSupplementalDatumUpdated = onSupplementalDatumUpdated;
-        _onSecuritySupplementalDatumUpdated = onSecuritySupplementalDatumUpdated;
-        _onOptionsContractSupplementalDatumUpdated = onOptionsContractSupplementalDatumUpdated;
-        _onEquitiesTradeUpdated = onEquitiesTradeUpdated;
-        _onEquitiesQuoteUpdated = onEquitiesQuoteUpdated;
-        _onEquitiesTradeCandleStickUpdated = onEquitiesTradeCandleStickUpdated;
-        _onEquitiesQuoteCandleStickUpdated = onEquitiesQuoteCandleStickUpdated;
-        _onOptionsTradeUpdated = onOptionsTradeUpdated;
-        _onOptionsQuoteUpdated = onOptionsQuoteUpdated;
-        _onOptionsRefreshUpdated = onOptionsRefreshUpdated;
-        _onOptionsUnusualActivityUpdated = onOptionsUnusualActivityUpdated;
-        _onOptionsTradeCandleStickUpdated = onOptionsTradeCandleStickUpdated;
-        _onOptionsQuoteCandleStickUpdated = onOptionsQuoteCandleStickUpdated;
     }
 
     #endregion // Constructors
@@ -77,11 +52,11 @@ public class DataCache : IDataCache
     public async Task<bool> SetSupplementaryDatum(string key, double? datum)
     {
         bool result = datum == _supplementaryData.AddOrUpdate(key, datum, (key, oldValue) => datum);
-        if (result && _onSupplementalDatumUpdated != null)
+        if (result && SupplementalDatumUpdatedCallback != null)
         {
             try
             {
-                await _onSupplementalDatumUpdated(key, datum, this);
+                await SupplementalDatumUpdatedCallback(key, datum, this);
             }
             catch (Exception e)
             {
@@ -103,7 +78,7 @@ public class DataCache : IDataCache
     public async Task<bool> SetSecuritySupplementalDatum(string tickerSymbol, string key, double? datum)
     {
         return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
-            ? await securityData.SetSupplementaryDatum(key, datum, _onSecuritySupplementalDatumUpdated, this)
+            ? await securityData.SetSupplementaryDatum(key, datum, SecuritySupplementalDatumUpdatedCallback, this)
             : false;
     }
     
@@ -117,7 +92,7 @@ public class DataCache : IDataCache
     public async Task<bool> SetOptionSupplementalDatum(string tickerSymbol, string contract, string key, double? datum)
     {
         return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
-            ? await securityData.SetOptionsContractSupplementalDatum(contract, key, datum, _onOptionsContractSupplementalDatumUpdated, this)
+            ? await securityData.SetOptionsContractSupplementalDatum(contract, key, datum, OptionsContractSupplementalDatumUpdatedCallback, this)
             : false;
     }
     
@@ -130,7 +105,7 @@ public class DataCache : IDataCache
         return _securities.GetValueOrDefault(tickerSymbol, null);
     }
     
-    public IReadOnlyDictionary<string, ISecurityData> AllSecurityData { get{return _readonlySecurities} }
+    public IReadOnlyDictionary<string, ISecurityData> AllSecurityData { get{return _readonlySecurities;} }
     public IOptionsContractData? GetOptionsContractData(string tickerSymbol, string contract)
     {
         return _securities.TryGetValue(tickerSymbol, out SecurityData securityData)
@@ -269,24 +244,4 @@ public class DataCache : IDataCache
     }
 
     #endregion
-    
-    #region Delegates
-    
-    public OnSupplementalDatumUpdated SetOnSupplementalDatumUpdated { get; set; }
-    public OnSecuritySupplementalDatumUpdated SetOnSecuritySupplementalDatumUpdated { get; set; }
-    public OnOptionsContractSupplementalDatumUpdated SetOnOptionsContractSupplementalDatumUpdated { get; set; }
-    
-    public OnEquitiesTradeUpdated SetOnEquitiesTradeUpdated { get; set; }
-    public OnEquitiesQuoteUpdated SetOnEquitiesQuoteUpdated { get; set; }
-    public OnEquitiesTradeCandleStickUpdated SetOnEquitiesTradeCandleStickUpdated { get; set; }
-    public OnEquitiesQuoteCandleStickUpdated SetOnEquitiesQuoteCandleStickUpdated { get; set; }
-    
-    public OnOptionsTradeUpdated SetOnOptionsTradeUpdated { get; set; }
-    public OnOptionsQuoteUpdated SetOnOptionsQuoteUpdated { get; set; }
-    public OnOptionsRefreshUpdated SetOnOptionsRefreshUpdated { get; set; }
-    public OnOptionsUnusualActivityUpdated SetOnOptionsUnusualActivityUpdated { get; set; }
-    public OnOptionsTradeCandleStickUpdated SetOnOptionsTradeCandleStickUpdated { get; set; }
-    public OnOptionsQuoteCandleStickUpdated SetOnOptionsQuoteCandleStickUpdated { get; set; }
-    
-    #endregion //Delegates
 }
