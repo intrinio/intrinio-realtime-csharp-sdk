@@ -28,9 +28,9 @@ public interface IDataCache
     
     #region Sub-caches
     
-    ISecurityData GetSecurityData(string tickerSymbol);
+    ISecurityData? GetSecurityData(string tickerSymbol);
     IReadOnlyDictionary<string, ISecurityData> AllSecurityData { get; }
-    IOptionsContractData GetOptionsContractData(string tickerSymbol, string contract);
+    IOptionsContractData? GetOptionsContractData(string tickerSymbol, string contract);
     IReadOnlyDictionary<string, IOptionsContractData> GetAllOptionsContractData(string tickerSymbol);
     
     #endregion //Sub-caches

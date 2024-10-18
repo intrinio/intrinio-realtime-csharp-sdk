@@ -226,7 +226,7 @@ internal class SecurityData : ISecurityData{
         return isSet;
     }
     
-    public IOptionsContractData GetOptionsContractData(string contract)
+    public IOptionsContractData? GetOptionsContractData(string contract)
     {
         return _contracts.TryGetValue(contract, out OptionsContractData optionsContractData) ? optionsContractData : null;
     }

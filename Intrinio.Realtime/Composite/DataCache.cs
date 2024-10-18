@@ -117,13 +117,13 @@ public class DataCache : IDataCache
     
     #region Sub-caches
     
-    public ISecurityData GetSecurityData(string tickerSymbol)
+    public ISecurityData? GetSecurityData(string tickerSymbol)
     {
-        
+        return _securities.GetValueOrDefault(tickerSymbol, null);
     }
     
     public IReadOnlyDictionary<string, ISecurityData> AllSecurityData { get; }
-    public IOptionsContractData GetOptionsContractData(string tickerSymbol, string contract)
+    public IOptionsContractData? GetOptionsContractData(string tickerSymbol, string contract)
     {
         
     }
@@ -245,10 +245,12 @@ public class DataCache : IDataCache
     {
         
     }
+    
     public Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsBidQuoteCandleStick(string tickerSymbol, string contract)
     {
         
     }
+    
     public async Task<bool> SetOptionsQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick)
     {
         
