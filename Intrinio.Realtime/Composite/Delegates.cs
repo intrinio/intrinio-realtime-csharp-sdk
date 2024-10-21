@@ -20,3 +20,5 @@ public delegate Task OnOptionsTradeCandleStickUpdated(IOptionsContractData optio
 public delegate Task OnOptionsQuoteCandleStickUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData);
 
 public delegate double? SupplementalDatumUpdate(string key, double? oldValue, double? newValue);
+
+public delegate Task CalculateNewGreek(IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache);
