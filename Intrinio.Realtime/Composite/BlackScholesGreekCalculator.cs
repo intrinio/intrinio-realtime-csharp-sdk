@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Intrinio.Realtime.Composite;
@@ -163,7 +164,7 @@ public static class BlackScholesGreekCalculator
     private static double Phi(double x)
     {
         double numerator = System.Math.Exp(-1.0 * x*x / 2.0);
-        double denominator = System.Math.Sqrt(2.0 * Math.PI);
+        double denominator = System.Math.Sqrt(2.0 * System.Math.PI);
         return numerator / denominator;
     }
 
@@ -199,9 +200,7 @@ public static class BlackScholesGreekCalculator
     private static double GetDaysToExpiration(Intrinio.Realtime.Options.Trade latestOptionTrade, Intrinio.Realtime.Options.Quote latestOptionQuote)
     {
         double latestActivity = System.Math.Max(latestOptionTrade.Timestamp, latestOptionQuote.Timestamp);
-        long expirationAsUnixWholeSeconds = latestOptionTrade.GetExpirationDate().toEpochSecond();
-        double fractional = ((double)(latestOptionTrade.GetExpirationDate().getNano())) / 1_000_000_000.0;
-        double expiration = (((double)expirationAsUnixWholeSeconds) + fractional);
-        return (expiration - latestActivity) / 86400.0; //86400 is seconds in a day
+        double expiration = (latestOptionTrade.GetExpirationDate() - DateTime.UnixEpoch.ToUniversalTime()).TotalSeconds;
+        return (expiration - latestActivity) / 86400.0D; //86400 is seconds in a day
     }
 }
