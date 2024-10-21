@@ -71,6 +71,7 @@ internal class DropOldestRingBuffer
                     if (IsFullNoLock())
                     {
                         _blockNextReadIndex = (++_blockNextReadIndex) % BlockCapacity;
+                        Interlocked.Decrement(ref _count);
                         Interlocked.Increment(ref _dropCount);
                     }
                 }
