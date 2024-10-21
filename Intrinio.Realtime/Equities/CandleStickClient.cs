@@ -143,7 +143,7 @@ public class CandleStickClient
         }
         catch (Exception e)
         {
-            Log.Warning("Error on handling trade in CandleStick Client: {0}", e.Message);
+            Log.Warning("Error on handling trade in Equities CandleStick Client: {0}", e.Message);
         }
     }
 
@@ -171,7 +171,7 @@ public class CandleStickClient
         }
         catch (Exception e)
         {
-            Log.Warning("Error on handling trade in CandleStick Client: {0}", e.Message);
+            Log.Warning("Error on handling quote in Equities CandleStick Client: {0}", e.Message);
         }      
     }
 

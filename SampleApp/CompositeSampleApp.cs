@@ -58,14 +58,22 @@ public class CompositeSampleApp
 	{
 		Interlocked.Increment(ref _optionsQuoteEventCount);
 		_dataCache.SetOptionsQuote(quote);
-		_optionsCandleStickClient.OnQuote(quote);
+		
+		if (_optionsUseTradeCandleSticks || _optionsUseQuoteCandleSticks)
+		{
+			_optionsCandleStickClient.OnQuote(quote);
+		}
 	}
 
 	static void OnOptionsTrade(Intrinio.Realtime.Options.Trade trade)
 	{
 		Interlocked.Increment(ref _optionsTradeEventCount);
 		_dataCache.SetOptionsTrade(trade);
-		_optionsCandleStickClient.OnTrade(trade);
+		
+		if (_optionsUseTradeCandleSticks || _optionsUseQuoteCandleSticks)
+		{
+			_optionsCandleStickClient.OnTrade(trade);
+		}
 	}
 	
 	static void OnOptionsRefresh(Intrinio.Realtime.Options.Refresh refresh)
@@ -112,14 +120,21 @@ public class CompositeSampleApp
 	{
 		Interlocked.Increment(ref _equitiesQuoteEventCount);
 		_dataCache.SetEquityQuote(quote);
-		_equitiesCandleStickClient.OnQuote(quote);
+		if (_equitiesUseTradeCandleSticks || _equitiesUseQuoteCandleSticks)
+		{
+			_equitiesCandleStickClient.OnQuote(quote);
+		}
 	}
 
 	static void OnEquitiesTrade(Intrinio.Realtime.Equities.Trade trade)
 	{
 		Interlocked.Increment(ref _equitiesTradeEventCount);
 		_dataCache.SetEquityTrade(trade);
-		_equitiesCandleStickClient.OnTrade(trade);
+		
+		if (_equitiesUseTradeCandleSticks || _equitiesUseQuoteCandleSticks)
+		{
+			_equitiesCandleStickClient.OnTrade(trade);
+		}
 	}
 	
 	static void OnEquitiesTradeCandleStick(Intrinio.Realtime.Equities.TradeCandleStick tradeCandleStick)
@@ -272,6 +287,10 @@ public class CompositeSampleApp
 		{
 			_optionsCandleStickClient.Stop();
 		}
+		if (_equitiesUseTradeCandleSticks || _equitiesUseQuoteCandleSticks)
+		{
+			_equitiesCandleStickClient.Stop();
+		}
 		Environment.Exit(0);
 	}
 
@@ -287,24 +306,24 @@ public class CompositeSampleApp
 		_dataCache = DataCacheFactory.Create();
 		_dataCache.EquitiesTradeUpdatedCallback = OnEquitiesTradeCacheUpdated;
 		_dataCache.EquitiesQuoteUpdatedCallback = OnEquitiesQuoteCacheUpdated;
-		_dataCache.EquitiesTradeCandleStickUpdatedCallback = OnEquitiesTradeCandleStickCacheUpdated;
-		_dataCache.EquitiesQuoteCandleStickUpdatedCallback = OnEquitiesQuoteCandleStickCacheUpdated;
+		//_dataCache.EquitiesTradeCandleStickUpdatedCallback = OnEquitiesTradeCandleStickCacheUpdated;
+		//_dataCache.EquitiesQuoteCandleStickUpdatedCallback = OnEquitiesQuoteCandleStickCacheUpdated;
 		_dataCache.OptionsTradeUpdatedCallback = OnOptionsTradeCacheUpdated;
 		_dataCache.OptionsQuoteUpdatedCallback = OnOptionsQuoteCacheUpdated;
 		_dataCache.OptionsRefreshUpdatedCallback = OnOptionsRefreshCacheUpdated;
 		_dataCache.OptionsUnusualActivityUpdatedCallback = OnOptionsUnusualActivityCacheUpdated;
-		_dataCache.OptionsTradeCandleStickUpdatedCallback = OnOptionsTradeCandleStickCacheUpdated;
-		_dataCache.OptionsQuoteCandleStickUpdatedCallback = OnOptionsQuoteCandleStickCacheUpdated;
+		//_dataCache.OptionsTradeCandleStickUpdatedCallback = OnOptionsTradeCandleStickCacheUpdated;
+		//_dataCache.OptionsQuoteCandleStickUpdatedCallback = OnOptionsQuoteCandleStickCacheUpdated;
 		
-		_optionsUseTradeCandleSticks = true;
-		_optionsUseQuoteCandleSticks = true;
-		_optionsCandleStickClient = new Intrinio.Realtime.Options.CandleStickClient(OnOptionsTradeCandleStick, OnOptionsQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0);
-		_optionsCandleStickClient.Start();
+		_optionsUseTradeCandleSticks = false;
+		_optionsUseQuoteCandleSticks = false;
+		// _optionsCandleStickClient = new Intrinio.Realtime.Options.CandleStickClient(OnOptionsTradeCandleStick, OnOptionsQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0);
+		// _optionsCandleStickClient.Start();
 		
-		_equitiesUseTradeCandleSticks = true;
-		_equitiesUseQuoteCandleSticks = true;
-		_equitiesCandleStickClient = new Intrinio.Realtime.Equities.CandleStickClient(OnEquitiesTradeCandleStick, OnEquitiesQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, false);
-		_equitiesCandleStickClient.Start();
+		_equitiesUseTradeCandleSticks = false;
+		_equitiesUseQuoteCandleSticks = false;
+		// _equitiesCandleStickClient = new Intrinio.Realtime.Equities.CandleStickClient(OnEquitiesTradeCandleStick, OnEquitiesQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, false);
+		// _equitiesCandleStickClient.Start();
 
 		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
 		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
