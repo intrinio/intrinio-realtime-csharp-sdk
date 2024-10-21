@@ -1,4 +1,7 @@
 using System.Threading.Tasks;
+using Intrinio.SDK.Api;
+using Intrinio.SDK.Client;
+using Intrinio.SDK.Model;
 
 namespace Intrinio.Realtime.Composite;
 
@@ -26,6 +29,13 @@ public class GreekClient
     private const string BlackScholesKeyName = "IntrinioBlackScholes";
     private readonly ConcurrentDictionary<string, CalculateNewGreek> _calcLookup;
     private readonly SupplementalDatumUpdate _updateFunc = (string key, double? oldValue, double? newValue) => { return newValue; };
+    private readonly Timer _dividendFetchTimer;
+    private readonly Timer _riskFreeInterestRateFetchTimer;
+    private const int PageSize = 1000;
+    private readonly Intrinio.SDK.Client.ApiClient _apiClient;
+    private readonly Intrinio.SDK.Api.CompanyApi _companyApi;
+    private readonly Intrinio.SDK.Api.IndexApi _indexApi;
+    
 
     public OnOptionsContractSupplementalDatumUpdated? OnGreekValueUpdated
     {
@@ -40,7 +50,7 @@ public class GreekClient
     /// </summary>
     /// <param name="greekUpdateFrequency"></param>
     /// <param name="onGreekValueUpdated"></param>
-    public GreekClient(GreekUpdateFrequency greekUpdateFrequency, OnOptionsContractSupplementalDatumUpdated onGreekValueUpdated)
+    public GreekClient(GreekUpdateFrequency greekUpdateFrequency, OnOptionsContractSupplementalDatumUpdated onGreekValueUpdated, string apiKey)
     {
         _cache = DataCacheFactory.Create();
         _calcLookup = new ConcurrentDictionary<string, CalculateNewGreek>();
@@ -57,6 +67,22 @@ public class GreekClient
         
         if (greekUpdateFrequency.HasFlag(GreekUpdateFrequency.EveryRiskFreeInterestRateUpdate))
             _cache.SupplementalDatumUpdatedCallback = UpdateGreeks;
+
+        _apiClient = new ApiClient();
+        _apiClient.Configuration.ApiKey.Add("api_key", apiKey);
+        _companyApi = new CompanyApi();
+        _companyApi.Configuration.ApiKey.Add("api_key", apiKey);
+        _indexApi = new IndexApi();
+        _indexApi.Configuration.ApiKey.Add("api_key", apiKey);
+        
+        _riskFreeInterestRateFetchTimer = new Timer(FetchRiskFreeInterestRate, null, 0, 11*60*60*1000);
+        _dividendFetchTimer = new Timer(FetchDividendYields, null, 0, 4*60*60*1000);
+    }
+
+    ~GreekClient()
+    {
+        _riskFreeInterestRateFetchTimer.Dispose();
+        _dividendFetchTimer.Dispose();
     }
     #endregion //Constructors
     
@@ -127,6 +153,59 @@ public class GreekClient
     
     #region Private Methods
 
+    private async void FetchDividendYields(object? _)
+    {
+        int sanityCount = 0;
+        string? nextPage = null;
+        do
+        {
+            sanityCount++;
+            try
+            {
+                ApiResponseCompanyDailyMetrics results = await _companyApi.GetAllCompaniesDailyMetricsAsync(null, PageSize, nextPage);
+                nextPage = results.NextPage;
+                foreach (CompanyDailyMetric dailyMetric in results.DailyMetrics)
+                {
+                    if (!String.IsNullOrWhiteSpace(dailyMetric.Company.Ticker) && dailyMetric.DividendYield.HasValue)
+                        await _cache.SetSecuritySupplementalDatum(dailyMetric.Company.Ticker, DividendYieldKeyName, Convert.ToDouble(dailyMetric.DividendYield.Value), _updateFunc);
+                }
+                if (!String.IsNullOrWhiteSpace(nextPage))
+                    Task.Delay(1000); //don't try to get rate limited.
+            }
+            catch (Exception e)
+            {
+                Log.Warning(e, e.Message);
+            }
+        } 
+        while (!String.IsNullOrWhiteSpace(nextPage) && sanityCount < 1000);
+    }
+    
+    private async void FetchRiskFreeInterestRate(object? _)
+    {
+        bool success = false;
+        int tryCount = 0;
+        do
+        {
+            tryCount++;
+            try
+            {
+                Decimal? results = await _indexApi.GetEconomicIndexDataPointNumberAsync("$DTB3", "level");
+                if (results.HasValue)
+                {
+                    await _cache.SetSupplementaryDatum(RiskFreeInterestRateKeyName, Convert.ToDouble(results.Value), _updateFunc);
+                    success = true;
+                }
+
+                if (!success)
+                    Task.Delay(10000); //don't try to get rate limited.
+            }
+            catch (Exception e)
+            {
+                Log.Warning(e, e.Message);
+            }
+        } while (!success && tryCount < 10);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private async Task UpdateGreeks(string key, double? datum, IDataCache dataCache)
     {
@@ -174,23 +253,4 @@ public class GreekClient
     }
     
     #endregion //Private Methods
-    
-    #region Private Static Methods
-    // [SkipLocalsInit]
-    // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    // private static Span<T> StackAlloc<T>(int length) where T : unmanaged
-    // {
-    //     unsafe
-    //     {
-    //         Span<T> p = stackalloc T[length];
-    //         return p;
-    //     }
-    // }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double GetCurrentTimestamp(double delay)
-    {
-        return (DateTime.UtcNow - DateTime.UnixEpoch.ToUniversalTime()).TotalSeconds - delay;
-    }
-    #endregion //Private Static Methods
 }
