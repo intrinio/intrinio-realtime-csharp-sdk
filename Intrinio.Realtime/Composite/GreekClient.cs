@@ -180,13 +180,13 @@ public class GreekClient
                 try
                 {
                     decimal? result = await _companyApi.GetCompanyDataPointNumberAsync(seenTicker.Key, dividendYieldTag);
-                    await _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
+                    _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
                     _seenTickers[seenTicker.Key] = DateTime.UtcNow;
                     await Task.Delay(DividendYieldCallSpacerMilliseconds); //don't try to get rate limited.
                 }
                 catch (Exception e)
                 {
-                    await _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, 0.0D, _updateFunc);
+                    _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, 0.0D, _updateFunc);
                     _seenTickers[seenTicker.Key] = DateTime.UtcNow;
                     await Task.Delay(DividendYieldCallSpacerMilliseconds); //don't try to get rate limited.
                 }
@@ -208,12 +208,12 @@ public class GreekClient
                 Decimal? results = await _indexApi.GetEconomicIndexDataPointNumberAsync("$DTB3", "level");
                 if (results.HasValue)
                 {
-                    await _cache.SetSupplementaryDatum(RiskFreeInterestRateKeyName, Convert.ToDouble(results.Value), _updateFunc);
+                    _cache.SetSupplementaryDatum(RiskFreeInterestRateKeyName, Convert.ToDouble(results.Value), _updateFunc);
                     success = true;
                 }
 
                 if (!success)
-                    Task.Delay(10000); //don't try to get rate limited.
+                    await Task.Delay(10000); //don't try to get rate limited.
             }
             catch (Exception e)
             {
@@ -223,37 +223,37 @@ public class GreekClient
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private async Task UpdateGreeks(string key, double? datum, IDataCache dataCache)
+    private void UpdateGreeks(string key, double? datum, IDataCache dataCache)
     {
         if (key == RiskFreeInterestRateKeyName)
             foreach (ISecurityData securityData in dataCache.AllSecurityData.Values)
                 foreach (IOptionsContractData optionsContractData in securityData.AllOptionsContractData.Values)
-                    await UpdateGreeks(optionsContractData, dataCache, securityData);
+                    UpdateGreeks(optionsContractData, dataCache, securityData);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public async Task UpdateGreeks(string key, double? datum, ISecurityData securityData, IDataCache dataCache)
+    public void UpdateGreeks(string key, double? datum, ISecurityData securityData, IDataCache dataCache)
     {
         if (key == DividendYieldKeyName)
             foreach (KeyValuePair<string,IOptionsContractData> keyValuePair in securityData.AllOptionsContractData)
-                await UpdateGreeks(keyValuePair.Value, dataCache, securityData);
+                UpdateGreeks(keyValuePair.Value, dataCache, securityData);
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public async Task UpdateGreeks(ISecurityData securityData, IDataCache dataCache)
+    public void UpdateGreeks(ISecurityData securityData, IDataCache dataCache)
     {
         foreach (KeyValuePair<string,IOptionsContractData> keyValuePair in securityData.AllOptionsContractData)
-            await UpdateGreeks(keyValuePair.Value, dataCache, securityData);
+            UpdateGreeks(keyValuePair.Value, dataCache, securityData);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private async Task UpdateGreeks(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+    private void UpdateGreeks(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
     {
         foreach (CalculateNewGreek calculateNewGreek in _calcLookup.Values)
-            await calculateNewGreek(optionsContractData, securityData, dataCache);
+            calculateNewGreek(optionsContractData, securityData, dataCache);
     } 
 
-    private async Task BlackScholesCalc(IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache)
+    private void BlackScholesCalc(IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache)
     {
         double? riskFreeInterestRate = dataCache.GetSupplementaryDatum(RiskFreeInterestRateKeyName);
         double? dividendYield = securityData.GetSupplementaryDatum(DividendYieldKeyName);
@@ -268,11 +268,11 @@ public class GreekClient
         
         if (result != null)
         {
-            await dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, ImpliedVolatilityKeyName, result.ImpliedVolatility, _updateFunc);
-            await dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, DeltaKeyName, result.Delta, _updateFunc);
-            await dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, GammaKeyName, result.Gamma, _updateFunc);
-            await dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, ThetaKeyName, result.Theta, _updateFunc);
-            await dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, VegaKeyName, result.Vega, _updateFunc);
+            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, ImpliedVolatilityKeyName, result.ImpliedVolatility, _updateFunc);
+            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, DeltaKeyName, result.Delta, _updateFunc);
+            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, GammaKeyName, result.Gamma, _updateFunc);
+            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, ThetaKeyName, result.Theta, _updateFunc);
+            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, VegaKeyName, result.Vega, _updateFunc);
         }
     }
     

@@ -49,14 +49,14 @@ internal class DataCache : IDataCache
 
     public double? GetSupplementaryDatum(string key) { return _supplementaryData.GetValueOrDefault(key, null); }
 
-    public async Task<bool> SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update)
+    public bool SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update)
     {
         bool result = datum == _supplementaryData.AddOrUpdate(key, datum, (string key, double? oldValue) => update(key, oldValue, datum));
         if (result && SupplementalDatumUpdatedCallback != null)
         {
             try
             {
-                await SupplementalDatumUpdatedCallback(key, datum, this);
+                SupplementalDatumUpdatedCallback(key, datum, this);
             }
             catch (Exception e)
             {
@@ -75,7 +75,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetSecuritySupplementalDatum(string tickerSymbol, string key, double? datum, SupplementalDatumUpdate update)
+    public bool SetSecuritySupplementalDatum(string tickerSymbol, string key, double? datum, SupplementalDatumUpdate update)
     {
         if (!String.IsNullOrWhiteSpace(tickerSymbol))
         {
@@ -86,7 +86,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(tickerSymbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(tickerSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetSupplementaryDatum(key, datum, SecuritySupplementalDatumUpdatedCallback, this, update);
+            return ((SecurityData)securityData).SetSupplementaryDatum(key, datum, SecuritySupplementalDatumUpdatedCallback, this, update);
         }
 
         return false;
@@ -99,7 +99,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetOptionSupplementalDatum(string tickerSymbol, string contract, string key, double? datum, SupplementalDatumUpdate update)
+    public bool SetOptionSupplementalDatum(string tickerSymbol, string contract, string key, double? datum, SupplementalDatumUpdate update)
     {
         if (!String.IsNullOrWhiteSpace(tickerSymbol))
         {
@@ -110,7 +110,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(tickerSymbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(tickerSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetOptionsContractSupplementalDatum(contract, key, datum, OptionsContractSupplementalDatumUpdatedCallback, this, update);
+            return ((SecurityData)securityData).SetOptionsContractSupplementalDatum(contract, key, datum, OptionsContractSupplementalDatumUpdatedCallback, this, update);
         }
 
         return false;
@@ -152,7 +152,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetEquityTrade(Intrinio.Realtime.Equities.Trade? trade)
+    public bool SetEquityTrade(Intrinio.Realtime.Equities.Trade? trade)
     {
         if (trade.HasValue)
         {
@@ -164,7 +164,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(symbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(symbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetEquitiesTrade(trade, EquitiesTradeUpdatedCallback, this);
+            return ((SecurityData)securityData).SetEquitiesTrade(trade, EquitiesTradeUpdatedCallback, this);
         }
 
         return false;
@@ -184,7 +184,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetEquityQuote(Intrinio.Realtime.Equities.Quote? quote)
+    public bool SetEquityQuote(Intrinio.Realtime.Equities.Quote? quote)
     {
         if (quote.HasValue)
         {
@@ -196,7 +196,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(symbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(symbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetEquitiesQuote(quote, EquitiesQuoteUpdatedCallback, this);
+            return ((SecurityData)securityData).SetEquitiesQuote(quote, EquitiesQuoteUpdatedCallback, this);
         }
 
         return false;
@@ -209,7 +209,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetEquityTradeCandleStick(Intrinio.Realtime.Equities.TradeCandleStick? tradeCandleStick)
+    public bool SetEquityTradeCandleStick(Intrinio.Realtime.Equities.TradeCandleStick? tradeCandleStick)
     {
         if (tradeCandleStick != null)
         {
@@ -221,7 +221,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(symbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(symbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetEquitiesTradeCandleStick(tradeCandleStick, EquitiesTradeCandleStickUpdatedCallback, this);
+            return ((SecurityData)securityData).SetEquitiesTradeCandleStick(tradeCandleStick, EquitiesTradeCandleStickUpdatedCallback, this);
         }
 
         return false;
@@ -241,7 +241,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetEquityQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick? quoteCandleStick)
+    public bool SetEquityQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick? quoteCandleStick)
     {
         if (quoteCandleStick != null)
         {
@@ -253,7 +253,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(symbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(symbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetEquitiesQuoteCandleStick(quoteCandleStick, EquitiesQuoteCandleStickUpdatedCallback, this);
+            return ((SecurityData)securityData).SetEquitiesQuoteCandleStick(quoteCandleStick, EquitiesQuoteCandleStickUpdatedCallback, this);
         }
 
         return false;
@@ -270,7 +270,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetOptionsTrade(Intrinio.Realtime.Options.Trade? trade)
+    public bool SetOptionsTrade(Intrinio.Realtime.Options.Trade? trade)
     {
         if (trade.HasValue)
         {
@@ -282,7 +282,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetOptionsContractTrade(trade, OptionsTradeUpdatedCallback, this);
+            return ((SecurityData)securityData).SetOptionsContractTrade(trade, OptionsTradeUpdatedCallback, this);
         }
 
         return false;
@@ -295,7 +295,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetOptionsQuote(Intrinio.Realtime.Options.Quote? quote)
+    public bool SetOptionsQuote(Intrinio.Realtime.Options.Quote? quote)
     {
         if (quote.HasValue)
         {
@@ -307,7 +307,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetOptionsContractQuote(quote, OptionsQuoteUpdatedCallback, this);
+            return ((SecurityData)securityData).SetOptionsContractQuote(quote, OptionsQuoteUpdatedCallback, this);
         }
 
         return false;
@@ -320,7 +320,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetOptionsRefresh(Intrinio.Realtime.Options.Refresh? refresh)
+    public bool SetOptionsRefresh(Intrinio.Realtime.Options.Refresh? refresh)
     {
         if (refresh.HasValue)
         {
@@ -332,7 +332,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetOptionsContractRefresh(refresh, OptionsRefreshUpdatedCallback, this);
+            return ((SecurityData)securityData).SetOptionsContractRefresh(refresh, OptionsRefreshUpdatedCallback, this);
         }
 
         return false;
@@ -345,7 +345,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetOptionsUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity)
+    public bool SetOptionsUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity)
     {
         if (unusualActivity.HasValue)
         {
@@ -357,7 +357,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetOptionsContractUnusualActivity(unusualActivity, OptionsUnusualActivityUpdatedCallback, this);
+            return ((SecurityData)securityData).SetOptionsContractUnusualActivity(unusualActivity, OptionsUnusualActivityUpdatedCallback, this);
         }
 
         return false;
@@ -370,7 +370,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetOptionsTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick)
+    public bool SetOptionsTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick)
     {
         if (tradeCandleStick != null)
         {
@@ -382,7 +382,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetOptionsContractTradeCandleStick(tradeCandleStick, OptionsTradeCandleStickUpdatedCallback, this);
+            return ((SecurityData)securityData).SetOptionsContractTradeCandleStick(tradeCandleStick, OptionsTradeCandleStickUpdatedCallback, this);
         }
 
         return false;
@@ -402,7 +402,7 @@ internal class DataCache : IDataCache
             : null;
     }
     
-    public async Task<bool> SetOptionsQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick)
+    public bool SetOptionsQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick)
     {
         if (quoteCandleStick != null)
         {
@@ -414,7 +414,7 @@ internal class DataCache : IDataCache
                 SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
                 securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
-            return await ((SecurityData)securityData).SetOptionsContractQuoteCandleStick(quoteCandleStick, OptionsQuoteCandleStickUpdatedCallback, this);
+            return ((SecurityData)securityData).SetOptionsContractQuoteCandleStick(quoteCandleStick, OptionsQuoteCandleStickUpdatedCallback, this);
         }
 
         return false;

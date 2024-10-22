@@ -292,7 +292,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
                     {
                         _onTrade.Invoke(trade);
                         if (_useDataCache)
-                            _dataCache.SetEquityTrade(trade).Wait();
+                            _dataCache.SetEquityTrade(trade);
                     }
                     catch (Exception e)
                     {
@@ -312,7 +312,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
                     {
                         _onQuote.Invoke(quote);
                         if (_useDataCache)
-                            _dataCache.SetEquityQuote(quote).Wait();
+                            _dataCache.SetEquityQuote(quote);
                     }
                     catch (Exception e)
                     {

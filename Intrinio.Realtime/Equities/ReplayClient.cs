@@ -367,7 +367,7 @@ public class ReplayClient : IEquitiesWebSocketClient
                             Interlocked.Increment(ref _dataTradeCount);
                             OnTrade.Invoke(datum.Trade);
                             if (_useDataCache)
-                                _dataCache.SetEquityTrade(datum.Trade).Wait();
+                                _dataCache.SetEquityTrade(datum.Trade);
                         }
                     }
                     else
@@ -377,7 +377,7 @@ public class ReplayClient : IEquitiesWebSocketClient
                             Interlocked.Increment(ref _dataQuoteCount);
                             OnQuote.Invoke(datum.Quote);
                             if (_useDataCache)
-                                _dataCache.SetEquityQuote(datum.Quote).Wait();
+                                _dataCache.SetEquityQuote(datum.Quote);
                         }
                     }
                 }

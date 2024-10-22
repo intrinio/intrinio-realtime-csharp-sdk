@@ -125,7 +125,7 @@ public class CandleStickClient
                             bucket.TradeCandleStick.MarkComplete();
                             OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
                             if (_useDataCache)
-                                _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick).Wait();
+                                _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick);
                             bucket.TradeCandleStick = CreateNewTradeCandle(trade, ts);
                         }
                         else if (bucket.TradeCandleStick.OpenTimestamp <= ts)
@@ -135,7 +135,7 @@ public class CandleStickClient
                             {
                                 OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
                                 if (_useDataCache)
-                                    _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick).Wait();
+                                    _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick);
                             }
                         }
                         else //This is a late trade.  We already shipped the candle, so add to lost and found
@@ -150,7 +150,7 @@ public class CandleStickClient
                         {
                             OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
                             if (_useDataCache)
-                                _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick).Wait();
+                                _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick);
                         }
                     }
                 }
@@ -381,7 +381,7 @@ public class CandleStickClient
                 bucket.AskCandleStick.MarkComplete();
                 OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
                 if (_useDataCache)
-                    _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick).Wait();
+                    _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick);
                 bucket.AskCandleStick = CreateNewAskCandle(quote, ts);
             }
             else if (bucket.AskCandleStick.OpenTimestamp <= ts)
@@ -391,7 +391,7 @@ public class CandleStickClient
                 {
                     OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
                     if (_useDataCache)
-                        _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick).Wait();
+                        _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick);
                 }
             }
             else //This is a late event.  We already shipped the candle, so add to lost and found
@@ -406,7 +406,7 @@ public class CandleStickClient
             {
                 OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
                 if (_useDataCache)
-                    _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick).Wait();
+                    _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick);
             }
         }
     }
@@ -422,7 +422,7 @@ public class CandleStickClient
                 bucket.BidCandleStick.MarkComplete();
                 OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
                 if (_useDataCache)
-                    _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick).Wait();
+                    _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick);
                 bucket.BidCandleStick = CreateNewBidCandle(quote, ts);
             }
             else if(bucket.BidCandleStick.OpenTimestamp <= ts)
@@ -432,7 +432,7 @@ public class CandleStickClient
                 {
                     OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
                     if (_useDataCache)
-                        _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick).Wait();
+                        _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick);
                 }
             }
             else //This is a late event.  We already shipped the candle, so add to lost and found
@@ -447,7 +447,7 @@ public class CandleStickClient
             {
                 OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
                 if (_useDataCache)
-                    _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick).Wait();
+                    _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick);
             }
         }
     }
@@ -481,7 +481,7 @@ public class CandleStickClient
                             bucket.TradeCandleStick.MarkComplete();
                             OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
                             if (_useDataCache)
-                                _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick).Wait();
+                                _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick);
                             bucket.TradeCandleStick = null;
                         }
 
@@ -490,7 +490,7 @@ public class CandleStickClient
                             bucket.AskCandleStick.MarkComplete();
                             OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
                             if (_useDataCache)
-                                _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick).Wait();
+                                _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick);
                             bucket.AskCandleStick = null;
                         }
 
@@ -499,7 +499,7 @@ public class CandleStickClient
                             bucket.BidCandleStick.MarkComplete();
                             OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
                             if (_useDataCache)
-                                _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick).Wait();
+                                _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick);
                             bucket.BidCandleStick = null;
                         }
                     }
@@ -550,7 +550,7 @@ public class CandleStickClient
                                     bucket.TradeCandleStick.MarkComplete();
                                     OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
                                     if (_useDataCache)
-                                        _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick).Wait();
+                                        _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick);
                                     bucket.TradeCandleStick = null;
                                 }
                                 else
@@ -559,7 +559,7 @@ public class CandleStickClient
                                     bucket.TradeCandleStick.MarkComplete();
                                     OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
                                     if (_useDataCache)
-                                        _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick).Wait();
+                                        _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick);
                                     bucket.TradeCandleStick = null;
                                 }
                             }
@@ -569,7 +569,7 @@ public class CandleStickClient
                                 bucket.TradeCandleStick.MarkComplete();
                                 OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
                                 if (_useDataCache)
-                                    _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick).Wait();
+                                    _dataCache.SetOptionsTradeCandleStick(bucket.TradeCandleStick);
                                 bucket.TradeCandleStick = null;
                             }
                         }
@@ -588,7 +588,7 @@ public class CandleStickClient
                                     bucket.AskCandleStick.MarkComplete();
                                     OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
                                     if (_useDataCache)
-                                        _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick).Wait();
+                                        _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick);
                                     bucket.AskCandleStick = null;
                                 }
                                 else
@@ -597,7 +597,7 @@ public class CandleStickClient
                                     bucket.AskCandleStick.MarkComplete();
                                     OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
                                     if (_useDataCache)
-                                        _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick).Wait();
+                                        _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick);
                                     bucket.AskCandleStick = null;
                                 }
                                 
@@ -608,7 +608,7 @@ public class CandleStickClient
                                 bucket.AskCandleStick.MarkComplete();
                                 OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
                                 if (_useDataCache)
-                                    _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick).Wait();
+                                    _dataCache.SetOptionsQuoteCandleStick(bucket.AskCandleStick);
                                 bucket.AskCandleStick = null;
                             }
                         }
@@ -627,7 +627,7 @@ public class CandleStickClient
                                     bucket.BidCandleStick.MarkComplete();
                                     OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
                                     if (_useDataCache)
-                                        _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick).Wait();
+                                        _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick);
                                     bucket.BidCandleStick = null;
                                 }
                                 else
@@ -636,7 +636,7 @@ public class CandleStickClient
                                     bucket.BidCandleStick.MarkComplete();
                                     OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
                                     if (_useDataCache)
-                                        _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick).Wait();
+                                        _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick);
                                     bucket.BidCandleStick = null;
                                 }
                             }
@@ -646,7 +646,7 @@ public class CandleStickClient
                                 bucket.BidCandleStick.MarkComplete();
                                 OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
                                 if (_useDataCache)
-                                    _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick).Wait();
+                                    _dataCache.SetOptionsQuoteCandleStick(bucket.BidCandleStick);
                                 bucket.BidCandleStick = null;
                             }
                         }

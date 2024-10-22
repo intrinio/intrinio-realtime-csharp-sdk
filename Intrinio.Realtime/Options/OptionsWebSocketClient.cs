@@ -486,7 +486,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
             {
                 _onQuote.Invoke(quote);
                 if (_useDataCache)
-                    _dataCache.SetOptionsQuote(quote).Wait();
+                    _dataCache.SetOptionsQuote(quote);
             }
             catch (Exception e)
             {
@@ -501,7 +501,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
             {
                 _onTrade.Invoke(trade);
                 if (_useDataCache)
-                    _dataCache.SetOptionsTrade(trade).Wait();
+                    _dataCache.SetOptionsTrade(trade);
             }
             catch (Exception e)
             {
@@ -516,7 +516,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
             {
                 _onRefresh.Invoke(refresh);
                 if (_useDataCache)
-                    _dataCache.SetOptionsRefresh(refresh).Wait();
+                    _dataCache.SetOptionsRefresh(refresh);
             }
             catch (Exception e)
             {
@@ -531,7 +531,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
             {
                 _onUnusualActivity.Invoke(unusualActivity);
                 if (_useDataCache)
-                    _dataCache.SetOptionsUnusualActivity(unusualActivity).Wait();
+                    _dataCache.SetOptionsUnusualActivity(unusualActivity);
             }
             catch (Exception e)
             {

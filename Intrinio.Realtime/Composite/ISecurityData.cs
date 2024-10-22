@@ -21,22 +21,22 @@ public interface ISecurityData {
 
     double? GetSupplementaryDatum(string key);
 
-    internal Task<bool> SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update);
-    internal Task<bool> SetSupplementaryDatum(string key, double? datum, OnSecuritySupplementalDatumUpdated? onSecuritySupplementalDatumUpdated, IDataCache dataCache, SupplementalDatumUpdate update);
+    internal bool SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update);
+    internal bool SetSupplementaryDatum(string key, double? datum, OnSecuritySupplementalDatumUpdated? onSecuritySupplementalDatumUpdated, IDataCache dataCache, SupplementalDatumUpdate update);
 
     IReadOnlyDictionary<string, double?> AllSupplementaryData { get; }
 
-    internal Task<bool> SetEquitiesTrade(Intrinio.Realtime.Equities.Trade? trade);
-    internal Task<bool> SetEquitiesTrade(Intrinio.Realtime.Equities.Trade? trade, OnEquitiesTradeUpdated? onEquitiesTradeUpdated, IDataCache dataCache);
+    internal bool SetEquitiesTrade(Intrinio.Realtime.Equities.Trade? trade);
+    internal bool SetEquitiesTrade(Intrinio.Realtime.Equities.Trade? trade, OnEquitiesTradeUpdated? onEquitiesTradeUpdated, IDataCache dataCache);
 
-    internal Task<bool> SetEquitiesQuote(Intrinio.Realtime.Equities.Quote? quote);
-    internal Task<bool> SetEquitiesQuote(Intrinio.Realtime.Equities.Quote? quote, OnEquitiesQuoteUpdated? onEquitiesQuoteUpdated, IDataCache dataCache);
+    internal bool SetEquitiesQuote(Intrinio.Realtime.Equities.Quote? quote);
+    internal bool SetEquitiesQuote(Intrinio.Realtime.Equities.Quote? quote, OnEquitiesQuoteUpdated? onEquitiesQuoteUpdated, IDataCache dataCache);
 
-    internal Task<bool> SetEquitiesTradeCandleStick(Intrinio.Realtime.Equities.TradeCandleStick? tradeCandleStick);
-    internal Task<bool> SetEquitiesTradeCandleStick(Intrinio.Realtime.Equities.TradeCandleStick? tradeCandleStick, OnEquitiesTradeCandleStickUpdated? onEquitiesTradeCandleStickUpdated, IDataCache dataCache);
+    internal bool SetEquitiesTradeCandleStick(Intrinio.Realtime.Equities.TradeCandleStick? tradeCandleStick);
+    internal bool SetEquitiesTradeCandleStick(Intrinio.Realtime.Equities.TradeCandleStick? tradeCandleStick, OnEquitiesTradeCandleStickUpdated? onEquitiesTradeCandleStickUpdated, IDataCache dataCache);
 
-    internal Task<bool> SetEquitiesQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick? quoteCandleStick);
-    internal Task<bool> SetEquitiesQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick? quoteCandleStick, OnEquitiesQuoteCandleStickUpdated? onEquitiesQuoteCandleStickUpdated, IDataCache dataCache);
+    internal bool SetEquitiesQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick? quoteCandleStick);
+    internal bool SetEquitiesQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick? quoteCandleStick, OnEquitiesQuoteCandleStickUpdated? onEquitiesQuoteCandleStickUpdated, IDataCache dataCache);
 
     IOptionsContractData GetOptionsContractData(string contract);
     
@@ -46,38 +46,38 @@ public interface ISecurityData {
 
     Intrinio.Realtime.Options.Trade? GetOptionsContractTrade(string contract);
 
-    internal Task<bool> SetOptionsContractTrade(Intrinio.Realtime.Options.Trade? trade);
-    internal Task<bool> SetOptionsContractTrade(Intrinio.Realtime.Options.Trade? trade, OnOptionsTradeUpdated? onOptionsTradeUpdated, IDataCache dataCache);
+    internal bool SetOptionsContractTrade(Intrinio.Realtime.Options.Trade? trade);
+    internal bool SetOptionsContractTrade(Intrinio.Realtime.Options.Trade? trade, OnOptionsTradeUpdated? onOptionsTradeUpdated, IDataCache dataCache);
 
     Intrinio.Realtime.Options.Quote? GetOptionsContractQuote(string contract);
 
-    internal Task<bool> SetOptionsContractQuote(Intrinio.Realtime.Options.Quote? quote);
-    internal Task<bool> SetOptionsContractQuote(Intrinio.Realtime.Options.Quote? quote, OnOptionsQuoteUpdated? onOptionsQuoteUpdated, IDataCache dataCache);
+    internal bool SetOptionsContractQuote(Intrinio.Realtime.Options.Quote? quote);
+    internal bool SetOptionsContractQuote(Intrinio.Realtime.Options.Quote? quote, OnOptionsQuoteUpdated? onOptionsQuoteUpdated, IDataCache dataCache);
 
     Intrinio.Realtime.Options.Refresh? GetOptionsContractRefresh(string contract);
 
-    internal Task<bool> SetOptionsContractRefresh(Intrinio.Realtime.Options.Refresh? refresh);
-    internal Task<bool> SetOptionsContractRefresh(Intrinio.Realtime.Options.Refresh? refresh, OnOptionsRefreshUpdated? onOptionsRefreshUpdated, IDataCache dataCache);
+    internal bool SetOptionsContractRefresh(Intrinio.Realtime.Options.Refresh? refresh);
+    internal bool SetOptionsContractRefresh(Intrinio.Realtime.Options.Refresh? refresh, OnOptionsRefreshUpdated? onOptionsRefreshUpdated, IDataCache dataCache);
 
     Intrinio.Realtime.Options.UnusualActivity? GetOptionsContractUnusualActivity(string contract);
 
-    internal Task<bool> SetOptionsContractUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity);
-    internal Task<bool> SetOptionsContractUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity, OnOptionsUnusualActivityUpdated? onOptionsUnusualActivityUpdated, IDataCache dataCache);
+    internal bool SetOptionsContractUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity);
+    internal bool SetOptionsContractUnusualActivity(Intrinio.Realtime.Options.UnusualActivity? unusualActivity, OnOptionsUnusualActivityUpdated? onOptionsUnusualActivityUpdated, IDataCache dataCache);
 
     Intrinio.Realtime.Options.TradeCandleStick? GetOptionsContractTradeCandleStick(string contract);
 
-    internal Task<bool> SetOptionsContractTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick);
-    internal Task<bool> SetOptionsContractTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick, OnOptionsTradeCandleStickUpdated? onOptionsTradeCandleStickUpdated, IDataCache dataCache);
+    internal bool SetOptionsContractTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick);
+    internal bool SetOptionsContractTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick, OnOptionsTradeCandleStickUpdated? onOptionsTradeCandleStickUpdated, IDataCache dataCache);
 
     Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsContractBidQuoteCandleStick(string contract);
 
     Intrinio.Realtime.Options.QuoteCandleStick? GetOptionsContractAskQuoteCandleStick(string contract);
 
-    internal Task<bool> SetOptionsContractQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick);
-    internal Task<bool> SetOptionsContractQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick, OnOptionsQuoteCandleStickUpdated? onOptionsQuoteCandleStickUpdated, IDataCache dataCache);
+    internal bool SetOptionsContractQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick);
+    internal bool SetOptionsContractQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick, OnOptionsQuoteCandleStickUpdated? onOptionsQuoteCandleStickUpdated, IDataCache dataCache);
 
     double? GetOptionsContractSupplementalDatum(string contract, string key);
 
-    internal Task<bool> SetOptionsContractSupplementalDatum(string contract, string key, double? datum, SupplementalDatumUpdate update);
-    internal Task<bool> SetOptionsContractSupplementalDatum(string contract, string key, double? datum, OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated, IDataCache dataCache, SupplementalDatumUpdate update);
+    internal bool SetOptionsContractSupplementalDatum(string contract, string key, double? datum, SupplementalDatumUpdate update);
+    internal bool SetOptionsContractSupplementalDatum(string contract, string key, double? datum, OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated, IDataCache dataCache, SupplementalDatumUpdate update);
 }
