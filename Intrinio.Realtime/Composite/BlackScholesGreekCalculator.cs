@@ -44,13 +44,13 @@ public static class BlackScholesGreekCalculator
         double low = LOW_VOL, high = HIGH_VOL;
         while ((high - low) > VOL_TOLERANCE)
         {
-            if (CalcPriceCall(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, (high + low) / 2.0, dividendYield) > marketPrice)
-                high = (high + low) / 2.0;
+            if (CalcPriceCall(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, (high + low) / 2.0D, dividendYield) > marketPrice)
+                high = (high + low) / 2.0D;
             else
-                low = (high + low) / 2.0;
+                low = (high + low) / 2.0D;
         }
 
-        return (high + low) / 2.0;
+        return (high + low) / 2.0D;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -59,13 +59,13 @@ public static class BlackScholesGreekCalculator
         double low = LOW_VOL, high = HIGH_VOL;
         while ((high - low) > VOL_TOLERANCE)
         {
-            if (CalcPricePut(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, (high + low) / 2.0, dividendYield) > marketPrice)
-                high = (high + low) / 2.0;
+            if (CalcPricePut(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, (high + low) / 2.0D, dividendYield) > marketPrice)
+                high = (high + low) / 2.0D;
             else
-                low = (high + low) / 2.0;
+                low = (high + low) / 2.0D;
         }
 
-        return (high + low) / 2.0;
+        return (high + low) / 2.0D;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -105,17 +105,17 @@ public static class BlackScholesGreekCalculator
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double CalcThetaCall(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma)
     {
-        double term1 = underlyingPrice * Phi( D1( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) ) * sigma / ( 2 * System.Math.Sqrt(daysToExpiration) );
-        double term2 = riskFreeInterestRate * strike * System.Math.Exp(-1.0 * riskFreeInterestRate * daysToExpiration) * NormalSDist( D2( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) );
-        return ( - term1 - term2 ) / 365.25;
+        double term1 = underlyingPrice * Phi( D1( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) ) * sigma / ( 2.0D * System.Math.Sqrt(daysToExpiration) );
+        double term2 = riskFreeInterestRate * strike * System.Math.Exp(-1.0D * riskFreeInterestRate * daysToExpiration) * NormalSDist( D2( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) );
+        return ( -term1 - term2 ) / 365.25D;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double CalcThetaPut(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma)
     {
-        double term1 = underlyingPrice * Phi( D1( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) ) * sigma / ( 2 * System.Math.Sqrt(daysToExpiration) );
-        double term2 = riskFreeInterestRate * strike * System.Math.Exp(-1.0 * riskFreeInterestRate * daysToExpiration) * NormalSDist( - D2( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) );
-        return ( - term1 + term2 ) / 365.25;
+        double term1 = underlyingPrice * Phi( D1( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) ) * sigma / ( 2.0D * System.Math.Sqrt(daysToExpiration) );
+        double term2 = riskFreeInterestRate * strike * System.Math.Exp(-1.0D * riskFreeInterestRate * daysToExpiration) * NormalSDist( - D2( underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield ) );
+        return ( -term1 + term2 ) / 365.25D;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -129,13 +129,13 @@ public static class BlackScholesGreekCalculator
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double CalcVega(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma)
     {
-        return 0.01 * underlyingPrice * System.Math.Sqrt(daysToExpiration) * Phi(D1(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield));
+        return 0.01D * underlyingPrice * System.Math.Sqrt(daysToExpiration) * Phi(D1(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double D1(double underylyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double sigma, double dividendYield)
     {
-        double numerator = ( System.Math.Log(underylyingPrice / strike) + (riskFreeInterestRate - dividendYield + 0.5 * System.Math.Pow(sigma, 2.0) ) * daysToExpiration);
+        double numerator = ( System.Math.Log(underylyingPrice / strike) + (riskFreeInterestRate - dividendYield + 0.5D * System.Math.Pow(sigma, 2.0D) ) * daysToExpiration);
         double denominator = ( sigma * System.Math.Sqrt(daysToExpiration));
         return numerator / denominator;
     }
@@ -150,24 +150,24 @@ public static class BlackScholesGreekCalculator
     private static double NormalSDist(double z)
     {
         if (z < MIN_Z_SCORE)
-            return 0.0;
+            return 0.0D;
         if (z > MAX_Z_SCORE)
-            return 1.0;
-        double i = 3.0, sum = 0.0, term = z;
+            return 1.0D;
+        double i = 3.0D, sum = 0.0D, term = z;
         while ((sum + term) != sum)
         {
-            sum = sum + term;
+            sum += term;
             term = term * z * z / i;
-            i += 2.0;
+            i += 2.0D;
         }
-        return 0.5 + sum * Phi(z);
+        return 0.5D + sum * Phi(z);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double Phi(double x)
     {
-        double numerator = System.Math.Exp(-1.0 * x*x / 2.0);
-        double denominator = System.Math.Sqrt(2.0 * System.Math.PI);
+        double numerator = System.Math.Exp(-1.0D * x*x / 2.0D);
+        double denominator = System.Math.Sqrt(2.0D * System.Math.PI);
         return numerator / denominator;
     }
 
@@ -175,28 +175,28 @@ public static class BlackScholesGreekCalculator
     private static double CalcPriceCall(double underylyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double sigma, double dividendYield)
     {
         double d1 = D1( underylyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield );
-        double discounted_underlying = System.Math.Exp(-1.0 * dividendYield * daysToExpiration) * underylyingPrice;
-        double probability_weighted_value_of_being_exercised = discounted_underlying * NormalSDist( d1 );
+        double discountedUnderlying = System.Math.Exp(-1.0D * dividendYield * daysToExpiration) * underylyingPrice;
+        double probabilityWeightedValueOfBeingExercised = discountedUnderlying * NormalSDist( d1 );
 
         double d2 = d1 - ( sigma * System.Math.Sqrt(daysToExpiration) );
-        double discounted_strike = System.Math.Exp(-1.0 * riskFreeInterestRate * daysToExpiration) * strike;
-        double probability_weighted_value_of_discounted_strike = discounted_strike * NormalSDist( d2 );
+        double discountedStrike = System.Math.Exp(-1.0D * riskFreeInterestRate * daysToExpiration) * strike;
+        double probabilityWeightedValueOfDiscountedStrike = discountedStrike * NormalSDist( d2 );
 
-        return probability_weighted_value_of_being_exercised - probability_weighted_value_of_discounted_strike;
+        return probabilityWeightedValueOfBeingExercised - probabilityWeightedValueOfDiscountedStrike;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double CalcPricePut(double underylyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double sigma, double dividendYield)
     {
         double d2 = D2( underylyingPrice, strike, daysToExpiration, riskFreeInterestRate, sigma, dividendYield );
-        double discounted_strike = strike * System.Math.Exp(-1.0 * riskFreeInterestRate * daysToExpiration);
-        double probabiltity_weighted_value_of_discounted_strike = discounted_strike * NormalSDist( -1.0 * d2 );
+        double discountedStrike = strike * System.Math.Exp(-1.0D * riskFreeInterestRate * daysToExpiration);
+        double probabiltityWeightedValueOfDiscountedStrike = discountedStrike * NormalSDist( -1.0D * d2 );
 
         double d1 = d2 + ( sigma * System.Math.Sqrt(daysToExpiration) );
-        double discounted_underlying = underylyingPrice * System.Math.Exp(-1.0 * dividendYield * daysToExpiration);
-        double probability_weighted_value_of_being_exercised = discounted_underlying * NormalSDist( -1.0 * d1 );
+        double discountedUnderlying = underylyingPrice * System.Math.Exp(-1.0D * dividendYield * daysToExpiration);
+        double probabilityWeightedValueOfBeingExercised = discountedUnderlying * NormalSDist( -1.0D * d1 );
 
-        return probabiltity_weighted_value_of_discounted_strike - probability_weighted_value_of_being_exercised;
+        return probabiltityWeightedValueOfDiscountedStrike - probabilityWeightedValueOfBeingExercised;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
