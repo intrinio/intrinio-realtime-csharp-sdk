@@ -165,64 +165,54 @@ public class CompositeSampleApp
 		_dataCache.SetEquityQuoteCandleStick(quoteCandleStick);
 	}
 	
-	static Task OnOptionsQuoteCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsQuoteCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
 	{
 		Interlocked.Increment(ref _optionsQuoteCacheUpdatedEventCount);
-		return Task.CompletedTask;
 	}
 
-	static Task OnOptionsTradeCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsTradeCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
 	{
 		Interlocked.Increment(ref _optionsTradeCacheUpdatedEventCount);
-		return Task.CompletedTask;
 	}
 	
-	static Task OnOptionsRefreshCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsRefreshCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
 	{
 		Interlocked.Increment(ref _optionsRefreshCacheUpdatedEventCount);
-		return Task.CompletedTask;
 	}
 	
-	static Task OnOptionsUnusualActivityCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsUnusualActivityCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
 	{
 		Interlocked.Increment(ref _optionsUnusualActivityCacheUpdatedEventCount);
-		return Task.CompletedTask;
 	}
 	
-	static Task OnOptionsTradeCandleStickCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsTradeCandleStickCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
 	{
 		Interlocked.Increment(ref _optionsTradeCandleStickCacheUpdatedCount);
-		return Task.CompletedTask;
 	}
 	
-	static Task OnOptionsQuoteCandleStickCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsQuoteCandleStickCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
 	{
 		Interlocked.Increment(ref _optionsQuoteCandleStickCacheUpdatedCount);
-		return Task.CompletedTask;
 	}
 	
-	static Task OnEquitiesQuoteCacheUpdated(ISecurityData securityData, IDataCache dataCache)
+	static void OnEquitiesQuoteCacheUpdated(ISecurityData securityData, IDataCache dataCache)
 	{
 		Interlocked.Increment(ref _equitiesQuoteCacheUpdatedEventCount);
-		return Task.CompletedTask;
 	}
 
-	static Task OnEquitiesTradeCacheUpdated(ISecurityData securityData, IDataCache dataCache)
+	static void OnEquitiesTradeCacheUpdated(ISecurityData securityData, IDataCache dataCache)
 	{
 		Interlocked.Increment(ref _equitiesTradeCacheUpdatedEventCount);
-		return Task.CompletedTask;
 	}
 	
-	static Task OnEquitiesTradeCandleStickCacheUpdated(ISecurityData securityData, IDataCache dataCache)
+	static void OnEquitiesTradeCandleStickCacheUpdated(ISecurityData securityData, IDataCache dataCache)
 	{
 		Interlocked.Increment(ref _equitiesTradeCandleStickCacheUpdatedCount);
-		return Task.CompletedTask;
 	}
 	
-	static Task OnEquitiesQuoteCandleStickCacheUpdated(ISecurityData securityData, IDataCache dataCache)
+	static void OnEquitiesQuoteCandleStickCacheUpdated(ISecurityData securityData, IDataCache dataCache)
 	{
 		Interlocked.Increment(ref _equitiesQuoteCandleStickCacheUpdatedCount);
-		return Task.CompletedTask;
 	}
 
 	static void TimerCallback(object obj)
