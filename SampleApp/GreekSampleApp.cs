@@ -14,36 +14,38 @@ public class GreekSampleApp
 	private static GreekClient _greekClient;
 	
     private static IOptionsWebSocketClient _optionsClient = null;
-	private static Intrinio.Realtime.Options.CandleStickClient _optionsCandleStickClient = null;
+	private static Intrinio.Realtime.Options.Config _optionsConfig;
 	private static UInt64 _optionsTradeEventCount = 0UL;
 	private static UInt64 _optionsQuoteEventCount = 0UL;
 	private static UInt64 _greekUpdatedEventCount = 0UL;
 	
 	private static IEquitiesWebSocketClient _equitiesClient = null;
-	private static Intrinio.Realtime.Equities.CandleStickClient _equitiesCandleStickClient = null;
+	private static Intrinio.Realtime.Equities.Config _equitiesConfig;
 	private static UInt64 _equitiesTradeEventCount = 0UL;
 	private static UInt64 _equitiesQuoteEventCount = 0UL;
-	private static Intrinio.Realtime.Options.Config _optionsConfig;
-	private static Intrinio.Realtime.Equities.Config _equitiesConfig;
 
 	static void OnOptionsQuote(Intrinio.Realtime.Options.Quote quote)
 	{
 		Interlocked.Increment(ref _optionsQuoteEventCount);
+		_greekClient.OnOptionQuote(quote);
 	}
 
 	static void OnOptionsTrade(Intrinio.Realtime.Options.Trade trade)
 	{
 		Interlocked.Increment(ref _optionsTradeEventCount);
+		_greekClient.OnOptionTrade(trade);
 	}
 	
 	static void OnEquitiesQuote(Intrinio.Realtime.Equities.Quote quote)
 	{
 		Interlocked.Increment(ref _equitiesQuoteEventCount);
+		_greekClient.OnEquityQuote(quote);
 	}
 
 	static void OnEquitiesTrade(Intrinio.Realtime.Equities.Trade trade)
 	{
 		Interlocked.Increment(ref _equitiesTradeEventCount);
+		_greekClient.OnEquityTrade(trade);
 	}
 	
 	static Task OnGreek(string key, double? datum, IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache)
