@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Intrinio.SDK.Api;
@@ -39,6 +40,13 @@ public class GreekClient
     private readonly ConcurrentDictionary<string, DateTime> _seenTickers;
     private const int DividendYieldUpdatePeriodHours = 4;
     private const int DividendYieldCallSpacerMilliseconds = 100;
+    private bool _dividendYieldWorking = false;
+
+    private UInt64 _greekTimeSum = 0UL;
+    private UInt64 _greekBroadcastTimeSum = 0UL;
+    private UInt64 _greekCount = 0UL;
+    private UInt64 _greekMaxTime = 0UL;
+    private UInt64 _greekBroadcastMaxTime = 0UL;
     
 
     public OnOptionsContractSupplementalDatumUpdated? OnGreekValueUpdated
@@ -164,51 +172,34 @@ public class GreekClient
     
     private async void FetchDividendYields(object? _)
     {
+        Log.Information("Average greek time: {0} milliseconds", TimeSpan.FromTicks(Convert.ToInt64(_greekTimeSum / (_greekCount > 0UL ? _greekCount : 1UL))).Milliseconds.ToString());
+        Log.Information("Max greek time: {0} milliseconds", TimeSpan.FromTicks(Convert.ToInt64(_greekMaxTime)).Milliseconds.ToString());
+        Log.Information("Average broadcast time: {0} milliseconds", TimeSpan.FromTicks(Convert.ToInt64(_greekBroadcastTimeSum / (_greekCount > 0UL ? _greekCount : 1UL))).Milliseconds.ToString());
+        Log.Information("Max broadcast time: {0} milliseconds", TimeSpan.FromTicks(Convert.ToInt64(_greekBroadcastMaxTime)).Milliseconds.ToString());
+        
         const string dividendYieldTag = "trailing_dividend_yield";
-        foreach (KeyValuePair<string,DateTime> seenTicker in _seenTickers.Where(t => t.Value < (DateTime.UtcNow - TimeSpan.FromHours(DividendYieldUpdatePeriodHours))))
+        if (!_dividendYieldWorking)
         {
-            try
+            _dividendYieldWorking = true;
+            foreach (KeyValuePair<string,DateTime> seenTicker in _seenTickers.Where(t => t.Value < (DateTime.UtcNow - TimeSpan.FromHours(DividendYieldUpdatePeriodHours))))
             {
-                decimal? result = await _companyApi.GetCompanyDataPointNumberAsync(seenTicker.Key, dividendYieldTag);
-                await _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
-                _seenTickers[seenTicker.Key] = DateTime.UtcNow;
-                await Task.Delay(DividendYieldCallSpacerMilliseconds); //don't try to get rate limited.
-            }
-            catch (Exception e)
-            {
-                await _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, 0.0D, _updateFunc);
-                _seenTickers[seenTicker.Key] = DateTime.UtcNow;
-                await Task.Delay(DividendYieldCallSpacerMilliseconds); //don't try to get rate limited.
-            }
-        }
-    }
-
-    private async void FetchDividendYieldsOld(object? _)
-    {
-        int sanityCount = 0;
-        string? nextPage = null;
-        do
-        {
-            sanityCount++;
-            try
-            {
-                ApiResponseCompanyDailyMetrics results = await _companyApi.GetAllCompaniesDailyMetricsAsync(null, PageSize, nextPage);
-                Console.WriteLine("dividend count: " + results.DailyMetrics.Count);
-                nextPage = results.NextPage;
-                foreach (CompanyDailyMetric dailyMetric in results.DailyMetrics)
+                try
                 {
-                    if (!String.IsNullOrWhiteSpace(dailyMetric.Company.Ticker) && dailyMetric.DividendYield.HasValue)
-                        await _cache.SetSecuritySupplementalDatum(dailyMetric.Company.Ticker, DividendYieldKeyName, Convert.ToDouble(dailyMetric.DividendYield.Value), _updateFunc);
+                    decimal? result = await _companyApi.GetCompanyDataPointNumberAsync(seenTicker.Key, dividendYieldTag);
+                    await _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
+                    _seenTickers[seenTicker.Key] = DateTime.UtcNow;
+                    await Task.Delay(DividendYieldCallSpacerMilliseconds); //don't try to get rate limited.
                 }
-                if (!String.IsNullOrWhiteSpace(nextPage))
-                    Task.Delay(1000); //don't try to get rate limited.
+                catch (Exception e)
+                {
+                    await _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, 0.0D, _updateFunc);
+                    _seenTickers[seenTicker.Key] = DateTime.UtcNow;
+                    await Task.Delay(DividendYieldCallSpacerMilliseconds); //don't try to get rate limited.
+                }
             }
-            catch (Exception e)
-            {
-                Log.Warning(e, e.Message);
-            }
-        } 
-        while (!String.IsNullOrWhiteSpace(nextPage) && sanityCount < 1000);
+
+            _dividendYieldWorking = false;
+        }
     }
     
     private async void FetchRiskFreeInterestRate(object? _)
@@ -263,6 +254,8 @@ public class GreekClient
 
     private async Task BlackScholesCalc(IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache)
     {
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
         double? riskFreeInterestRate = dataCache.GetSupplementaryDatum(RiskFreeInterestRateKeyName);
         double? dividendYield = securityData.GetSupplementaryDatum(DividendYieldKeyName);
         Intrinio.Realtime.Equities.Trade? equitiesTrade = securityData.LatestEquitiesTrade;
@@ -271,8 +264,18 @@ public class GreekClient
 
         if (!riskFreeInterestRate.HasValue || !dividendYield.HasValue || !equitiesTrade.HasValue || !optionsTrade.HasValue || !optionsQuote.HasValue)
             return;
-        
+
         Greek? result = BlackScholesGreekCalculator.Calculate(riskFreeInterestRate.Value, dividendYield.Value, equitiesTrade.Value, optionsTrade.Value, optionsQuote.Value);
+        
+        sw.Stop();
+        UInt64 time = Convert.ToUInt64(sw.ElapsedTicks);
+        Interlocked.Add(ref _greekTimeSum, time);
+        Interlocked.Increment(ref _greekCount);
+        if (time > _greekMaxTime)
+            Interlocked.Exchange(ref _greekMaxTime, time);
+        sw.Reset();
+        sw.Start();
+        
         if (result != null)
         {
             await dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, ImpliedVolatilityKeyName, result.ImpliedVolatility, _updateFunc);
@@ -281,6 +284,12 @@ public class GreekClient
             await dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, ThetaKeyName, result.Theta, _updateFunc);
             await dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, VegaKeyName, result.Vega, _updateFunc);
         }
+        
+        sw.Stop();
+        time = Convert.ToUInt64(sw.ElapsedTicks);
+        Interlocked.Add(ref _greekBroadcastTimeSum, time);
+        if (time > _greekMaxTime)
+            Interlocked.Exchange(ref _greekBroadcastMaxTime, time);
     }
     
     #endregion //Private Methods

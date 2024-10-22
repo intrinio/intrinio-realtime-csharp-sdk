@@ -1,16 +1,17 @@
 {
 	"EquitiesConfig": {
 		"ApiKey": "API_KEY_HERE",
-		"NumThreads": 4,
+		"NumThreads": 8,
 		"Provider": "REALTIME",
 		//"Provider": "DELAYED_SIP",
 		//"Provider": "NASDAQ_BASIC",
 		//"Provider": "MANUAL",
 		//"IPAddress": "1.2.3.4",
-		"BufferSize": 2048,
-		"OverflowBufferSize": 2048,
+		"BufferSize": 4096,
+		"OverflowBufferSize": 16384,
 		"Symbols": [ "AAPL", "MSFT", "TSLA" ]
-		//"Symbols": [ "lobby" ]
+		//"Symbols": [ "lobby" ],
+		//"Symbols": [  ]
 	},
 	"OptionsConfig": {
 		"ApiKey": "API_KEY_HERE",
@@ -19,10 +20,11 @@
 		//"Provider": "MANUAL",
 		//"IPAddress": "1.2.3.4",
 		"BufferSize": 4096,
-		"OverflowBufferSize": 8192,
+		"OverflowBufferSize": 65536,
 		"Delayed": false,
 		"Symbols": [ "GOOG__220408C02870000", "MSFT__220408C00315000", "AAPL__220414C00180000", "SPY", "TSLA" ]
-		//"Symbols": [ "lobby" ]
+		//"Symbols": [ "lobby" ],
+		//"Symbols": [  ]
 	},
 	"Serilog": {
 		"Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],

@@ -253,7 +253,7 @@ public abstract class WebSocketClient
     protected abstract List<KeyValuePair<string, string>> GetCustomSocketHeaders();
     protected abstract byte[] MakeJoinMessage(string channel);
     protected abstract byte[] MakeLeaveMessage(string channel);
-    protected abstract void HandleMessage(ReadOnlySpan<byte> bytes);
+    protected abstract void HandleMessage(in ReadOnlySpan<byte> bytes);
     protected abstract int GetNextChunkLength(ReadOnlySpan<byte> bytes);
     
     #endregion //Abstract Methods
@@ -288,26 +288,27 @@ public abstract class WebSocketClient
         return CloseType.Other;
     }
 
-    private async void ReceiveFn()
+    private void ReceiveFn()
     {
         CancellationToken token = _ctSource.Token;
         Thread.CurrentThread.Priority = ThreadPriority.Highest;
         byte[] buffer = new byte[_bufferBlockSize];
+        ReadOnlySpan<byte> bufferSpan = new Span<byte>(buffer);
         while (!token.IsCancellationRequested)
         {
             try
             {
                 if (_wsState.IsConnected)
                 {
-                    var result = await _wsState.WebSocket.ReceiveAsync(buffer, token);
+                    var result = _wsState.WebSocket.ReceiveAsync(buffer, token).Result;
                     switch (result.MessageType)
                     {
                         case WebSocketMessageType.Binary:
                             if (result.Count > 0)
                             {
                                 Interlocked.Increment(ref _dataMsgCount);
-                                if (!_data.TryEnqueue(buffer))
-                                    _overflowData.Enqueue(buffer);
+                                if (!_data.TryEnqueue(in bufferSpan))
+                                    _overflowData.Enqueue(in bufferSpan);
                             }
                             break;
                         case WebSocketMessageType.Text:
@@ -319,7 +320,7 @@ public abstract class WebSocketClient
                     }
                 }
                 else
-                    await Task.Delay(1000, token);
+                    Task.Delay(1000, token).Wait(token);
             }
             catch (NullReferenceException ex)
             {
@@ -362,7 +363,7 @@ public abstract class WebSocketClient
         {
             try
             {
-                if (_data.TryDequeue(datum) || _overflowData.TryDequeue(datum))
+                if (_data.TryDequeue(in datum) || _overflowData.TryDequeue(in datum))
                 {
                     // These are grouped (many) messages.
                     // The first byte tells us how many messages there are.
@@ -377,7 +378,7 @@ public abstract class WebSocketClient
                         {
                             msgLength = GetNextChunkLength(datum.Slice(startIndex));
                             ReadOnlySpan<byte> chunk = datum.Slice(startIndex, msgLength);
-                            HandleMessage(chunk);
+                            HandleMessage(in chunk);
                         }
                         catch(Exception e) {LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", new object[]{e.Message, e.StackTrace});}
                         finally

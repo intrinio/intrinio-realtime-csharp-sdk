@@ -60,7 +60,7 @@ internal class DropOldestRingBuffer
     /// blockToWrite MUST be of length BlockSize!
     /// </summary>
     /// <param name="blockToWrite"></param>
-    public void Enqueue(ReadOnlySpan<byte> blockToWrite)
+    public void Enqueue(in ReadOnlySpan<byte> blockToWrite)
     {
         lock (_writeLock)
         {
@@ -89,7 +89,7 @@ internal class DropOldestRingBuffer
     /// blockBuffer MUST be of length BlockSize!
     /// </summary>
     /// <param name="blockBuffer"></param>
-    public bool TryDequeue(Span<byte> blockBuffer)
+    public bool TryDequeue(in Span<byte> blockBuffer)
     {
         lock (_readLock)
         {

@@ -473,7 +473,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         );
     }
 
-    protected override void HandleMessage(ReadOnlySpan<byte> bytes)
+    protected override void HandleMessage(in ReadOnlySpan<byte> bytes)
     { 
         byte msgType = bytes[MessageTypeIndex];
         

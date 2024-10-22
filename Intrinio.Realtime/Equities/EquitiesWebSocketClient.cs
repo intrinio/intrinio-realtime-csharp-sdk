@@ -276,7 +276,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         return new Quote(type, symbol, price, size, timestamp, subProvider, marketCenter, condition);
     }
 
-    protected override void HandleMessage(ReadOnlySpan<byte> bytes)
+    protected override void HandleMessage(in ReadOnlySpan<byte> bytes)
     { 
         MessageType msgType = (MessageType)Convert.ToInt32(bytes[0]);
         switch (msgType)
