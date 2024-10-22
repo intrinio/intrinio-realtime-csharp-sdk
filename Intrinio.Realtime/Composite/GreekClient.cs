@@ -29,8 +29,8 @@ public class GreekClient
     private const string BlackScholesKeyName = "IntrinioBlackScholes";
     private readonly ConcurrentDictionary<string, CalculateNewGreek> _calcLookup;
     private readonly SupplementalDatumUpdate _updateFunc = (string key, double? oldValue, double? newValue) => { return newValue; };
-    private readonly Timer _dividendFetchTimer;
-    private readonly Timer _riskFreeInterestRateFetchTimer;
+    private Timer? _dividendFetchTimer;
+    private Timer? _riskFreeInterestRateFetchTimer;
     private const int PageSize = 1000;
     private readonly Intrinio.SDK.Client.ApiClient _apiClient;
     private readonly Intrinio.SDK.Api.CompanyApi _companyApi;
@@ -50,6 +50,7 @@ public class GreekClient
     /// </summary>
     /// <param name="greekUpdateFrequency"></param>
     /// <param name="onGreekValueUpdated"></param>
+    /// <param name="apiKey"></param>
     public GreekClient(GreekUpdateFrequency greekUpdateFrequency, OnOptionsContractSupplementalDatumUpdated onGreekValueUpdated, string apiKey)
     {
         _cache = DataCacheFactory.Create();
@@ -74,19 +75,22 @@ public class GreekClient
         _companyApi.Configuration.ApiKey.Add("api_key", apiKey);
         _indexApi = new IndexApi();
         _indexApi.Configuration.ApiKey.Add("api_key", apiKey);
-        
-        _riskFreeInterestRateFetchTimer = new Timer(FetchRiskFreeInterestRate, null, 0, 11*60*60*1000);
-        _dividendFetchTimer = new Timer(FetchDividendYields, null, 0, 4*60*60*1000);
-    }
-
-    ~GreekClient()
-    {
-        _riskFreeInterestRateFetchTimer.Dispose();
-        _dividendFetchTimer.Dispose();
     }
     #endregion //Constructors
     
     #region Public Methods
+
+    public void Start()
+    {
+        _riskFreeInterestRateFetchTimer = new Timer(FetchRiskFreeInterestRate, null, 0, 11*60*60*1000);
+        _dividendFetchTimer = new Timer(FetchDividendYields, null, 0, 4*60*60*1000);
+    }
+    
+    public void Stop()
+    {
+        _riskFreeInterestRateFetchTimer.Dispose();
+        _dividendFetchTimer.Dispose();
+    }
 
     public void OnEquityTrade(Intrinio.Realtime.Equities.Trade trade)
     {

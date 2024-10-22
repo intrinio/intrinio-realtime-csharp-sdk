@@ -283,6 +283,7 @@ public class CompositeSampleApp
 		Log("Stopping sample app");
 		timer.Dispose();
 		_optionsClient.Stop();
+		_equitiesClient.Stop();
 		if (_optionsUseTradeCandleSticks || _optionsUseQuoteCandleSticks)
 		{
 			_optionsCandleStickClient.Stop();

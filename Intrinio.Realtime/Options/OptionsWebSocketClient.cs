@@ -23,12 +23,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     private bool _useOnQuote;
     private bool _useOnRefresh;
     private bool _useOnUnusualActivity;
-    private Action<Trade> _onTrade;
+    private Action<Trade>? _onTrade;
 
     /// <summary>
     /// The callback for when a trade event occurs.
     /// </summary>
-    public Action<Trade> OnTrade
+    public Action<Trade>? OnTrade
     {
         set
         {
@@ -37,12 +37,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         }
     }
 
-    private Action<Quote> _onQuote;
+    private Action<Quote>? _onQuote;
 
     /// <summary>
     /// The callback for when a quote event occurs.
     /// </summary>
-    public Action<Quote> OnQuote
+    public Action<Quote>? OnQuote
     {
         set
         {
@@ -51,12 +51,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         }
     }
     
-    private Action<Refresh> _onRefresh;
+    private Action<Refresh>? _onRefresh;
 
     /// <summary>
     /// The callback for when a refresh event occurs.
     /// </summary>
-    public Action<Refresh> OnRefresh
+    public Action<Refresh>? OnRefresh
     {
         set
         {
@@ -65,12 +65,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         }
     }
 
-    private Action<UnusualActivity> _onUnusualActivity;
+    private Action<UnusualActivity>? _onUnusualActivity;
 
     /// <summary>
     /// The callback for when an unusual activity event occurs.
     /// </summary>
-    public Action<UnusualActivity> OnUnusualActivity
+    public Action<UnusualActivity>? OnUnusualActivity
     {
         set
         {
@@ -106,7 +106,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// <param name="onRefresh"></param>
     /// <param name="onUnusualActivity"></param>
     /// <param name="config"></param>
-    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity, Config config) 
+    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity, Config config) 
         : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
     {
         OnTrade = onTrade;
@@ -125,7 +125,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// Create a new Options websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
-    public OptionsWebSocketClient(Action<Trade> onTrade) : this(onTrade, null, null, null, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade>? onTrade) : this(onTrade, null, null, null, Config.LoadConfig())
     {
     }
 
@@ -133,7 +133,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// Create a new Options websocket client.
     /// </summary>
     /// <param name="onQuote"></param>
-    public OptionsWebSocketClient(Action<Quote> onQuote) : this(null, onQuote, null, null, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Quote>? onQuote) : this(null, onQuote, null, null, Config.LoadConfig())
     {
     }
     
@@ -142,7 +142,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// </summary>
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
-    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote) : this(onTrade, onQuote, null, null, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote) : this(onTrade, onQuote, null, null, Config.LoadConfig())
     {
     }
     
@@ -153,7 +153,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// <param name="onQuote"></param>
     /// <param name="onRefresh"></param>
     /// <param name="onUnusualActivity"></param>
-    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity) : this(onTrade, onQuote, onRefresh, onUnusualActivity, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity) : this(onTrade, onQuote, onRefresh, onUnusualActivity, Config.LoadConfig())
     {
     }
     #endregion //Constructors
