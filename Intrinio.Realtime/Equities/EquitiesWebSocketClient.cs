@@ -15,12 +15,12 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     private const string LobbyName = "lobby";
     private bool _useOnTrade;
     private bool _useOnQuote;
-    private Action<Trade> _onTrade;
+    private Action<Trade>? _onTrade;
 
     /// <summary>
     /// The callback for when a trade event occurs.
     /// </summary>
-    public Action<Trade> OnTrade
+    public Action<Trade>? OnTrade
     {
         set
         {
@@ -29,12 +29,12 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         }
     }
 
-    private Action<Quote> _onQuote;
+    private Action<Quote>? _onQuote;
 
     /// <summary>
     /// The callback for when a quote event occurs.
     /// </summary>
-    public Action<Quote> OnQuote
+    public Action<Quote>? OnQuote
     {
         set
         {
@@ -63,7 +63,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
     /// <param name="config"></param>
-    public EquitiesWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config) 
+    public EquitiesWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Config config) 
         : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
     {
         OnTrade = onTrade;
