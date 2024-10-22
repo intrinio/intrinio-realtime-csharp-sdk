@@ -33,7 +33,6 @@ public class GreekClient
     private readonly SupplementalDatumUpdate _updateFunc = (string key, double? oldValue, double? newValue) => { return newValue; };
     private Timer? _dividendFetchTimer;
     private Timer? _riskFreeInterestRateFetchTimer;
-    private const int PageSize = 1000;
     private readonly Intrinio.SDK.Client.ApiClient _apiClient;
     private readonly Intrinio.SDK.Api.CompanyApi _companyApi;
     private readonly Intrinio.SDK.Api.IndexApi _indexApi;
