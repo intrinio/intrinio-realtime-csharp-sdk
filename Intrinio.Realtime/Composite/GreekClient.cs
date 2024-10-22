@@ -264,9 +264,9 @@ public class GreekClient
         if (!riskFreeInterestRate.HasValue || !dividendYield.HasValue || !equitiesTrade.HasValue || !optionsTrade.HasValue || !optionsQuote.HasValue)
             return;
 
-        Greek? result = BlackScholesGreekCalculator.Calculate(riskFreeInterestRate.Value, dividendYield.Value, equitiesTrade.Value, optionsTrade.Value, optionsQuote.Value);
+        Greek result = BlackScholesGreekCalculator.Calculate(riskFreeInterestRate.Value, dividendYield.Value, equitiesTrade.Value, optionsTrade.Value, optionsQuote.Value);
         
-        if (result != null)
+        if (result.IsValid)
         {
             dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, ImpliedVolatilityKeyName, result.ImpliedVolatility, _updateFunc);
             dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, DeltaKeyName, result.Delta, _updateFunc);

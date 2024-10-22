@@ -12,16 +12,16 @@ public static class BlackScholesGreekCalculator
     private const double MAX_Z_SCORE = 8.0D;
 
     
-    public static Greek? Calculate( double riskFreeInterestRate, 
+    public static Greek Calculate( double riskFreeInterestRate, 
                                     double dividendYield, 
                                     Intrinio.Realtime.Equities.Trade underlyingTrade,
                                     Intrinio.Realtime.Options.Trade latestOptionTrade, 
                                     Intrinio.Realtime.Options.Quote latestOptionQuote) 
     {
         if (latestOptionQuote.AskPrice <= 0.0D || latestOptionQuote.BidPrice <= 0.0D)
-            return null;
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
         if (riskFreeInterestRate <= 0.0D)
-            return null;
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);;
 
         bool isPut = latestOptionTrade.IsPut();
         double underlyingPrice = underlyingTrade.Price;
@@ -35,7 +35,7 @@ public static class BlackScholesGreekCalculator
         double theta = CalcTheta(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
         double vega = CalcVega(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
 
-        return new Greek(impliedVolatility, delta, gamma, theta, vega);
+        return new Greek(impliedVolatility, delta, gamma, theta, vega, true);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
