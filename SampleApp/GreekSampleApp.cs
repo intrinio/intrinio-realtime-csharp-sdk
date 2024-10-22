@@ -109,7 +109,8 @@ public class GreekSampleApp
 		Log("Starting sample app");
 		GreekUpdateFrequency updateFrequency = GreekUpdateFrequency.EveryDividendYieldUpdate |
 		                       GreekUpdateFrequency.EveryRiskFreeInterestRateUpdate |
-		                       GreekUpdateFrequency.EveryOptionsTradeUpdate;
+		                       GreekUpdateFrequency.EveryOptionsTradeUpdate |
+		                       GreekUpdateFrequency.EveryEquityTradeUpdate;
 
 		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
 		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
