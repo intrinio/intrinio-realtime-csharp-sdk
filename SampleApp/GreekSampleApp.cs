@@ -51,7 +51,7 @@ public class GreekSampleApp
 	static Task OnGreek(string key, double? datum, IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache)
 	{
 		Interlocked.Increment(ref _greekUpdatedEventCount);
-		Log("Greek: {0}\t\t{1}\t\t{2}", optionsContractData.Contract, key, datum?.ToString() ?? String.Empty);
+		//Log("Greek: {0}\t\t{1}\t\t{2}", optionsContractData.Contract, key, datum?.ToString() ?? String.Empty);
 		return Task.CompletedTask;
 	}
 
@@ -125,6 +125,7 @@ public class GreekSampleApp
 		// _optionsConfig.Delayed = false;
 		_optionsConfig = Intrinio.Realtime.Options.Config.LoadConfig();
 		_greekClient = new GreekClient(updateFrequency, OnGreek, _optionsConfig.ApiKey);
+		_greekClient.AddBlackScholes();
 		_greekClient.Start();
 		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, null, null, _optionsConfig);
 		await _optionsClient.Start();

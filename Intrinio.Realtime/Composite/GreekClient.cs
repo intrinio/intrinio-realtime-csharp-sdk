@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Intrinio.SDK.Api;
 using Intrinio.SDK.Client;
@@ -35,6 +36,9 @@ public class GreekClient
     private readonly Intrinio.SDK.Client.ApiClient _apiClient;
     private readonly Intrinio.SDK.Api.CompanyApi _companyApi;
     private readonly Intrinio.SDK.Api.IndexApi _indexApi;
+    private readonly ConcurrentDictionary<string, DateTime> _seenTickers;
+    private const int DividendYieldUpdatePeriodHours = 4;
+    private const int DividendYieldCallSpacerMilliseconds = 100;
     
 
     public OnOptionsContractSupplementalDatumUpdated? OnGreekValueUpdated
@@ -54,6 +58,7 @@ public class GreekClient
     public GreekClient(GreekUpdateFrequency greekUpdateFrequency, OnOptionsContractSupplementalDatumUpdated onGreekValueUpdated, string apiKey)
     {
         _cache = DataCacheFactory.Create();
+        _seenTickers = new ConcurrentDictionary<string, DateTime>();
         _calcLookup = new ConcurrentDictionary<string, CalculateNewGreek>();
         OnGreekValueUpdated = onGreekValueUpdated;
 
@@ -83,7 +88,7 @@ public class GreekClient
     public void Start()
     {
         _riskFreeInterestRateFetchTimer = new Timer(FetchRiskFreeInterestRate, null, 0, 11*60*60*1000);
-        _dividendFetchTimer = new Timer(FetchDividendYields, null, 0, 4*60*60*1000);
+        _dividendFetchTimer = new Timer(FetchDividendYields, null, 0, 60*1000);
     }
     
     public void Stop()
@@ -97,6 +102,7 @@ public class GreekClient
         try
         {
             _cache.SetEquityTrade(trade);
+            _seenTickers.TryAdd(trade.Symbol, DateTime.MinValue);
         }
         catch (Exception e)
         {
@@ -109,6 +115,7 @@ public class GreekClient
         try
         {
             _cache.SetEquityQuote(quote);
+            _seenTickers.TryAdd(quote.Symbol, DateTime.MinValue);
         }
         catch (Exception e)
         {
@@ -121,6 +128,7 @@ public class GreekClient
         try
         {
             _cache.SetOptionsTrade(trade);
+            _seenTickers.TryAdd(trade.GetUnderlyingSymbol(), DateTime.MinValue);
         }
         catch (Exception e)
         {
@@ -133,6 +141,7 @@ public class GreekClient
         try
         {
             _cache.SetOptionsQuote(quote);
+            _seenTickers.TryAdd(quote.GetUnderlyingSymbol(), DateTime.MinValue);
         }
         catch (Exception e)
         {
@@ -142,11 +151,7 @@ public class GreekClient
 
     public bool TryAddOrUpdateGreekCalculation(string name, CalculateNewGreek? calc)
     {
-        return String.IsNullOrWhiteSpace(name) 
-            ? calc == null
-                ? _calcLookup.AddOrUpdate(name, calc, (key, old) => calc) == calc
-                : false
-            : false;
+        return !String.IsNullOrWhiteSpace(name) && calc != null && _calcLookup.AddOrUpdate(name, calc, (key, old) => calc) == calc;
     }
 
     public void AddBlackScholes()
@@ -156,8 +161,29 @@ public class GreekClient
     #endregion //Public Methods
     
     #region Private Methods
-
+    
     private async void FetchDividendYields(object? _)
+    {
+        const string dividendYieldTag = "trailing_dividend_yield";
+        foreach (KeyValuePair<string,DateTime> seenTicker in _seenTickers.Where(t => t.Value < (DateTime.UtcNow - TimeSpan.FromHours(DividendYieldUpdatePeriodHours))))
+        {
+            try
+            {
+                decimal? result = await _companyApi.GetCompanyDataPointNumberAsync(seenTicker.Key, dividendYieldTag);
+                await _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
+                _seenTickers[seenTicker.Key] = DateTime.UtcNow;
+                await Task.Delay(DividendYieldCallSpacerMilliseconds); //don't try to get rate limited.
+            }
+            catch (Exception e)
+            {
+                await _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, 0.0D, _updateFunc);
+                _seenTickers[seenTicker.Key] = DateTime.UtcNow;
+                await Task.Delay(DividendYieldCallSpacerMilliseconds); //don't try to get rate limited.
+            }
+        }
+    }
+
+    private async void FetchDividendYieldsOld(object? _)
     {
         int sanityCount = 0;
         string? nextPage = null;
@@ -166,7 +192,8 @@ public class GreekClient
             sanityCount++;
             try
             {
-                ApiResponseCompanyDailyMetrics results = await _companyApi.GetAllCompaniesDailyMetricsAsync(DateTime.Today, PageSize, nextPage);
+                ApiResponseCompanyDailyMetrics results = await _companyApi.GetAllCompaniesDailyMetricsAsync(null, PageSize, nextPage);
+                Console.WriteLine("dividend count: " + results.DailyMetrics.Count);
                 nextPage = results.NextPage;
                 foreach (CompanyDailyMetric dailyMetric in results.DailyMetrics)
                 {
