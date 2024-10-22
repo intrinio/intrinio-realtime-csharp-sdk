@@ -42,7 +42,8 @@ public static class BlackScholesGreekCalculator
     private static double CalcImpliedVolatilityCall(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice) 
     {
         double low = LOW_VOL, high = HIGH_VOL;
-        while ((high - low) > VOL_TOLERANCE){
+        while ((high - low) > VOL_TOLERANCE)
+        {
             if (CalcPriceCall(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, (high + low) / 2.0, dividendYield) > marketPrice)
                 high = (high + low) / 2.0;
             else
@@ -56,7 +57,8 @@ public static class BlackScholesGreekCalculator
     private static double CalcImpliedVolatilityPut(double underlyingPrice, double strike, double daysToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice) 
     {
         double low = LOW_VOL, high = HIGH_VOL;
-        while ((high - low) > VOL_TOLERANCE){
+        while ((high - low) > VOL_TOLERANCE)
+        {
             if (CalcPricePut(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, (high + low) / 2.0, dividendYield) > marketPrice)
                 high = (high + low) / 2.0;
             else
@@ -152,7 +154,8 @@ public static class BlackScholesGreekCalculator
         if (z > MAX_Z_SCORE)
             return 1.0;
         double i = 3.0, sum = 0.0, term = z;
-        while ((sum + term) != sum){
+        while ((sum + term) != sum)
+        {
             sum = sum + term;
             term = term * z * z / i;
             i += 2.0;
