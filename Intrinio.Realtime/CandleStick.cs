@@ -6,7 +6,6 @@ using System;
 
 public abstract class CandleStick
 {
-    private readonly string _contract;
     private readonly double _openTimestamp;
     private readonly double _closeTimestamp;
     private readonly IntervalType _interval;
