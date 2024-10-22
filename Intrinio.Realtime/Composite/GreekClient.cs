@@ -72,9 +72,9 @@ public class GreekClient
         _apiClient = new ApiClient();
         _apiClient.Configuration.ApiKey.Add("api_key", apiKey);
         _companyApi = new CompanyApi();
-        _companyApi.Configuration.ApiKey.Add("api_key", apiKey);
+        _companyApi.Configuration.ApiKey.TryAdd("api_key", apiKey);
         _indexApi = new IndexApi();
-        _indexApi.Configuration.ApiKey.Add("api_key", apiKey);
+        _indexApi.Configuration.ApiKey.TryAdd("api_key", apiKey);
     }
     #endregion //Constructors
     
@@ -166,7 +166,7 @@ public class GreekClient
             sanityCount++;
             try
             {
-                ApiResponseCompanyDailyMetrics results = await _companyApi.GetAllCompaniesDailyMetricsAsync(null, PageSize, nextPage);
+                ApiResponseCompanyDailyMetrics results = await _companyApi.GetAllCompaniesDailyMetricsAsync(DateTime.Today, PageSize, nextPage);
                 nextPage = results.NextPage;
                 foreach (CompanyDailyMetric dailyMetric in results.DailyMetrics)
                 {
