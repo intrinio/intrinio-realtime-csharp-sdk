@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Intrinio.Realtime.Composite;
 
 namespace Intrinio.Realtime.Options;
 
@@ -106,8 +107,8 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// <param name="onRefresh"></param>
     /// <param name="onUnusualActivity"></param>
     /// <param name="config"></param>
-    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity, Config config) 
-        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
+    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity, Config config, IDataCache? dataCache = null) 
+        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize, dataCache)
     {
         OnTrade = onTrade;
         OnQuote = onQuote;
@@ -125,7 +126,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// Create a new Options websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
-    public OptionsWebSocketClient(Action<Trade>? onTrade) : this(onTrade, null, null, null, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade>? onTrade, IDataCache? dataCache = null) : this(onTrade, null, null, null, Config.LoadConfig(), dataCache)
     {
     }
 
@@ -133,7 +134,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// Create a new Options websocket client.
     /// </summary>
     /// <param name="onQuote"></param>
-    public OptionsWebSocketClient(Action<Quote>? onQuote) : this(null, onQuote, null, null, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Quote>? onQuote, IDataCache? dataCache = null) : this(null, onQuote, null, null, Config.LoadConfig(), dataCache)
     {
     }
     
@@ -142,7 +143,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// </summary>
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
-    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote) : this(onTrade, onQuote, null, null, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, IDataCache? dataCache = null) : this(onTrade, onQuote, null, null, Config.LoadConfig(), dataCache)
     {
     }
     
@@ -153,7 +154,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// <param name="onQuote"></param>
     /// <param name="onRefresh"></param>
     /// <param name="onUnusualActivity"></param>
-    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity) : this(onTrade, onQuote, onRefresh, onUnusualActivity, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity, IDataCache? dataCache = null) : this(onTrade, onQuote, onRefresh, onUnusualActivity, Config.LoadConfig(), dataCache)
     {
     }
     #endregion //Constructors
@@ -481,7 +482,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         {
             Quote quote = ParseQuote(bytes);
             Interlocked.Increment(ref _dataQuoteCount);
-            try { _onQuote.Invoke(quote); }
+            try
+            {
+                _onQuote.Invoke(quote);
+                if (_useDataCache)
+                    _dataCache.SetOptionsQuote(quote).Wait();
+            }
             catch (Exception e)
             {
                 LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
@@ -491,7 +497,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         {
             Trade trade = ParseTrade(bytes);
             Interlocked.Increment(ref _dataTradeCount);
-            try { _onTrade.Invoke(trade); }
+            try
+            {
+                _onTrade.Invoke(trade);
+                if (_useDataCache)
+                    _dataCache.SetOptionsTrade(trade).Wait();
+            }
             catch (Exception e)
             {
                 LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
@@ -501,7 +512,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         {
             Refresh refresh = ParseRefresh(bytes);
             Interlocked.Increment(ref _dataRefreshCount);
-            try { _onRefresh.Invoke(refresh); }
+            try
+            {
+                _onRefresh.Invoke(refresh);
+                if (_useDataCache)
+                    _dataCache.SetOptionsRefresh(refresh).Wait();
+            }
             catch (Exception e)
             {
                 LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnRefresh: {0}; {1}", new object[]{e.Message, e.StackTrace});
@@ -511,7 +527,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         {
             UnusualActivity unusualActivity = ParseUnusualActivity(bytes);
             Interlocked.Increment(ref _dataUnusualActivityCount);
-            try { _onUnusualActivity.Invoke(unusualActivity); }
+            try
+            {
+                _onUnusualActivity.Invoke(unusualActivity);
+                if (_useDataCache)
+                    _dataCache.SetOptionsUnusualActivity(unusualActivity).Wait();
+            }
             catch (Exception e)
             {
                 LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnUnusualActivity: {0}; {1}", new object[]{e.Message, e.StackTrace});

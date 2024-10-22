@@ -12,6 +12,7 @@ public class GreekSampleApp
 {
 	private static Timer timer = null;
 	private static GreekClient _greekClient;
+	private static IDataCache _dataCache;
 	
     private static IOptionsWebSocketClient _optionsClient = null;
 	private static Intrinio.Realtime.Options.Config _optionsConfig;
@@ -27,25 +28,21 @@ public class GreekSampleApp
 	static void OnOptionsQuote(Intrinio.Realtime.Options.Quote quote)
 	{
 		Interlocked.Increment(ref _optionsQuoteEventCount);
-		_greekClient.OnOptionQuote(quote);
 	}
 
 	static void OnOptionsTrade(Intrinio.Realtime.Options.Trade trade)
 	{
 		Interlocked.Increment(ref _optionsTradeEventCount);
-		_greekClient.OnOptionTrade(trade);
 	}
 	
 	static void OnEquitiesQuote(Intrinio.Realtime.Equities.Quote quote)
 	{
 		Interlocked.Increment(ref _equitiesQuoteEventCount);
-		_greekClient.OnEquityQuote(quote);
 	}
 
 	static void OnEquitiesTrade(Intrinio.Realtime.Equities.Trade trade)
 	{
 		Interlocked.Increment(ref _equitiesTradeEventCount);
-		_greekClient.OnEquityTrade(trade);
 	}
 	
 	static Task OnGreek(string key, double? datum, IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache)
@@ -86,6 +83,7 @@ public class GreekSampleApp
 			equitiesClient.QuoteCount);
 		
 		Log("Greek updates: {0}", _greekUpdatedEventCount);
+		Log("Data Cache Security Count: {0}", _dataCache.AllSecurityData.Count);
 	}
 
 	static void Cancel(object sender, ConsoleCancelEventArgs args)
@@ -107,6 +105,7 @@ public class GreekSampleApp
 	public static async Task Run(string[] _)
 	{
 		Log("Starting sample app");
+		_dataCache = DataCacheFactory.Create();
 		GreekUpdateFrequency updateFrequency = GreekUpdateFrequency.EveryDividendYieldUpdate |
 		                       GreekUpdateFrequency.EveryRiskFreeInterestRateUpdate |
 		                       GreekUpdateFrequency.EveryOptionsTradeUpdate |
@@ -119,16 +118,16 @@ public class GreekSampleApp
 		// _optionsConfig.Provider = Intrinio.Realtime.Options.Provider.OPRA;
 		// _optionsConfig.ApiKey = "API_KEY_HERE";
 		// _optionsConfig.Symbols = Array.Empty<string>();
-		// _optionsConfig.NumThreads = 16;
+		// _optionsConfig.NumThreads = System.Environment.ProcessorCount;
 		// _optionsConfig.TradesOnly = false;
-		// _optionsConfig.BufferSize = 2048;
-		// _optionsConfig.OverflowBufferSize = 8192;
+		// _optionsConfig.BufferSize = 8192;
+		// _optionsConfig.OverflowBufferSize = 65536;
 		// _optionsConfig.Delayed = false;
 		_optionsConfig = Intrinio.Realtime.Options.Config.LoadConfig();
-		_greekClient = new GreekClient(updateFrequency, OnGreek, _optionsConfig.ApiKey);
+		_greekClient = new GreekClient(updateFrequency, OnGreek, _optionsConfig.ApiKey, _dataCache);
 		_greekClient.AddBlackScholes();
 		_greekClient.Start();
-		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, null, null, _optionsConfig);
+		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, null, null, _optionsConfig, _dataCache);
 		await _optionsClient.Start();
 		await _optionsClient.Join();
 		//await _optionsClient.JoinLobby(false); //Firehose
@@ -141,12 +140,12 @@ public class GreekSampleApp
 		// _equitiesConfig.Provider = Intrinio.Realtime.Equities.Provider.NASDAQ_BASIC;
 		// _equitiesConfig.ApiKey = "API_KEY_HERE";
 		// _equitiesConfig.Symbols = Array.Empty<string>();
-		// _equitiesConfig.NumThreads = 8;
+		// _equitiesConfig.NumThreads = System.Environment.ProcessorCount;
 		// _equitiesConfig.TradesOnly = false;
-		// _equitiesConfig.BufferSize = 2048;
-		// _equitiesConfig.OverflowBufferSize = 4096;
+		// _equitiesConfig.BufferSize = 8192;
+		// _equitiesConfig.OverflowBufferSize = 65536;
 		_equitiesConfig = Intrinio.Realtime.Equities.Config.LoadConfig();
-		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, _equitiesConfig);
+		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, _equitiesConfig, _dataCache);
 		await _equitiesClient.Start();
 		await _equitiesClient.Join();
 		//await _equitiesClient.JoinLobby(false); //Firehose

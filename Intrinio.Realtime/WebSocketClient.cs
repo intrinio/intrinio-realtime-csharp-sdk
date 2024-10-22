@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Net;
 using System.Net.WebSockets;
+using Intrinio.Realtime.Composite;
 
 namespace Intrinio.Realtime;
 
@@ -40,19 +41,26 @@ public abstract class WebSocketClient
     private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv11.0";
     private readonly ThreadPriority _mainThreadPriority;
     private readonly Thread[] _threads;
-    private Thread _receiveThread;
+    private Thread? _receiveThread;
     private bool _started;
+    protected IDataCache? _dataCache;
+    protected readonly bool _useDataCache;
+    public IDataCache DataCache { get { return _dataCache; } }
     #endregion //Data Members
     
     #region Constuctors
     /// <summary>
     /// Create a new Equities websocket client.
     /// </summary>
-    /// <param name="onTrade"></param>
-    /// <param name="onQuote"></param>
-    /// <param name="config"></param>
-    public WebSocketClient(uint processingThreadsQuantity, uint bufferSize, uint overflowBufferSize, uint maxMessageSize)
+    /// <param name="processingThreadsQuantity"></param>
+    /// <param name="bufferSize"></param>
+    /// <param name="overflowBufferSize"></param>
+    /// <param name="maxMessageSize"></param>
+    /// <param name="dataCache"></param>
+    public WebSocketClient(uint processingThreadsQuantity, uint bufferSize, uint overflowBufferSize, uint maxMessageSize, IDataCache? dataCache = null)
     {
+        _dataCache = dataCache;
+        _useDataCache = _dataCache != null;
         _started = false;
         _mainThreadPriority = Thread.CurrentThread.Priority; //this is set outside of our scope - let's not interfere.
         _maxMessageSize = maxMessageSize;

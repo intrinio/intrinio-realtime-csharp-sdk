@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Intrinio.Realtime.Composite;
 
 namespace Intrinio.Realtime.Equities;
 
@@ -63,8 +64,8 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
     /// <param name="config"></param>
-    public EquitiesWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Config config) 
-        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
+    public EquitiesWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Config config, IDataCache? dataCache = null) 
+        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize, dataCache)
     {
         OnTrade = onTrade;
         OnQuote = onQuote;
@@ -80,7 +81,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// Create a new Equities websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
-    public EquitiesWebSocketClient(Action<Trade> onTrade) : this(onTrade, null, Config.LoadConfig())
+    public EquitiesWebSocketClient(Action<Trade> onTrade, IDataCache? dataCache = null) : this(onTrade, null, Config.LoadConfig(), dataCache)
     {
     }
 
@@ -88,7 +89,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// Create a new Equities websocket client.
     /// </summary>
     /// <param name="onQuote"></param>
-    public EquitiesWebSocketClient(Action<Quote> onQuote) : this(null, onQuote, Config.LoadConfig())
+    public EquitiesWebSocketClient(Action<Quote> onQuote, IDataCache? dataCache = null) : this(null, onQuote, Config.LoadConfig(), dataCache)
     {
     }
     
@@ -97,7 +98,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// </summary>
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
-    public EquitiesWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote) : this(onTrade, onQuote, Config.LoadConfig())
+    public EquitiesWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, IDataCache? dataCache = null) : this(onTrade, onQuote, Config.LoadConfig(), dataCache)
     {
     }
     #endregion //Constructors
@@ -287,7 +288,12 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
                 {
                     Trade trade = ParseTrade(bytes);
                     Interlocked.Increment(ref _dataTradeCount);
-                    try { _onTrade.Invoke(trade); }
+                    try
+                    {
+                        _onTrade.Invoke(trade);
+                        if (_useDataCache)
+                            _dataCache.SetEquityTrade(trade).Wait();
+                    }
                     catch (Exception e)
                     {
                         LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
@@ -302,7 +308,12 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
                 {
                     Quote quote = ParseQuote(bytes);
                     Interlocked.Increment(ref _dataQuoteCount);
-                    try { _onQuote.Invoke(quote); }
+                    try
+                    {
+                        _onQuote.Invoke(quote);
+                        if (_useDataCache)
+                            _dataCache.SetEquityQuote(quote).Wait();
+                    }
                     catch (Exception e)
                     {
                         LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});

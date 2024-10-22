@@ -1,4 +1,5 @@
 using System.Linq;
+using Intrinio.Realtime.Composite;
 
 namespace Intrinio.Realtime.Equities;
 
@@ -41,19 +42,24 @@ public class ReplayClient : IEquitiesWebSocketClient
     private readonly Thread _replayThread;
     public UInt64 TradeCount { get { return Interlocked.Read(ref _dataTradeCount); } }
     public UInt64 QuoteCount { get { return Interlocked.Read(ref _dataQuoteCount); } }
+    protected IDataCache? _dataCache;
+    protected readonly bool _useDataCache;
+    public IDataCache DataCache { get { return _dataCache; } }
     #endregion //Data Members
 
     #region Constructors
-    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath)
+    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IDataCache? dataCache = null)
     {
-        this.OnTrade = onTrade;
-        this.OnQuote = onQuote;
-        this._config = config;
-        this._date = date;
-        this._withSimulatedDelay = withSimulatedDelay;
-        this._deleteFileWhenDone = deleteFileWhenDone;
-        this._writeToCsv = writeToCsv;
-        this._csvFilePath = csvFilePath;
+        _dataCache = dataCache;
+        _useDataCache = _dataCache != null;
+        OnTrade = onTrade;
+        OnQuote = onQuote;
+        _config = config;
+        _date = date;
+        _withSimulatedDelay = withSimulatedDelay;
+        _deleteFileWhenDone = deleteFileWhenDone;
+        _writeToCsv = writeToCsv;
+        _csvFilePath = csvFilePath;
         
         _dataMsgCount = 0UL;
         _dataEventCount = 0UL;
@@ -360,6 +366,8 @@ public class ReplayClient : IEquitiesWebSocketClient
                         {
                             Interlocked.Increment(ref _dataTradeCount);
                             OnTrade.Invoke(datum.Trade);
+                            if (_useDataCache)
+                                _dataCache.SetEquityTrade(datum.Trade).Wait();
                         }
                     }
                     else
@@ -368,6 +376,8 @@ public class ReplayClient : IEquitiesWebSocketClient
                         {
                             Interlocked.Increment(ref _dataQuoteCount);
                             OnQuote.Invoke(datum.Quote);
+                            if (_useDataCache)
+                                _dataCache.SetEquityQuote(datum.Quote).Wait();
                         }
                     }
                 }

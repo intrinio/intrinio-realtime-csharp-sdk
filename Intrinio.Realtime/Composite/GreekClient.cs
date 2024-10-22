@@ -55,9 +55,10 @@ public class GreekClient
     /// <param name="greekUpdateFrequency"></param>
     /// <param name="onGreekValueUpdated"></param>
     /// <param name="apiKey"></param>
-    public GreekClient(GreekUpdateFrequency greekUpdateFrequency, OnOptionsContractSupplementalDatumUpdated onGreekValueUpdated, string apiKey)
+    /// <param name="apiKey"></param>
+    public GreekClient(GreekUpdateFrequency greekUpdateFrequency, OnOptionsContractSupplementalDatumUpdated onGreekValueUpdated, string apiKey, IDataCache? cache = null)
     {
-        _cache = DataCacheFactory.Create();
+        _cache = cache ?? DataCacheFactory.Create();
         _seenTickers = new ConcurrentDictionary<string, DateTime>();
         _calcLookup = new ConcurrentDictionary<string, CalculateNewGreek>();
         OnGreekValueUpdated = onGreekValueUpdated;
