@@ -1,31 +1,25 @@
-using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
-using Intrinio.SDK.Api;
-using Intrinio.SDK.Client;
-using Intrinio.SDK.Model;
-
 namespace Intrinio.Realtime.Composite;
 
-using Intrinio;
 using Serilog;
 using System;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
-using System.Runtime.CompilerServices;
+using System.Linq;
+using Intrinio.SDK.Api;
+using Intrinio.SDK.Client;
+using Intrinio.SDK.Model;
 
 public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Realtime.Options.ISocketPlugIn
 {
     #region Data Members
     private readonly IDataCache _cache;
-    private const string ImpliedVolatilityKeyName = "IntrinioImpliedVolatility";
-    private const string DeltaKeyName = "IntrinioDelta";
-    private const string GammaKeyName = "IntrinioGamma";
-    private const string ThetaKeyName = "IntrinioTheta";
-    private const string VegaKeyName = "IntrinioVega";
+    private const string BlackScholesImpliedVolatilityKeyName = "IntrinioBlackScholesImpliedVolatility";
+    private const string BlackScholesDeltaKeyName = "IntrinioBlackScholesDelta";
+    private const string BlackScholesGammaKeyName = "IntrinioBlackScholesGamma";
+    private const string BlackScholesThetaKeyName = "IntrinioBlackScholesTheta";
+    private const string BlackScholesVegaKeyName = "IntrinioBlackScholesVega";
     private const string DividendYieldKeyName = "DividendYield";
     private const string RiskFreeInterestRateKeyName = "RiskFreeInterestRate";
     private const string BlackScholesKeyName = "IntrinioBlackScholes";
@@ -336,11 +330,11 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         
         if (result.IsValid)
         {
-            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, ImpliedVolatilityKeyName, result.ImpliedVolatility, _updateFunc);
-            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, DeltaKeyName, result.Delta, _updateFunc);
-            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, GammaKeyName, result.Gamma, _updateFunc);
-            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, ThetaKeyName, result.Theta, _updateFunc);
-            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, VegaKeyName, result.Vega, _updateFunc);
+            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesImpliedVolatilityKeyName, result.ImpliedVolatility, _updateFunc);
+            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesDeltaKeyName, result.Delta, _updateFunc);
+            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesGammaKeyName, result.Gamma, _updateFunc);
+            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesThetaKeyName, result.Theta, _updateFunc);
+            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesVegaKeyName, result.Vega, _updateFunc);
         }
     }
     

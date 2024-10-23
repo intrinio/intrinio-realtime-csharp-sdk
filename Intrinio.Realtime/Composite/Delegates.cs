@@ -1,8 +1,5 @@
 namespace Intrinio.Realtime.Composite;
 
-using System;
-using System.Threading.Tasks;
-
 public delegate void OnSupplementalDatumUpdated(string key, double? datum, IDataCache dataCache);
 public delegate void OnSecuritySupplementalDatumUpdated(string key, double? datum, ISecurityData securityData, IDataCache dataCache);
 public delegate void OnOptionsContractSupplementalDatumUpdated(string key, double? datum, IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache);
