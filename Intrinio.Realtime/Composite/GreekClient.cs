@@ -40,10 +40,11 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
     private const int DividendYieldUpdatePeriodHours = 4;
     private const int DividendYieldCallSpacerMilliseconds = 50;
     private bool _dividendYieldWorking = false;
+    private readonly bool _selfCache;
 
     public OnOptionsContractSupplementalDatumUpdated? OnGreekValueUpdated
     {
-        set { _cache.OptionsContractSupplementalDatumUpdatedCallback = value; }
+        set { _cache.OptionsContractSupplementalDatumUpdatedCallback += value; }
     }
     #endregion //Data Members
     
@@ -59,6 +60,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
     public GreekClient(GreekUpdateFrequency greekUpdateFrequency, OnOptionsContractSupplementalDatumUpdated onGreekValueUpdated, string apiKey, IDataCache? cache = null)
     {
         _cache = cache ?? DataCacheFactory.Create();
+        _selfCache = cache == null;
         _seenTickers = new ConcurrentDictionary<string, DateTime>();
         _calcLookup = new ConcurrentDictionary<string, CalculateNewGreek>();
         OnGreekValueUpdated = onGreekValueUpdated;
@@ -109,6 +111,8 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         try
         {
             _seenTickers.TryAdd(String.Intern(trade.Symbol), DateTime.MinValue);
+            if (_selfCache)
+                _cache.SetEquityTrade(trade);
         }
         catch (Exception e)
         {
@@ -121,6 +125,8 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         try
         {
             _seenTickers.TryAdd(String.Intern(quote.Symbol), DateTime.MinValue);
+            if (_selfCache)
+                _cache.SetEquityQuote(quote);
         }
         catch (Exception e)
         {
@@ -133,6 +139,8 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         try
         {
             _seenTickers.TryAdd(String.Intern(trade.GetUnderlyingSymbol()), DateTime.MinValue);
+            if (_selfCache)
+                _cache.SetOptionsTrade(trade);
         }
         catch (Exception e)
         {
@@ -145,6 +153,8 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         try
         {
             _seenTickers.TryAdd(String.Intern(quote.GetUnderlyingSymbol()), DateTime.MinValue);
+            if (_selfCache)
+                _cache.SetOptionsQuote(quote);
         }
         catch (Exception e)
         {
