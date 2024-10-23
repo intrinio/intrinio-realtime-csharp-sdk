@@ -39,7 +39,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
     private readonly Intrinio.SDK.Api.OptionsApi _optionsApi;
     private readonly ConcurrentDictionary<string, DateTime> _seenTickers;
     private const int DividendYieldUpdatePeriodHours = 4;
-    private const int ApiCallSpacerMilliseconds = 1001;
+    private const int ApiCallSpacerMilliseconds = 1100;
     private bool _dividendYieldWorking = false;
     private readonly bool _selfCache;
 
@@ -188,7 +188,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
     
     #region Private Methods
 
-    private async void FetchInitialCompanyDividends()
+    private void FetchInitialCompanyDividends()
     {
         Log.Information("Fetching company daily metrics in bulk");
         //Fetch daily metrics in bulk
@@ -198,7 +198,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
             DateTime date = DateTime.Today;
             do
             {
-                ApiResponseCompanyDailyMetrics result = await _companyApi.GetAllCompaniesDailyMetricsAsync(date, 1000, nextPage, null);
+                ApiResponseCompanyDailyMetrics result = _companyApi.GetAllCompaniesDailyMetrics(date, 1000, nextPage, null);
                 foreach (CompanyDailyMetric companyDailyMetric in result.DailyMetrics)
                 {
                     if (!String.IsNullOrWhiteSpace(companyDailyMetric.Company.Ticker) && companyDailyMetric.DividendYield.HasValue)
@@ -207,7 +207,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                         _seenTickers[String.Intern(companyDailyMetric.Company.Ticker)] = DateTime.UtcNow;
                     }
                 }
-                await Task.Delay(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+                Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
             } while (!String.IsNullOrWhiteSpace(nextPage));
         }
         catch (Exception e)
@@ -219,7 +219,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         //Fetch known options tickers
         try
         {
-            foreach (string ticker in (await _optionsApi.GetAllOptionsTickersAsync()).Tickers)
+            foreach (string ticker in (_optionsApi.GetAllOptionsTickers()).Tickers)
                 _seenTickers.TryAdd(String.Intern(ticker), DateTime.MinValue);
         }
         catch (Exception e)
@@ -228,34 +228,43 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         }
     }
     
-    private async void FetchDividendYields(object? _)
+    private void FetchDividendYields(object? _)
     {
         const string dividendYieldTag = "trailing_dividend_yield";
         if (!_dividendYieldWorking)
         {
             _dividendYieldWorking = true;
-            foreach (KeyValuePair<string,DateTime> seenTicker in _seenTickers.Where(t => t.Value < (DateTime.UtcNow - TimeSpan.FromHours(DividendYieldUpdatePeriodHours))))
+            try
             {
-                try
+                foreach (KeyValuePair<string,DateTime> seenTicker in _seenTickers.Where(t => t.Value < (DateTime.UtcNow - TimeSpan.FromHours(DividendYieldUpdatePeriodHours))))
                 {
-                    decimal? result = await _companyApi.GetCompanyDataPointNumberAsync(seenTicker.Key, dividendYieldTag);
-                    _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
-                    _seenTickers[seenTicker.Key] = DateTime.UtcNow;
-                    await Task.Delay(ApiCallSpacerMilliseconds); //don't try to get rate limited.
-                }
-                catch (Exception e)
-                {
-                    _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, 0.0D, _updateFunc);
-                    _seenTickers[seenTicker.Key] = DateTime.UtcNow;
-                    await Task.Delay(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+                    try
+                    {
+                        decimal? result = _companyApi.GetCompanyDataPointNumber(seenTicker.Key, dividendYieldTag);
+                        _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
+                        _seenTickers[seenTicker.Key] = DateTime.UtcNow;
+                        Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+                    }
+                    catch (Exception e)
+                    {
+                        _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, 0.0D, _updateFunc);
+                        _seenTickers[seenTicker.Key] = DateTime.UtcNow;
+                        Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+                    }
                 }
             }
-
-            _dividendYieldWorking = false;
+            catch (Exception e)
+            {
+                Log.Warning(e, e.Message);
+            }
+            finally
+            {
+                _dividendYieldWorking = false;
+            }
         }
     }
     
-    private async void FetchRiskFreeInterestRate(object? _)
+    private void FetchRiskFreeInterestRate(object? _)
     {
         bool success = false;
         int tryCount = 0;
@@ -264,7 +273,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
             tryCount++;
             try
             {
-                Decimal? results = await _indexApi.GetEconomicIndexDataPointNumberAsync("$DTB3", "level");
+                Decimal? results = _indexApi.GetEconomicIndexDataPointNumber("$DTB3", "level");
                 if (results.HasValue)
                 {
                     _cache.SetSupplementaryDatum(RiskFreeInterestRateKeyName, Convert.ToDouble(results.Value), _updateFunc);
@@ -272,7 +281,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                 }
 
                 if (!success)
-                    await Task.Delay(10000); //don't try to get rate limited.
+                    Thread.Sleep(10000); //don't try to get rate limited.
             }
             catch (Exception e)
             {

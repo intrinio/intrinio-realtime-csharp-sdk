@@ -14,7 +14,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     #region Data Members
 
     private const string LobbyName = "lobby";
-    private const uint MaxMessageSize = 75u;
+    private const uint MaxMessageSize = 86u;
     private const int MessageTypeIndex = 22;
     private const int TradeMessageSize = 72;
     private const int QuoteMessageSize = 52;

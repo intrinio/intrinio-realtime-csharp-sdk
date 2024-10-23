@@ -55,7 +55,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     private readonly string _logPrefix;
     private const string MessageVersionHeaderKey = "UseNewEquitiesFormat";
     private const string MessageVersionHeaderValue = "v2";
-    private const uint MaxMessageSize = 64u;
+    private const uint MaxMessageSize = 86u;
     private const string ChannelFormat = "{0}|TradesOnly|{1}";
     #endregion //Data Members
     

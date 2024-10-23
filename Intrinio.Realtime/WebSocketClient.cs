@@ -68,7 +68,7 @@ public abstract class WebSocketClient
         _data = new SingleProducerRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
         _overflowData = new DropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_overflowBufferSize));
         
-        _httpClient.Timeout = TimeSpan.FromSeconds(5.0);
+        //_httpClient.Timeout = TimeSpan.FromMinutes(10.0);
         
         _tryReconnect = async () =>
         {
