@@ -5,6 +5,7 @@ using Intrinio.Realtime.Equities;
 using Intrinio.Realtime.Options;
 using Serilog;
 using Serilog.Core;
+using ISocketPlugIn = Intrinio.Realtime.Options.ISocketPlugIn;
 
 namespace SampleApp;
 
@@ -285,16 +286,16 @@ public class CompositeSampleApp
 	{
 		Log("Starting sample app");
 		_dataCache = DataCacheFactory.Create();
-		_dataCache.EquitiesTradeUpdatedCallback = OnEquitiesTradeCacheUpdated;
-		_dataCache.EquitiesQuoteUpdatedCallback = OnEquitiesQuoteCacheUpdated;
-		_dataCache.EquitiesTradeCandleStickUpdatedCallback = OnEquitiesTradeCandleStickCacheUpdated;
-		_dataCache.EquitiesQuoteCandleStickUpdatedCallback = OnEquitiesQuoteCandleStickCacheUpdated;
-		_dataCache.OptionsTradeUpdatedCallback = OnOptionsTradeCacheUpdated;
-		_dataCache.OptionsQuoteUpdatedCallback = OnOptionsQuoteCacheUpdated;
-		_dataCache.OptionsRefreshUpdatedCallback = OnOptionsRefreshCacheUpdated;
-		_dataCache.OptionsUnusualActivityUpdatedCallback = OnOptionsUnusualActivityCacheUpdated;
-		_dataCache.OptionsTradeCandleStickUpdatedCallback = OnOptionsTradeCandleStickCacheUpdated;
-		_dataCache.OptionsQuoteCandleStickUpdatedCallback = OnOptionsQuoteCandleStickCacheUpdated;
+		_dataCache.EquitiesTradeUpdatedCallback += OnEquitiesTradeCacheUpdated;
+		_dataCache.EquitiesQuoteUpdatedCallback += OnEquitiesQuoteCacheUpdated;
+		_dataCache.EquitiesTradeCandleStickUpdatedCallback += OnEquitiesTradeCandleStickCacheUpdated;
+		_dataCache.EquitiesQuoteCandleStickUpdatedCallback += OnEquitiesQuoteCandleStickCacheUpdated;
+		_dataCache.OptionsTradeUpdatedCallback += OnOptionsTradeCacheUpdated;
+		_dataCache.OptionsQuoteUpdatedCallback += OnOptionsQuoteCacheUpdated;
+		_dataCache.OptionsRefreshUpdatedCallback += OnOptionsRefreshCacheUpdated;
+		_dataCache.OptionsUnusualActivityUpdatedCallback += OnOptionsUnusualActivityCacheUpdated;
+		_dataCache.OptionsTradeCandleStickUpdatedCallback += OnOptionsTradeCandleStickCacheUpdated;
+		_dataCache.OptionsQuoteCandleStickUpdatedCallback += OnOptionsQuoteCandleStickCacheUpdated;
 		
 		_optionsUseTradeCandleSticks = false;
 		_optionsUseQuoteCandleSticks = false;
@@ -305,6 +306,10 @@ public class CompositeSampleApp
 		_equitiesUseQuoteCandleSticks = false;
 		// _equitiesCandleStickClient = new Intrinio.Realtime.Equities.CandleStickClient(OnEquitiesTradeCandleStick, OnEquitiesQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, false, _dataCache);
 		// _equitiesCandleStickClient.Start();
+
+		List<Intrinio.Realtime.Options.ISocketPlugIn> optionsPlugins = new List<Intrinio.Realtime.Options.ISocketPlugIn>();
+		//optionsPlugins.Add(_optionsCandleStickClient);
+		optionsPlugins.Add(_dataCache);
 
 		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
 		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
@@ -318,12 +323,16 @@ public class CompositeSampleApp
 		// optionsConfig.BufferSize = 2048;
 		// optionsConfig.OverflowBufferSize = 8192;
 		// optionsConfig.Delayed = false;
-		//_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsConfig, _dataCache);
-		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, _dataCache);
+		//_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsConfig, optionsPlugins);
+		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsPlugins);
 		await _optionsClient.Start();
 		await _optionsClient.Join();
 		//await _optionsClient.JoinLobby(false); //Firehose
 		// await _optionsClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		
+		List<Intrinio.Realtime.Equities.ISocketPlugIn> equitiesPlugins = new List<Intrinio.Realtime.Equities.ISocketPlugIn>();
+		//equitiesPlugins.Add(_equitiesCandleStickClient);
+		equitiesPlugins.Add(_dataCache);
 		
 		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
 		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
@@ -336,8 +345,8 @@ public class CompositeSampleApp
 		// equitiesConfig.TradesOnly = false;
 		// equitiesConfig.BufferSize = 2048;
 		// equitiesConfig.OverflowBufferSize = 4096;
-		//_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesConfig, _dataCache);
-		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, _dataCache);
+		//_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesConfig, equitiesPlugins);
+		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesPlugins);
 		await _equitiesClient.Start();
 		await _equitiesClient.Join();
 		//await _equitiesClient.JoinLobby(false); //Firehose

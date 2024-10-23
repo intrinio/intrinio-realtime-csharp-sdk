@@ -42,16 +42,14 @@ public class ReplayClient : IEquitiesWebSocketClient
     private readonly Thread _replayThread;
     public UInt64 TradeCount { get { return Interlocked.Read(ref _dataTradeCount); } }
     public UInt64 QuoteCount { get { return Interlocked.Read(ref _dataQuoteCount); } }
-    protected IDataCache? _dataCache;
-    protected readonly bool _useDataCache;
-    public IDataCache DataCache { get { return _dataCache; } }
+    private readonly IEnumerable<ISocketPlugIn> _plugIns;
+    public IEnumerable<ISocketPlugIn> PlugIns { get { return _plugIns; } }
     #endregion //Data Members
 
     #region Constructors
-    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IDataCache? dataCache = null)
+    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IEnumerable<ISocketPlugIn>? plugIns = null)
     {
-        _dataCache = dataCache;
-        _useDataCache = _dataCache != null;
+        _plugIns = plugIns ?? Array.Empty<ISocketPlugIn>();
         OnTrade = onTrade;
         OnQuote = onQuote;
         _config = config;
@@ -80,17 +78,17 @@ public class ReplayClient : IEquitiesWebSocketClient
         config.Validate();
     }
 
-    public ReplayClient(Action<Trade> onTrade, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(onTrade, null, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
+    public ReplayClient(Action<Trade> onTrade, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IEnumerable<ISocketPlugIn>? plugIns = null) : this(onTrade, null, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath, plugIns)
     {
         
     }
 
-    public ReplayClient(Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(null, onQuote, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
+    public ReplayClient(Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IEnumerable<ISocketPlugIn>? plugIns = null) : this(null, onQuote, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath, plugIns)
     {
         
     }
 
-    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(onTrade, onQuote, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
+    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IEnumerable<ISocketPlugIn>? plugIns = null) : this(onTrade, onQuote, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath, plugIns)
     {
         
     }
@@ -366,8 +364,8 @@ public class ReplayClient : IEquitiesWebSocketClient
                         {
                             Interlocked.Increment(ref _dataTradeCount);
                             OnTrade.Invoke(datum.Trade);
-                            if (_useDataCache)
-                                _dataCache.SetEquityTrade(datum.Trade);
+                            foreach (ISocketPlugIn socketPlugIn in _plugIns)
+                                socketPlugIn.OnTrade(datum.Trade);
                         }
                     }
                     else
@@ -376,8 +374,8 @@ public class ReplayClient : IEquitiesWebSocketClient
                         {
                             Interlocked.Increment(ref _dataQuoteCount);
                             OnQuote.Invoke(datum.Quote);
-                            if (_useDataCache)
-                                _dataCache.SetEquityQuote(datum.Quote);
+                            foreach (ISocketPlugIn socketPlugIn in _plugIns)
+                                socketPlugIn.OnQuote(datum.Quote);
                         }
                     }
                 }

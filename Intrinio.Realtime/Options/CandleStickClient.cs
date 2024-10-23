@@ -16,7 +16,7 @@ using System.Runtime.CompilerServices;
 public delegate TradeCandleStick FetchHistoricalTradeCandleStick(string contract, double openTimestamp, double closeTimestamp, IntervalType interval);
 public delegate QuoteCandleStick FetchHistoricalQuoteCandleStick(string contract, double openTimestamp, double closeTimestamp, QuoteType quoteType, IntervalType interval);
 
-public class CandleStickClient
+public class CandleStickClient : ISocketPlugIn
 {
     #region Data Members
     private readonly IntervalType _interval;
@@ -181,6 +181,14 @@ public class CandleStickClient
         {
             Log.Warning("Error on handling quote in Options CandleStick Client: {0}", e.Message);
         }      
+    }
+
+    public void OnRefresh(Refresh refresh)
+    {
+    }
+    
+    public void OnUnusualActivity(UnusualActivity unusualActivity)
+    {
     }
 
     public void Start()

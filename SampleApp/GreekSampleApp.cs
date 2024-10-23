@@ -122,7 +122,7 @@ public class GreekSampleApp
 		_greekClient = new GreekClient(updateFrequency, OnGreek, _optionsConfig.ApiKey, _dataCache);
 		_greekClient.AddBlackScholes();
 		_greekClient.Start();
-		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, null, null, _optionsConfig, _dataCache);
+		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, null, null, _optionsConfig, new Intrinio.Realtime.Options.ISocketPlugIn[]{_dataCache, _greekClient});
 		await _optionsClient.Start();
 		await _optionsClient.Join();
 		//await _optionsClient.JoinLobby(false); //Firehose
@@ -140,7 +140,7 @@ public class GreekSampleApp
 		// _equitiesConfig.BufferSize = 8192;
 		// _equitiesConfig.OverflowBufferSize = 65536;
 		_equitiesConfig = Intrinio.Realtime.Equities.Config.LoadConfig();
-		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, _equitiesConfig, _dataCache);
+		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, _equitiesConfig, new Intrinio.Realtime.Equities.ISocketPlugIn[]{_dataCache, _greekClient});
 		await _equitiesClient.Start();
 		await _equitiesClient.Join();
 		//await _equitiesClient.JoinLobby(false); //Firehose

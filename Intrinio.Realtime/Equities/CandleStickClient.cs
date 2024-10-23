@@ -16,7 +16,7 @@ using System.Runtime.CompilerServices;
 public delegate TradeCandleStick FetchHistoricalTradeCandleStick(string symbol, double openTimestamp, double closeTimestamp, IntervalType interval);
 public delegate QuoteCandleStick FetchHistoricalQuoteCandleStick(string symbol, double openTimestamp, double closeTimestamp, QuoteType quoteType, IntervalType interval);
 
-public class CandleStickClient
+public class CandleStickClient : ISocketPlugIn
 {
     #region Data Members
     private readonly IntervalType _interval;

@@ -3,12 +3,13 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
+
 namespace Intrinio.Realtime.Composite;
 
 /// <summary>
 /// Not for Use yet. Subject to change.
 /// </summary>
-public interface IDataCache
+public interface IDataCache : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Realtime.Options.ISocketPlugIn
 {
     #region Supplementary Data
     

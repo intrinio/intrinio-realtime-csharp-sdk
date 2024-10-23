@@ -169,6 +169,11 @@ internal class DataCache : IDataCache
 
         return false;
     }
+
+    public void OnTrade(Intrinio.Realtime.Equities.Trade trade)
+    {
+        SetEquityTrade(trade);
+    }
     
     public Intrinio.Realtime.Equities.Quote? GetLatestEquityAskQuote(string tickerSymbol)
     {
@@ -200,6 +205,11 @@ internal class DataCache : IDataCache
         }
 
         return false;
+    }
+    
+    public void OnQuote(Intrinio.Realtime.Equities.Quote quote)
+    {
+        SetEquityQuote(quote);
     }
     
     public Intrinio.Realtime.Equities.TradeCandleStick? GetLatestEquityTradeCandleStick(string tickerSymbol)
@@ -287,6 +297,11 @@ internal class DataCache : IDataCache
 
         return false;
     }
+
+    public void OnTrade(Intrinio.Realtime.Options.Trade trade)
+    {
+        SetOptionsTrade(trade);
+    }
     
     public Intrinio.Realtime.Options.Quote? GetLatestOptionsQuote(string tickerSymbol, string contract)
     {
@@ -311,6 +326,11 @@ internal class DataCache : IDataCache
         }
 
         return false;
+    }
+    
+    public void OnQuote(Intrinio.Realtime.Options.Quote quote)
+    {
+        SetOptionsQuote(quote);
     }
     
     public Intrinio.Realtime.Options.Refresh? GetLatestOptionsRefresh(string tickerSymbol, string contract)
@@ -338,6 +358,11 @@ internal class DataCache : IDataCache
         return false;
     }
     
+    public void OnRefresh(Intrinio.Realtime.Options.Refresh refresh)
+    {
+        SetOptionsRefresh(refresh);
+    }
+    
     public Intrinio.Realtime.Options.UnusualActivity? GetLatestOptionsUnusualActivity(string tickerSymbol, string contract)
     {
         return _securities.TryGetValue(tickerSymbol, out ISecurityData securityData)
@@ -361,6 +386,11 @@ internal class DataCache : IDataCache
         }
 
         return false;
+    }
+    
+    public void OnUnusualActivity(Intrinio.Realtime.Options.UnusualActivity unusualActivity)
+    {
+        SetOptionsUnusualActivity(unusualActivity);
     }
     
     public Intrinio.Realtime.Options.TradeCandleStick? GetLatestOptionsTradeCandleStick(string tickerSymbol, string contract)

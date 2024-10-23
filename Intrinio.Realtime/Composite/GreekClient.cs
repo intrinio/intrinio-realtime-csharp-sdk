@@ -17,7 +17,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Runtime.CompilerServices;
 
-public class GreekClient
+public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Realtime.Options.ISocketPlugIn
 {
     #region Data Members
     private readonly IDataCache _cache;
@@ -55,7 +55,7 @@ public class GreekClient
     /// <param name="greekUpdateFrequency"></param>
     /// <param name="onGreekValueUpdated"></param>
     /// <param name="apiKey"></param>
-    /// <param name="apiKey"></param>
+    /// <param name="cache"></param>
     public GreekClient(GreekUpdateFrequency greekUpdateFrequency, OnOptionsContractSupplementalDatumUpdated onGreekValueUpdated, string apiKey, IDataCache? cache = null)
     {
         _cache = cache ?? DataCacheFactory.Create();
@@ -64,22 +64,22 @@ public class GreekClient
         OnGreekValueUpdated = onGreekValueUpdated;
 
         if (greekUpdateFrequency.HasFlag(GreekUpdateFrequency.EveryOptionsTradeUpdate))
-            _cache.OptionsTradeUpdatedCallback = UpdateGreeks;
+            _cache.OptionsTradeUpdatedCallback += UpdateGreeks;
         
         if (greekUpdateFrequency.HasFlag(GreekUpdateFrequency.EveryOptionsQuoteUpdate))
-            _cache.OptionsQuoteUpdatedCallback = UpdateGreeks;
+            _cache.OptionsQuoteUpdatedCallback += UpdateGreeks;
         
         if (greekUpdateFrequency.HasFlag(GreekUpdateFrequency.EveryDividendYieldUpdate))
-            _cache.SecuritySupplementalDatumUpdatedCallback = UpdateGreeks;
+            _cache.SecuritySupplementalDatumUpdatedCallback += UpdateGreeks;
         
         if (greekUpdateFrequency.HasFlag(GreekUpdateFrequency.EveryRiskFreeInterestRateUpdate))
-            _cache.SupplementalDatumUpdatedCallback = UpdateGreeks;
+            _cache.SupplementalDatumUpdatedCallback += UpdateGreeks;
         
         if (greekUpdateFrequency.HasFlag(GreekUpdateFrequency.EveryEquityTradeUpdate))
-            _cache.EquitiesTradeUpdatedCallback = UpdateGreeks;
+            _cache.EquitiesTradeUpdatedCallback += UpdateGreeks;
         
         if (greekUpdateFrequency.HasFlag(GreekUpdateFrequency.EveryEquityQuoteUpdate))
-            _cache.EquitiesQuoteUpdatedCallback = UpdateGreeks;
+            _cache.EquitiesQuoteUpdatedCallback += UpdateGreeks;
 
         _apiClient = new ApiClient();
         _apiClient.Configuration.ApiKey.Add("api_key", apiKey);
@@ -104,11 +104,10 @@ public class GreekClient
         _dividendFetchTimer.Dispose();
     }
 
-    public void OnEquityTrade(Intrinio.Realtime.Equities.Trade trade)
+    public void OnTrade(Intrinio.Realtime.Equities.Trade trade)
     {
         try
         {
-            _cache.SetEquityTrade(trade);
             _seenTickers.TryAdd(String.Intern(trade.Symbol), DateTime.MinValue);
         }
         catch (Exception e)
@@ -117,11 +116,10 @@ public class GreekClient
         }
     }
 
-    public void OnEquityQuote(Intrinio.Realtime.Equities.Quote quote)
+    public void OnQuote(Intrinio.Realtime.Equities.Quote quote)
     {
         try
         {
-            _cache.SetEquityQuote(quote);
             _seenTickers.TryAdd(String.Intern(quote.Symbol), DateTime.MinValue);
         }
         catch (Exception e)
@@ -130,11 +128,10 @@ public class GreekClient
         }      
     }
     
-    public void OnOptionTrade(Intrinio.Realtime.Options.Trade trade)
+    public void OnTrade(Intrinio.Realtime.Options.Trade trade)
     {
         try
         {
-            _cache.SetOptionsTrade(trade);
             _seenTickers.TryAdd(String.Intern(trade.GetUnderlyingSymbol()), DateTime.MinValue);
         }
         catch (Exception e)
@@ -143,17 +140,24 @@ public class GreekClient
         }
     }
 
-    public void OnOptionQuote(Intrinio.Realtime.Options.Quote quote)
+    public void OnQuote(Intrinio.Realtime.Options.Quote quote)
     {
         try
         {
-            _cache.SetOptionsQuote(quote);
             _seenTickers.TryAdd(String.Intern(quote.GetUnderlyingSymbol()), DateTime.MinValue);
         }
         catch (Exception e)
         {
             Log.Warning("Error on handling option quote in GreekClient: {0}", e.Message);
         }      
+    }
+
+    public void OnRefresh(Intrinio.Realtime.Options.Refresh refresh)
+    {
+    }
+
+    public void OnUnusualActivity(Intrinio.Realtime.Options.UnusualActivity unusualActivity)
+    {
     }
 
     public bool TryAddOrUpdateGreekCalculation(string name, CalculateNewGreek? calc)

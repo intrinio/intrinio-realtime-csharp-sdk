@@ -43,9 +43,6 @@ public abstract class WebSocketClient
     private readonly Thread[] _threads;
     private Thread? _receiveThread;
     private bool _started;
-    protected IDataCache? _dataCache;
-    protected readonly bool _useDataCache;
-    public IDataCache? DataCache { get { return _dataCache; } }
     #endregion //Data Members
     
     #region Constuctors
@@ -57,10 +54,8 @@ public abstract class WebSocketClient
     /// <param name="overflowBufferSize"></param>
     /// <param name="maxMessageSize"></param>
     /// <param name="dataCache"></param>
-    public WebSocketClient(uint processingThreadsQuantity, uint bufferSize, uint overflowBufferSize, uint maxMessageSize, IDataCache? dataCache = null)
+    public WebSocketClient(uint processingThreadsQuantity, uint bufferSize, uint overflowBufferSize, uint maxMessageSize)
     {
-        _dataCache = dataCache;
-        _useDataCache = _dataCache != null;
         _started = false;
         _mainThreadPriority = Thread.CurrentThread.Priority; //this is set outside of our scope - let's not interfere.
         _maxMessageSize = maxMessageSize;

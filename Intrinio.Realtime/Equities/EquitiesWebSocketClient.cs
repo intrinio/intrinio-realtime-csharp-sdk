@@ -17,6 +17,8 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     private bool _useOnTrade;
     private bool _useOnQuote;
     private Action<Trade>? _onTrade;
+    private readonly IEnumerable<ISocketPlugIn> _plugIns;
+    public IEnumerable<ISocketPlugIn> PlugIns { get { return _plugIns; } }
 
     /// <summary>
     /// The callback for when a trade event occurs.
@@ -64,12 +66,14 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
     /// <param name="config"></param>
-    public EquitiesWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Config config, IDataCache? dataCache = null) 
-        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize, dataCache)
+    /// <param name="plugIns"></param>
+    public EquitiesWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Config config, IEnumerable<ISocketPlugIn>? plugIns = null) 
+        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
     {
         OnTrade = onTrade;
         OnQuote = onQuote;
         _config = config;
+        _plugIns = plugIns ?? Array.Empty<ISocketPlugIn>();
         
         if (ReferenceEquals(null, _config))
             throw new ArgumentException("Config may not be null.");
@@ -81,7 +85,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// Create a new Equities websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
-    public EquitiesWebSocketClient(Action<Trade> onTrade, IDataCache? dataCache = null) : this(onTrade, null, Config.LoadConfig(), dataCache)
+    public EquitiesWebSocketClient(Action<Trade> onTrade, IEnumerable<ISocketPlugIn>? plugIns = null) : this(onTrade, null, Config.LoadConfig(), plugIns)
     {
     }
 
@@ -89,7 +93,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// Create a new Equities websocket client.
     /// </summary>
     /// <param name="onQuote"></param>
-    public EquitiesWebSocketClient(Action<Quote> onQuote, IDataCache? dataCache = null) : this(null, onQuote, Config.LoadConfig(), dataCache)
+    public EquitiesWebSocketClient(Action<Quote> onQuote, IEnumerable<ISocketPlugIn>? plugIns = null) : this(null, onQuote, Config.LoadConfig(), plugIns)
     {
     }
     
@@ -98,7 +102,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// </summary>
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
-    public EquitiesWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, IDataCache? dataCache = null) : this(onTrade, onQuote, Config.LoadConfig(), dataCache)
+    public EquitiesWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, IEnumerable<ISocketPlugIn>? plugIns = null) : this(onTrade, onQuote, Config.LoadConfig(), plugIns)
     {
     }
     #endregion //Constructors
@@ -284,19 +288,28 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         {
             case MessageType.Trade:
             {
+                Trade trade = ParseTrade(bytes);
+                Interlocked.Increment(ref _dataTradeCount);
                 if (_useOnTrade)
                 {
-                    Trade trade = ParseTrade(bytes);
-                    Interlocked.Increment(ref _dataTradeCount);
                     try
                     {
                         _onTrade.Invoke(trade);
-                        if (_useDataCache)
-                            _dataCache.SetEquityTrade(trade);
                     }
                     catch (Exception e)
                     {
                         LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                    }
+                }
+                foreach (ISocketPlugIn socketPlugIn in _plugIns)
+                {
+                    try
+                    {
+                        socketPlugIn.OnTrade(trade);
+                    }
+                    catch (Exception e)
+                    {
+                        LogMessage(LogLevel.ERROR, "Error while invoking plugin supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
                     }
                 }
                 break;
@@ -304,19 +317,29 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
             case MessageType.Ask:
             case MessageType.Bid:
             {
+                Quote quote = ParseQuote(bytes);
+                Interlocked.Increment(ref _dataQuoteCount);
                 if (_useOnQuote)
                 {
-                    Quote quote = ParseQuote(bytes);
-                    Interlocked.Increment(ref _dataQuoteCount);
                     try
                     {
                         _onQuote.Invoke(quote);
-                        if (_useDataCache)
-                            _dataCache.SetEquityQuote(quote);
                     }
                     catch (Exception e)
                     {
                         LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                    }
+                }
+
+                foreach (ISocketPlugIn socketPlugIn in _plugIns)
+                {
+                    try
+                    {
+                        socketPlugIn.OnQuote(quote);
+                    }
+                    catch (Exception e)
+                    {
+                        LogMessage(LogLevel.ERROR, "Error while invoking plugin supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
                     }
                 }
                 break;
