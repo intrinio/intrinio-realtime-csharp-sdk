@@ -16,12 +16,12 @@ docker compose run example
 
 ## Installation
 
-Go to [Release](https://github.com/intrinio/intrinio-realtime-csharp-sdk/releases/), download the DLLs, reference it in your project. The DLLs contains dependencies necessary to the SDK.
+Either use the [Nuget](https://www.nuget.org/packages/IntrinioRealTimeClient) package, or go to [Release](https://github.com/intrinio/intrinio-realtime-csharp-sdk/releases/), download the DLLs, reference it in your project. The DLLs contains dependencies necessary to the SDK.
 
 ## Sample Project
 
 For a sample .NET project see: [intrinio-realtime-dotnet-sdk](https://github.com/intrinio/intrinio-realtime-csharp-sdk/blob/master/IntrinioRealTimeSDK/Program.cs)
-Be sure to update [config.json](https://github.com/intrinio/intrinio-realtime-csharp-sdk/blob/master/IntrinioRealtimeMultiExchange/config.json)
+Be sure to update [config.json](https://github.com/intrinio/intrinio-realtime-csharp-sdk/blob/master/SampleApp/config.json)
 
 ## Features
 
