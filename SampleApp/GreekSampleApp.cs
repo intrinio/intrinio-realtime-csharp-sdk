@@ -126,7 +126,7 @@ public class GreekSampleApp
 		await _optionsClient.Start();
 		await _optionsClient.Join();
 		//await _optionsClient.JoinLobby(false); //Firehose
-		// await _optionsClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		//await _optionsClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
 		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
 		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
@@ -144,7 +144,7 @@ public class GreekSampleApp
 		await _equitiesClient.Start();
 		await _equitiesClient.Join();
 		//await _equitiesClient.JoinLobby(false); //Firehose
-		// await _equitiesClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		//await _equitiesClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
 		timer = new Timer(TimerCallback, null, 60000, 60000);
 		

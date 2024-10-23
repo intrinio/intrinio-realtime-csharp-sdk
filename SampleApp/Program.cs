@@ -14,7 +14,7 @@ namespace SampleApp
 			await EquitiesSampleApp.Run(args);
 			//await OptionsSampleApp.Run(args);
 			//await GreekSampleApp.Run(args);
-			//await CompositeSampleApp.Run(args);
+			//await KitchenSinkSampleApp.Run(args);
 		}		
 	}
 }

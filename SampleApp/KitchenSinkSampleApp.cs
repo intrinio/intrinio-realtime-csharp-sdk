@@ -9,13 +9,14 @@ using ISocketPlugIn = Intrinio.Realtime.Options.ISocketPlugIn;
 
 namespace SampleApp;
 
-public class CompositeSampleApp
+public class KitchenSinkSampleApp
 {
 	private static Timer timer = null;
 	private static IDataCache _dataCache;
 	
     private static IOptionsWebSocketClient _optionsClient = null;
-	private static Intrinio.Realtime.Options.CandleStickClient _optionsCandleStickClient = null;
+	private static Intrinio.Realtime.Options.CandleStickClient _optionsCandleStickClient1Minute = null;
+	private static Intrinio.Realtime.Options.CandleStickClient _optionsCandleStickClient15Minute = null;
 	private static UInt64 _optionsTradeEventCount = 0UL;
 	private static UInt64 _optionsQuoteEventCount = 0UL;
 	private static UInt64 _optionsRefreshEventCount = 0UL;
@@ -40,7 +41,8 @@ public class CompositeSampleApp
 	private static bool _equitiesUseTradeCandleSticks = false;
 	private static bool _equitiesUseQuoteCandleSticks = false;
 	
-	private static Intrinio.Realtime.Equities.CandleStickClient _equitiesCandleStickClient = null;
+	private static Intrinio.Realtime.Equities.CandleStickClient _equitiesCandleStickClient1Minute = null;
+	private static Intrinio.Realtime.Equities.CandleStickClient _equitiesCandleStickClient15Minute = null;
 	private static UInt64 _equitiesTradeEventCount = 0UL;
 	private static UInt64 _equitiesQuoteEventCount = 0UL;
 	private static UInt64 _equitiesTradeCandleStickCount = 0UL;
@@ -61,7 +63,7 @@ public class CompositeSampleApp
 		
 		if (_optionsUseTradeCandleSticks || _optionsUseQuoteCandleSticks)
 		{
-			_optionsCandleStickClient.OnQuote(quote);
+			_optionsCandleStickClient1Minute.OnQuote(quote);
 		}
 	}
 
@@ -71,7 +73,7 @@ public class CompositeSampleApp
 		
 		if (_optionsUseTradeCandleSticks || _optionsUseQuoteCandleSticks)
 		{
-			_optionsCandleStickClient.OnTrade(trade);
+			_optionsCandleStickClient1Minute.OnTrade(trade);
 		}
 	}
 	
@@ -116,7 +118,7 @@ public class CompositeSampleApp
 		Interlocked.Increment(ref _equitiesQuoteEventCount);
 		if (_equitiesUseTradeCandleSticks || _equitiesUseQuoteCandleSticks)
 		{
-			_equitiesCandleStickClient.OnQuote(quote);
+			_equitiesCandleStickClient1Minute.OnQuote(quote);
 		}
 	}
 
@@ -126,7 +128,7 @@ public class CompositeSampleApp
 		
 		if (_equitiesUseTradeCandleSticks || _equitiesUseQuoteCandleSticks)
 		{
-			_equitiesCandleStickClient.OnTrade(trade);
+			_equitiesCandleStickClient1Minute.OnTrade(trade);
 		}
 	}
 	
@@ -267,11 +269,11 @@ public class CompositeSampleApp
 		_equitiesClient.Stop();
 		if (_optionsUseTradeCandleSticks || _optionsUseQuoteCandleSticks)
 		{
-			_optionsCandleStickClient.Stop();
+			_optionsCandleStickClient1Minute.Stop();
 		}
 		if (_equitiesUseTradeCandleSticks || _equitiesUseQuoteCandleSticks)
 		{
-			_equitiesCandleStickClient.Stop();
+			_equitiesCandleStickClient1Minute.Stop();
 		}
 		Environment.Exit(0);
 	}
@@ -285,7 +287,11 @@ public class CompositeSampleApp
 	public static async Task Run(string[] _)
 	{
 		Log("Starting sample app");
+		
+		//Create a cache so we can have the latest even of all types
 		_dataCache = DataCacheFactory.Create();
+		
+		//Hook in to the on-updated events of the cache
 		_dataCache.EquitiesTradeUpdatedCallback += OnEquitiesTradeCacheUpdated;
 		_dataCache.EquitiesQuoteUpdatedCallback += OnEquitiesQuoteCacheUpdated;
 		_dataCache.EquitiesTradeCandleStickUpdatedCallback += OnEquitiesTradeCandleStickCacheUpdated;
@@ -297,61 +303,74 @@ public class CompositeSampleApp
 		_dataCache.OptionsTradeCandleStickUpdatedCallback += OnOptionsTradeCandleStickCacheUpdated;
 		_dataCache.OptionsQuoteCandleStickUpdatedCallback += OnOptionsQuoteCandleStickCacheUpdated;
 		
-		_optionsUseTradeCandleSticks = false;
-		_optionsUseQuoteCandleSticks = false;
-		// _optionsCandleStickClient = new Intrinio.Realtime.Options.CandleStickClient(OnOptionsTradeCandleStick, OnOptionsQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, _dataCache);
-		// _optionsCandleStickClient.Start();
+		//Create options trade and quote candlestick client.  Feed in the cache so the candle client can update the cache with the latest candles.
+		_optionsUseTradeCandleSticks = true;
+		_optionsUseQuoteCandleSticks = true;
+		_optionsCandleStickClient1Minute = new Intrinio.Realtime.Options.CandleStickClient(OnOptionsTradeCandleStick, OnOptionsQuoteCandleStick, IntervalType.OneMinute, false, null, null, 0, _dataCache);
+		_optionsCandleStickClient15Minute = new Intrinio.Realtime.Options.CandleStickClient(OnOptionsTradeCandleStick, OnOptionsQuoteCandleStick, IntervalType.FifteenMinute, false, null, null, 0, null);
+		_optionsCandleStickClient1Minute.Start();
 		
-		_equitiesUseTradeCandleSticks = false;
-		_equitiesUseQuoteCandleSticks = false;
-		// _equitiesCandleStickClient = new Intrinio.Realtime.Equities.CandleStickClient(OnEquitiesTradeCandleStick, OnEquitiesQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, false, _dataCache);
-		// _equitiesCandleStickClient.Start();
+		//Create equities trade and quote candlestick client.  Feed in the cache so the candle client can update the cache with the latest candles. 
+		_equitiesUseTradeCandleSticks = true;
+		_equitiesUseQuoteCandleSticks = true;
+		_equitiesCandleStickClient1Minute = new Intrinio.Realtime.Equities.CandleStickClient(OnEquitiesTradeCandleStick, OnEquitiesQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, false, _dataCache);
+		_equitiesCandleStickClient15Minute = new Intrinio.Realtime.Equities.CandleStickClient(OnEquitiesTradeCandleStick, OnEquitiesQuoteCandleStick, IntervalType.FifteenMinute, true, null, null, 0, false, null);
+		_equitiesCandleStickClient1Minute.Start();
 
+		//Maintain a list of options plugins that we want the options socket to send events to
 		List<Intrinio.Realtime.Options.ISocketPlugIn> optionsPlugins = new List<Intrinio.Realtime.Options.ISocketPlugIn>();
-		//optionsPlugins.Add(_optionsCandleStickClient);
+		optionsPlugins.Add(_optionsCandleStickClient1Minute);
+		optionsPlugins.Add(_optionsCandleStickClient15Minute);
 		optionsPlugins.Add(_dataCache);
 
-		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
-		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
-		// Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
-		// Intrinio.Realtime.Options.Config optionsConfig = new Intrinio.Realtime.Options.Config();
-		// optionsConfig.Provider = Intrinio.Realtime.Options.Provider.OPRA;
-		// optionsConfig.ApiKey = "API_KEY_HERE";
-		// optionsConfig.Symbols = Array.Empty<string>();
-		// optionsConfig.NumThreads = 16;
-		// optionsConfig.TradesOnly = false;
-		// optionsConfig.BufferSize = 2048;
-		// optionsConfig.OverflowBufferSize = 8192;
-		// optionsConfig.Delayed = false;
-		//_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsConfig, optionsPlugins);
-		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsPlugins);
+		//You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
+		//If you don't have a config.json, don't forget to also give Serilog (the logging library) a config so it can write to console
+		Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
+		Intrinio.Realtime.Options.Config optionsConfig = new Intrinio.Realtime.Options.Config();
+		optionsConfig.Provider = Intrinio.Realtime.Options.Provider.OPRA;
+		optionsConfig.ApiKey = "API_KEY_HERE";
+		optionsConfig.Symbols = new string[] {"MSFT", "AAPL"};
+		optionsConfig.NumThreads = 4; //Adjust this higher as you subscribe to more channels, or you will fall behind and will drop messages out of your local buffer.
+		optionsConfig.TradesOnly = false; //If true, don't send separate quote events.
+		optionsConfig.BufferSize = 2048; //Primary buffer block quantity.  Adjust higher as you subscribe to more channels.
+		optionsConfig.OverflowBufferSize = 8192; //Overflow buffer block quantity.  Adjust higher as you subscribe to more channels.
+		optionsConfig.Delayed = false; //Used to force to 15minute delayed mode if you have access to realtime but want delayed. 
+		 
+		//Provide the plugins to feed events to, as well as callbacks for each event type. 
+		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsConfig, optionsPlugins);
+		//_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsPlugins);
 		await _optionsClient.Start();
 		await _optionsClient.Join();
-		//await _optionsClient.JoinLobby(false); //Firehose
-		// await _optionsClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		//await _optionsClient.JoinLobby(false); //Firehose - subscribe to everything all at once. Do NOT subscribe to any individual channels if you subscribe to this channel. This is resource intensive (especially with quotes). You need more than a 2 core machine to subscribe to this... 
+		//await _optionsClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
+		//Maintain a list of options plugins that we want the equity socket to send events to
 		List<Intrinio.Realtime.Equities.ISocketPlugIn> equitiesPlugins = new List<Intrinio.Realtime.Equities.ISocketPlugIn>();
-		//equitiesPlugins.Add(_equitiesCandleStickClient);
+		equitiesPlugins.Add(_equitiesCandleStickClient1Minute);
+		equitiesPlugins.Add(_equitiesCandleStickClient15Minute);
 		equitiesPlugins.Add(_dataCache);
 		
-		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
-		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
-		// //Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
-		// Intrinio.Realtime.Equities.Config equitiesConfig = new Intrinio.Realtime.Equities.Config();
-		// equitiesConfig.Provider = Intrinio.Realtime.Equities.Provider.NASDAQ_BASIC;
-		// equitiesConfig.ApiKey = "API_KEY_HERE";
-		// equitiesConfig.Symbols = Array.Empty<string>();
-		// equitiesConfig.NumThreads = 8;
-		// equitiesConfig.TradesOnly = false;
-		// equitiesConfig.BufferSize = 2048;
-		// equitiesConfig.OverflowBufferSize = 4096;
-		//_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesConfig, equitiesPlugins);
-		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesPlugins);
+		//You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
+		//If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
+		//Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
+		Intrinio.Realtime.Equities.Config equitiesConfig = new Intrinio.Realtime.Equities.Config();
+		equitiesConfig.Provider = Intrinio.Realtime.Equities.Provider.NASDAQ_BASIC;
+		equitiesConfig.ApiKey = "API_KEY_HERE";
+		equitiesConfig.Symbols = new string[] {"MSFT", "AAPL"};
+		equitiesConfig.NumThreads = 2; //Adjust this higher as you subscribe to more channels, or you will fall behind and will drop messages out of your local buffer.
+		equitiesConfig.TradesOnly = false; //If true, don't send separate quote events.
+		equitiesConfig.BufferSize = 2048; //Primary buffer block quantity.  Adjust higher as you subscribe to more channels.
+		equitiesConfig.OverflowBufferSize = 4096; //Overflow buffer block quantity.  Adjust higher as you subscribe to more channels.
+		
+		//Provide the plugins to feed events to, as well as callbacks for each event type.
+		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesConfig, equitiesPlugins);
+		//_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesPlugins);
 		await _equitiesClient.Start();
 		await _equitiesClient.Join();
-		//await _equitiesClient.JoinLobby(false); //Firehose
+		//await _equitiesClient.JoinLobby(false); //Firehose - subscribe to everything all at once. Do NOT subscribe to any individual channels if you subscribe to this channel. This is resource intensive (especially with quotes). You need more than a 2 core machine to subscribe to this...
 		//await _equitiesClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
+		//Summarize app performance and event metrics periodically.
 		timer = new Timer(TimerCallback, null, 60000, 60000);
 		
 		Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
