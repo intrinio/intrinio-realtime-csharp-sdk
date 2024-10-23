@@ -68,7 +68,14 @@ internal class SecurityData : ISecurityData{
         {
             try
             {
-                onSecuritySupplementalDatumUpdated(key, datum, this, dataCache);
+                Task.Factory.StartNew(o => 
+                    onSecuritySupplementalDatumUpdated( ((Tuple<string, double?, ISecurityData, IDataCache>)o).Item1, 
+                                                        ((Tuple<string, double?, ISecurityData, IDataCache>)o).Item2,
+                                                        ((Tuple<string, double?, ISecurityData, IDataCache>)o).Item3, 
+                                                        ((Tuple<string, double?, ISecurityData, IDataCache>)o).Item4
+                                                      ), 
+                    new Tuple<string, double?, ISecurityData, IDataCache>(key, datum, this, dataCache));
+                //onSecuritySupplementalDatumUpdated(key, datum, this, dataCache);
             }
             catch (Exception e)
             {
@@ -98,7 +105,12 @@ internal class SecurityData : ISecurityData{
         {
             try
             {
-                onEquitiesTradeUpdated(this, dataCache);
+                Task.Factory.StartNew(o => 
+                        onEquitiesTradeUpdated( ((Tuple<ISecurityData, IDataCache>)o).Item1, 
+                                                ((Tuple<ISecurityData, IDataCache>)o).Item2
+                        ), 
+                    new Tuple<ISecurityData, IDataCache>(this, dataCache));
+                //onEquitiesTradeUpdated(this, dataCache);
             }
             catch (Exception e)
             {
@@ -141,7 +153,12 @@ internal class SecurityData : ISecurityData{
         {
             try
             {
-                onEquitiesQuoteUpdated(this, dataCache);
+                Task.Factory.StartNew(o => 
+                        onEquitiesQuoteUpdated( ((Tuple<ISecurityData, IDataCache>)o).Item1, 
+                            ((Tuple<ISecurityData, IDataCache>)o).Item2
+                        ), 
+                    new Tuple<ISecurityData, IDataCache>(this, dataCache));
+                //onEquitiesQuoteUpdated(this, dataCache);
             }
             catch (Exception e)
             {
@@ -169,7 +186,12 @@ internal class SecurityData : ISecurityData{
         {
             try
             {
-                onEquitiesTradeCandleStickUpdated(this, dataCache);
+                Task.Factory.StartNew(o => 
+                        onEquitiesTradeCandleStickUpdated( ((Tuple<ISecurityData, IDataCache>)o).Item1, 
+                            ((Tuple<ISecurityData, IDataCache>)o).Item2
+                        ), 
+                    new Tuple<ISecurityData, IDataCache>(this, dataCache));
+                //onEquitiesTradeCandleStickUpdated(this, dataCache);
             }
             catch (Exception e)
             {
@@ -216,7 +238,12 @@ internal class SecurityData : ISecurityData{
         {
             try
             {
-                onEquitiesQuoteCandleStickUpdated(this, dataCache);
+                Task.Factory.StartNew(o => 
+                        onEquitiesQuoteCandleStickUpdated( ((Tuple<ISecurityData, IDataCache>)o).Item1, 
+                            ((Tuple<ISecurityData, IDataCache>)o).Item2
+                        ), 
+                    new Tuple<ISecurityData, IDataCache>(this, dataCache));
+                //onEquitiesQuoteCandleStickUpdated(this, dataCache);
             }
             catch (Exception e)
             {

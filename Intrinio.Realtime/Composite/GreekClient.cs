@@ -36,9 +36,10 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
     private readonly Intrinio.SDK.Client.ApiClient _apiClient;
     private readonly Intrinio.SDK.Api.CompanyApi _companyApi;
     private readonly Intrinio.SDK.Api.IndexApi _indexApi;
+    private readonly Intrinio.SDK.Api.OptionsApi _optionsApi;
     private readonly ConcurrentDictionary<string, DateTime> _seenTickers;
     private const int DividendYieldUpdatePeriodHours = 4;
-    private const int DividendYieldCallSpacerMilliseconds = 50;
+    private const int ApiCallSpacerMilliseconds = 1001;
     private bool _dividendYieldWorking = false;
     private readonly bool _selfCache;
 
@@ -89,6 +90,8 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         _companyApi.Configuration.ApiKey.TryAdd("api_key", apiKey);
         _indexApi = new IndexApi();
         _indexApi.Configuration.ApiKey.TryAdd("api_key", apiKey);
+        _optionsApi = new OptionsApi();
+        _optionsApi.Configuration.ApiKey.TryAdd("api_key", apiKey);
     }
     #endregion //Constructors
     
@@ -96,8 +99,10 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
 
     public void Start()
     {
+        FetchInitialCompanyDividends();
+        Log.Information("Fetching risk free interest rate and periodically additional new dividend yields");
         _riskFreeInterestRateFetchTimer = new Timer(FetchRiskFreeInterestRate, null, 0, 11*60*60*1000);
-        _dividendFetchTimer = new Timer(FetchDividendYields, null, 0, 30*1000);
+        _dividendFetchTimer = new Timer(FetchDividendYields, null, 60*1000, 30*1000);
     }
     
     public void Stop()
@@ -182,6 +187,46 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
     #endregion //Public Methods
     
     #region Private Methods
+
+    private async void FetchInitialCompanyDividends()
+    {
+        Log.Information("Fetching company daily metrics in bulk");
+        //Fetch daily metrics in bulk
+        try
+        {
+            string? nextPage = null;
+            DateTime date = DateTime.Today;
+            do
+            {
+                ApiResponseCompanyDailyMetrics result = await _companyApi.GetAllCompaniesDailyMetricsAsync(date, 1000, nextPage, null);
+                foreach (CompanyDailyMetric companyDailyMetric in result.DailyMetrics)
+                {
+                    if (!String.IsNullOrWhiteSpace(companyDailyMetric.Company.Ticker) && companyDailyMetric.DividendYield.HasValue)
+                    {
+                        _cache.SetSecuritySupplementalDatum(companyDailyMetric.Company.Ticker, DividendYieldKeyName, Convert.ToDouble(companyDailyMetric.DividendYield ?? 0m), _updateFunc);
+                        _seenTickers[String.Intern(companyDailyMetric.Company.Ticker)] = DateTime.UtcNow;
+                    }
+                }
+                await Task.Delay(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+            } while (!String.IsNullOrWhiteSpace(nextPage));
+        }
+        catch (Exception e)
+        {
+            Log.Warning(e, e.Message);
+        }
+
+        Log.Information("Fetching list of tickers with options assiciated");
+        //Fetch known options tickers
+        try
+        {
+            foreach (string ticker in (await _optionsApi.GetAllOptionsTickersAsync()).Tickers)
+                _seenTickers.TryAdd(String.Intern(ticker), DateTime.MinValue);
+        }
+        catch (Exception e)
+        {
+            Log.Warning(e, e.Message);
+        }
+    }
     
     private async void FetchDividendYields(object? _)
     {
@@ -196,13 +241,13 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                     decimal? result = await _companyApi.GetCompanyDataPointNumberAsync(seenTicker.Key, dividendYieldTag);
                     _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
                     _seenTickers[seenTicker.Key] = DateTime.UtcNow;
-                    await Task.Delay(DividendYieldCallSpacerMilliseconds); //don't try to get rate limited.
+                    await Task.Delay(ApiCallSpacerMilliseconds); //don't try to get rate limited.
                 }
                 catch (Exception e)
                 {
                     _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, 0.0D, _updateFunc);
                     _seenTickers[seenTicker.Key] = DateTime.UtcNow;
-                    await Task.Delay(DividendYieldCallSpacerMilliseconds); //don't try to get rate limited.
+                    await Task.Delay(ApiCallSpacerMilliseconds); //don't try to get rate limited.
                 }
             }
 

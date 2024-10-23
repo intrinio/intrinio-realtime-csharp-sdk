@@ -56,7 +56,8 @@ internal class DataCache : IDataCache
         {
             try
             {
-                SupplementalDatumUpdatedCallback(key, datum, this);
+                Task.Factory.StartNew(o => SupplementalDatumUpdatedCallback(((Tuple<string, double?, IDataCache>)o).Item1, ((Tuple<string, double?, IDataCache>)o).Item2, ((Tuple<string, double?, IDataCache>)o).Item3), new Tuple<string, double?, IDataCache>(key, datum, this));
+                //SupplementalDatumUpdatedCallback(key, datum, this);
             }
             catch (Exception e)
             {
