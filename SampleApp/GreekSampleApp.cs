@@ -55,24 +55,20 @@ public class GreekSampleApp
 	{
 		IOptionsWebSocketClient optionsClient = _optionsClient;
 		ClientStats optionsClientStats = optionsClient.GetStats();
-		Log("Options Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, Individual Events: {6}, Trades: {7}, Quotes: {8}, Refreshes: {9}, UnusualActivities: {10}",
+		Log("Options Socket Stats - Grouped Messages: {0}, Queue Depth: {1}%, Overflow Queue Depth: {2}%, Drops: {3}, Overflow Count: {4}, Individual Events: {5}, Trades: {6}, Quotes: {7}",
 			optionsClientStats.SocketDataMessages,
-			optionsClientStats.SocketTextMessages,
 			(optionsClientStats.QueueDepth * 100) / optionsClientStats.QueueCapacity,
 			(optionsClientStats.OverflowQueueDepth * 100) / optionsClientStats.OverflowQueueCapacity,
 			optionsClientStats.DroppedCount,
 			optionsClientStats.OverflowCount,
 			optionsClientStats.EventCount,
 			optionsClient.TradeCount,
-			optionsClient.QuoteCount,
-			optionsClient.RefreshCount,
-			optionsClient.UnusualActivityCount);
+			optionsClient.QuoteCount);
 		
 		IEquitiesWebSocketClient equitiesClient = _equitiesClient;
 		ClientStats equitiesClientStats = equitiesClient.GetStats();
-		Log("Equities Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, Individual Events: {6}, Trades: {7}, Quotes: {8}",
+		Log("Equities Socket Stats - Grouped Messages: {0}, Queue Depth: {1}%, Overflow Queue Depth: {2}%, Drops: {3}, Overflow Count: {4}, Individual Events: {5}, Trades: {6}, Quotes: {7}",
 			equitiesClientStats.SocketDataMessages,
-			equitiesClientStats.SocketTextMessages,
 			(equitiesClientStats.QueueDepth * 100) / equitiesClientStats.QueueCapacity,
 			(equitiesClientStats.OverflowQueueDepth * 100) / equitiesClientStats.OverflowQueueCapacity,
 			equitiesClientStats.DroppedCount,

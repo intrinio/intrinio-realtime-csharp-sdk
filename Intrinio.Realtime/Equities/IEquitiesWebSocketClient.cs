@@ -22,5 +22,5 @@ public interface IEquitiesWebSocketClient
     public UInt64 TradeCount { get; }
     public UInt64 QuoteCount { get; }
     public void LogMessage(LogLevel logLevel, string messageTemplate, params object[] propertyValues);
-    public IDataCache DataCache { get; }
+    public IDataCache? DataCache { get; }
 }

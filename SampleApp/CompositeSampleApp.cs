@@ -57,7 +57,6 @@ public class CompositeSampleApp
 	static void OnOptionsQuote(Intrinio.Realtime.Options.Quote quote)
 	{
 		Interlocked.Increment(ref _optionsQuoteEventCount);
-		_dataCache.SetOptionsQuote(quote);
 		
 		if (_optionsUseTradeCandleSticks || _optionsUseQuoteCandleSticks)
 		{
@@ -68,7 +67,6 @@ public class CompositeSampleApp
 	static void OnOptionsTrade(Intrinio.Realtime.Options.Trade trade)
 	{
 		Interlocked.Increment(ref _optionsTradeEventCount);
-		_dataCache.SetOptionsTrade(trade);
 		
 		if (_optionsUseTradeCandleSticks || _optionsUseQuoteCandleSticks)
 		{
@@ -79,13 +77,11 @@ public class CompositeSampleApp
 	static void OnOptionsRefresh(Intrinio.Realtime.Options.Refresh refresh)
 	{
 		Interlocked.Increment(ref _optionsRefreshEventCount);
-		_dataCache.SetOptionsRefresh(refresh);
 	}
 	
 	static void OnOptionsUnusualActivity(Intrinio.Realtime.Options.UnusualActivity unusualActivity)
 	{
 		Interlocked.Increment(ref _optionsUnusualActivityEventCount);
-		_dataCache.SetOptionsUnusualActivity(unusualActivity);
 	}
 	
 	static void OnOptionsTradeCandleStick(Intrinio.Realtime.Options.TradeCandleStick tradeCandleStick)
@@ -98,7 +94,6 @@ public class CompositeSampleApp
 		{
 			Interlocked.Increment(ref _optionsTradeCandleStickCountIncomplete);
 		}
-		_dataCache.SetOptionsTradeCandleStick(tradeCandleStick);
 	}
 	
 	static void OnOptionsQuoteCandleStick(Intrinio.Realtime.Options.QuoteCandleStick quoteCandleStick)
@@ -113,13 +108,11 @@ public class CompositeSampleApp
 				Interlocked.Increment(ref _optionsBidCandleStickCount);
 			else
 				Interlocked.Increment(ref _optionsBidCandleStickCountIncomplete);
-		_dataCache.SetOptionsQuoteCandleStick(quoteCandleStick);
 	}
 	
 	static void OnEquitiesQuote(Intrinio.Realtime.Equities.Quote quote)
 	{
 		Interlocked.Increment(ref _equitiesQuoteEventCount);
-		_dataCache.SetEquityQuote(quote);
 		if (_equitiesUseTradeCandleSticks || _equitiesUseQuoteCandleSticks)
 		{
 			_equitiesCandleStickClient.OnQuote(quote);
@@ -129,7 +122,6 @@ public class CompositeSampleApp
 	static void OnEquitiesTrade(Intrinio.Realtime.Equities.Trade trade)
 	{
 		Interlocked.Increment(ref _equitiesTradeEventCount);
-		_dataCache.SetEquityTrade(trade);
 		
 		if (_equitiesUseTradeCandleSticks || _equitiesUseQuoteCandleSticks)
 		{
@@ -147,7 +139,6 @@ public class CompositeSampleApp
 		{
 			Interlocked.Increment(ref _equitiesTradeCandleStickCountIncomplete);
 		}
-		_dataCache.SetEquityTradeCandleStick(tradeCandleStick);
 	}
 	
 	static void OnEquitiesQuoteCandleStick(Intrinio.Realtime.Equities.QuoteCandleStick quoteCandleStick)
@@ -162,7 +153,6 @@ public class CompositeSampleApp
 			Interlocked.Increment(ref _equitiesBidCandleStickCount);
 		else
 			Interlocked.Increment(ref _equitiesBidCandleStickCountIncomplete);
-		_dataCache.SetEquityQuoteCandleStick(quoteCandleStick);
 	}
 	
 	static void OnOptionsQuoteCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
@@ -297,23 +287,23 @@ public class CompositeSampleApp
 		_dataCache = DataCacheFactory.Create();
 		_dataCache.EquitiesTradeUpdatedCallback = OnEquitiesTradeCacheUpdated;
 		_dataCache.EquitiesQuoteUpdatedCallback = OnEquitiesQuoteCacheUpdated;
-		//_dataCache.EquitiesTradeCandleStickUpdatedCallback = OnEquitiesTradeCandleStickCacheUpdated;
-		//_dataCache.EquitiesQuoteCandleStickUpdatedCallback = OnEquitiesQuoteCandleStickCacheUpdated;
+		_dataCache.EquitiesTradeCandleStickUpdatedCallback = OnEquitiesTradeCandleStickCacheUpdated;
+		_dataCache.EquitiesQuoteCandleStickUpdatedCallback = OnEquitiesQuoteCandleStickCacheUpdated;
 		_dataCache.OptionsTradeUpdatedCallback = OnOptionsTradeCacheUpdated;
 		_dataCache.OptionsQuoteUpdatedCallback = OnOptionsQuoteCacheUpdated;
 		_dataCache.OptionsRefreshUpdatedCallback = OnOptionsRefreshCacheUpdated;
 		_dataCache.OptionsUnusualActivityUpdatedCallback = OnOptionsUnusualActivityCacheUpdated;
-		//_dataCache.OptionsTradeCandleStickUpdatedCallback = OnOptionsTradeCandleStickCacheUpdated;
-		//_dataCache.OptionsQuoteCandleStickUpdatedCallback = OnOptionsQuoteCandleStickCacheUpdated;
+		_dataCache.OptionsTradeCandleStickUpdatedCallback = OnOptionsTradeCandleStickCacheUpdated;
+		_dataCache.OptionsQuoteCandleStickUpdatedCallback = OnOptionsQuoteCandleStickCacheUpdated;
 		
 		_optionsUseTradeCandleSticks = false;
 		_optionsUseQuoteCandleSticks = false;
-		// _optionsCandleStickClient = new Intrinio.Realtime.Options.CandleStickClient(OnOptionsTradeCandleStick, OnOptionsQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0);
+		// _optionsCandleStickClient = new Intrinio.Realtime.Options.CandleStickClient(OnOptionsTradeCandleStick, OnOptionsQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, _dataCache);
 		// _optionsCandleStickClient.Start();
 		
 		_equitiesUseTradeCandleSticks = false;
 		_equitiesUseQuoteCandleSticks = false;
-		// _equitiesCandleStickClient = new Intrinio.Realtime.Equities.CandleStickClient(OnEquitiesTradeCandleStick, OnEquitiesQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, false);
+		// _equitiesCandleStickClient = new Intrinio.Realtime.Equities.CandleStickClient(OnEquitiesTradeCandleStick, OnEquitiesQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, false, _dataCache);
 		// _equitiesCandleStickClient.Start();
 
 		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
@@ -328,8 +318,8 @@ public class CompositeSampleApp
 		// optionsConfig.BufferSize = 2048;
 		// optionsConfig.OverflowBufferSize = 8192;
 		// optionsConfig.Delayed = false;
-		//_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsConfig);
-		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity);
+		//_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsConfig, _dataCache);
+		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, _dataCache);
 		await _optionsClient.Start();
 		await _optionsClient.Join();
 		//await _optionsClient.JoinLobby(false); //Firehose
@@ -346,12 +336,12 @@ public class CompositeSampleApp
 		// equitiesConfig.TradesOnly = false;
 		// equitiesConfig.BufferSize = 2048;
 		// equitiesConfig.OverflowBufferSize = 4096;
-		//_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesConfig);
-		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote);
+		//_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesConfig, _dataCache);
+		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, _dataCache);
 		await _equitiesClient.Start();
 		await _equitiesClient.Join();
 		//await _equitiesClient.JoinLobby(false); //Firehose
-		// await _equitiesClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		//await _equitiesClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
 		timer = new Timer(TimerCallback, null, 60000, 60000);
 		

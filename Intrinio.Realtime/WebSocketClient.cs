@@ -45,7 +45,7 @@ public abstract class WebSocketClient
     private bool _started;
     protected IDataCache? _dataCache;
     protected readonly bool _useDataCache;
-    public IDataCache DataCache { get { return _dataCache; } }
+    public IDataCache? DataCache { get { return _dataCache; } }
     #endregion //Data Members
     
     #region Constuctors

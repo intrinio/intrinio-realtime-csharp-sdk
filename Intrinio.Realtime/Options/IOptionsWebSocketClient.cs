@@ -26,5 +26,5 @@ public interface IOptionsWebSocketClient
     public UInt64 RefreshCount { get; }
     public UInt64 UnusualActivityCount { get; }
     public void LogMessage(LogLevel logLevel, string messageTemplate, params object[] propertyValues);
-    public IDataCache DataCache { get; }
+    public IDataCache? DataCache { get; }
 }
