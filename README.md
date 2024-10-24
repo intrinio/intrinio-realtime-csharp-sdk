@@ -294,7 +294,7 @@ You will receive your Intrinio API Key after [creating an account](https://intri
 
 ## Methods
 
-`Client client = new Client(OnTrade, OnQuote);` - Creates a new instance of the Intrinio Real-Time client. The provided actions implement OnTrade and OnQuote, which handle what happens when the associated event happens.
+`EquitiesWebSocketClient client = new EquitiesWebSocketClient(OnTrade, OnQuote);` - Creates a new instance of the Intrinio Real-Time client. The provided actions implement OnTrade and OnQuote, which handle what happens when the associated event happens.
 * **Parameter** `onTrade`: The Action accepting trades. This function will be invoked when a 'trade' has been received. The trade will be passed as an argument to the callback.
 * **Parameter** `onQuote`: Optional. The Action accepting quotes. This function will be invoked when a 'quote' has been received. The quote will be passed as an argument to the callback. If 'onQuote' is not provided, the client will NOT request to receive quote updates from the server.
 ---------
@@ -327,19 +327,32 @@ client.Leave()
 The application will look for the config file if you don't pass in a config object.
 ```json
 {
-  "Config": {
+  "EquitiesConfig": {
     "ApiKey": "API_KEY_HERE",
-    "NumThreads": 8,
-    //"Provider": "OPRA",
+    "NumThreads": 4,
     "Provider": "REALTIME",
     //"Provider": "DELAYED_SIP",
     //"Provider": "NASDAQ_BASIC",
     //"Provider": "MANUAL",
     //"IPAddress": "1.2.3.4",
     "BufferSize": 4096,
-    "OverflowBufferSize": 8192,
+    "OverflowBufferSize": 16384,
     "Symbols": [ "AAPL", "MSFT", "TSLA" ]
-    //"Symbols": [ "lobby" ]
+    //"Symbols": [ "lobby" ],
+    //"Symbols": [  ]
+  },
+  "OptionsConfig": {
+    "ApiKey": "API_KEY_HERE",
+    "NumThreads": 8,
+    "Provider": "OPRA",
+    //"Provider": "MANUAL",
+    //"IPAddress": "1.2.3.4",
+    "BufferSize": 4096,
+    "OverflowBufferSize": 16384,
+    "Delayed": false,
+    "Symbols": [ "GOOG__220408C02870000", "MSFT__220408C00315000", "AAPL__220414C00180000", "SPY", "TSLA" ]
+    //"Symbols": [ "lobby" ],
+    //"Symbols": [  ]
   },
   "Serilog": {
     "Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.File" ],
@@ -359,7 +372,7 @@ The application will look for the config file if you don't pass in a config obje
 To create a config object to pass in instead of the file, do the following.  Don't forget to also set up sirilog configuration as well:
 ```csharp
 Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
-Config.Config config = new Config.Config();
+Config config = new Config();
 config.Provider = Provider.REALTIME;
 config.ApiKey = "";
 config.Symbols = new[] { "AAPL", "MSFT" };
@@ -371,13 +384,15 @@ client.Start();
 ```
 
 ## Example Replay Client Usage
+The replay client may be used to replay a specific day's data. It may be used as a drop in replacement since it adheres to the same interface. It is especially useful for testing when the markets are closed and the websocket servers are off for the night. 
+You may have it play at the same rate it did that day, or stream all the events as a continuous stream as fast as it can process through them.
 ```csharp
 static void Main(string[] _)
 {
 	Client.Log("Starting sample app");
 	//You can also simulate a trading day by replaying a particular day's data. You can do this with the actual time between events, or without.
 	DateTime yesterday = DateTime.Today - TimeSpan.FromDays(1);
-	replayClient = new ReplayClient(onTrade, onQuote, yesterday, true, true, false, String.Empty); //A client to replay a previous day's data
+	replayClient = new ReplayClient(onTrade, onQuote, config, yesterday, true, true, false, String.Empty); //A client to replay a previous day's data
 	timer = new Timer(ReplayTimerCallback, replayClient, 10000, 10000);
 	replayClient.Join(); //Load symbols from your config or config.json
 	//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
@@ -408,4 +423,152 @@ static void Main(string[] _)
 			
 	Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
 }
+```
+
+## Realtime Options Greeks
+It is possible to calculate greek values in realtime with this client.  It has a built-in Black-Scholes calculator, but you may also add your own, and we'll probably add more methods in the future. You can specify on which events they recalculate. 
+The greek client automatically downloads the risk free interest rate and dividend yields via the REST SDK (product plan authorization required) and stores both in the DataCache.
+```csharp
+        _dataCache = DataCacheFactory.Create();
+		GreekUpdateFrequency updateFrequency = GreekUpdateFrequency.EveryDividendYieldUpdate |
+		                       GreekUpdateFrequency.EveryRiskFreeInterestRateUpdate |
+		                       GreekUpdateFrequency.EveryOptionsTradeUpdate |
+		                       GreekUpdateFrequency.EveryEquityTradeUpdate;
+
+		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
+		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
+		// Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
+		// _optionsConfig = new Intrinio.Realtime.Options.Config();
+		// _optionsConfig.Provider = Intrinio.Realtime.Options.Provider.OPRA;
+		// _optionsConfig.ApiKey = "API_KEY_HERE";
+		// _optionsConfig.Symbols = Array.Empty<string>();
+		// _optionsConfig.NumThreads = System.Environment.ProcessorCount;
+		// _optionsConfig.TradesOnly = false;
+		// _optionsConfig.BufferSize = 8192;
+		// _optionsConfig.OverflowBufferSize = 65536;
+		// _optionsConfig.Delayed = false;
+		_optionsConfig = Intrinio.Realtime.Options.Config.LoadConfig();
+		_greekClient = new GreekClient(updateFrequency, OnGreek, _optionsConfig.ApiKey, _dataCache);
+		_greekClient.AddBlackScholes();
+        _greekClient.TryAddOrUpdateGreekCalculation("MyGreekCalculation", MyCalculateNewGreekDelegate); //Hint: Use the dataCache.SetOptionSupplementalDatum inside your delegate to save the value.
+		_greekClient.Start();
+		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, null, null, _optionsConfig, new Intrinio.Realtime.Options.ISocketPlugIn[]{_dataCache, _greekClient});
+		await _optionsClient.Start();
+		await _optionsClient.Join();
+		//await _optionsClient.JoinLobby(false); //Firehose
+		//await _optionsClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		
+		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
+		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
+		// //Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
+		// Intrinio.Realtime.Equities.Config _equitiesConfig = new Intrinio.Realtime.Equities.Config();
+		// _equitiesConfig.Provider = Intrinio.Realtime.Equities.Provider.NASDAQ_BASIC;
+		// _equitiesConfig.ApiKey = "API_KEY_HERE";
+		// _equitiesConfig.Symbols = Array.Empty<string>();
+		// _equitiesConfig.NumThreads = System.Environment.ProcessorCount;
+		// _equitiesConfig.TradesOnly = false;
+		// _equitiesConfig.BufferSize = 8192;
+		// _equitiesConfig.OverflowBufferSize = 65536;
+		_equitiesConfig = Intrinio.Realtime.Equities.Config.LoadConfig();
+		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, _equitiesConfig, new Intrinio.Realtime.Equities.ISocketPlugIn[]{_dataCache, _greekClient});
+		await _equitiesClient.Start();
+		await _equitiesClient.Join();
+		//await _equitiesClient.JoinLobby(false); //Firehose
+		//await _equitiesClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		
+		timer = new Timer(TimerCallback, null, 60000, 60000);
+		
+		Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
+```
+
+## DataCache
+The DataCache is a local in-memory cache of the most recent event of each event type (ex: last trade) for securities, option contracts, and candlesticks, and other scalar data. To populate it, pass it in to the constructor of a websocket client, and the client will insert the events.
+It is thread-safe, but non-transactional - the cache is always updating as it's passed around. You may also hook in to events that fire when a specific type of data is updated, and the event will have the appropriate context and scope of the cache slots changed.
+```csharp
+        //Create a cache so we can have the latest even of all types
+		_dataCache = DataCacheFactory.Create();
+		
+		//Hook in to the on-updated events of the cache
+		_dataCache.EquitiesTradeUpdatedCallback += OnEquitiesTradeCacheUpdated;
+		_dataCache.EquitiesQuoteUpdatedCallback += OnEquitiesQuoteCacheUpdated;
+		_dataCache.EquitiesTradeCandleStickUpdatedCallback += OnEquitiesTradeCandleStickCacheUpdated;
+		_dataCache.EquitiesQuoteCandleStickUpdatedCallback += OnEquitiesQuoteCandleStickCacheUpdated;
+		_dataCache.OptionsTradeUpdatedCallback += OnOptionsTradeCacheUpdated;
+		_dataCache.OptionsQuoteUpdatedCallback += OnOptionsQuoteCacheUpdated;
+		_dataCache.OptionsRefreshUpdatedCallback += OnOptionsRefreshCacheUpdated;
+		_dataCache.OptionsUnusualActivityUpdatedCallback += OnOptionsUnusualActivityCacheUpdated;
+		_dataCache.OptionsTradeCandleStickUpdatedCallback += OnOptionsTradeCandleStickCacheUpdated;
+		_dataCache.OptionsQuoteCandleStickUpdatedCallback += OnOptionsQuoteCandleStickCacheUpdated;
+		
+		//Create options trade and quote candlestick client.  Feed in the cache so the candle client can update the cache with the latest candles.
+		_optionsUseTradeCandleSticks = true;
+		_optionsUseQuoteCandleSticks = true;
+		_optionsCandleStickClient1Minute = new Intrinio.Realtime.Options.CandleStickClient(OnOptionsTradeCandleStick, OnOptionsQuoteCandleStick, IntervalType.OneMinute, false, null, null, 0, _dataCache);
+		_optionsCandleStickClient15Minute = new Intrinio.Realtime.Options.CandleStickClient(OnOptionsTradeCandleStick, OnOptionsQuoteCandleStick, IntervalType.FifteenMinute, false, null, null, 0, null);
+		_optionsCandleStickClient1Minute.Start();
+		
+		//Create equities trade and quote candlestick client.  Feed in the cache so the candle client can update the cache with the latest candles. 
+		_equitiesUseTradeCandleSticks = true;
+		_equitiesUseQuoteCandleSticks = true;
+		_equitiesCandleStickClient1Minute = new Intrinio.Realtime.Equities.CandleStickClient(OnEquitiesTradeCandleStick, OnEquitiesQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, false, _dataCache);
+		_equitiesCandleStickClient15Minute = new Intrinio.Realtime.Equities.CandleStickClient(OnEquitiesTradeCandleStick, OnEquitiesQuoteCandleStick, IntervalType.FifteenMinute, true, null, null, 0, false, null);
+		_equitiesCandleStickClient1Minute.Start();
+
+		//Maintain a list of options plugins that we want the options socket to send events to
+		List<Intrinio.Realtime.Options.ISocketPlugIn> optionsPlugins = new List<Intrinio.Realtime.Options.ISocketPlugIn>();
+		optionsPlugins.Add(_optionsCandleStickClient1Minute);
+		optionsPlugins.Add(_optionsCandleStickClient15Minute);
+		optionsPlugins.Add(_dataCache);
+
+		//You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
+		//If you don't have a config.json, don't forget to also give Serilog (the logging library) a config so it can write to console
+		Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
+		Intrinio.Realtime.Options.Config optionsConfig = new Intrinio.Realtime.Options.Config();
+		optionsConfig.Provider = Intrinio.Realtime.Options.Provider.OPRA;
+		optionsConfig.ApiKey = "API_KEY_HERE";
+		optionsConfig.Symbols = new string[] {"MSFT", "AAPL"};
+		optionsConfig.NumThreads = 4; //Adjust this higher as you subscribe to more channels, or you will fall behind and will drop messages out of your local buffer.
+		optionsConfig.TradesOnly = false; //If true, don't send separate quote events.
+		optionsConfig.BufferSize = 2048; //Primary buffer block quantity.  Adjust higher as you subscribe to more channels.
+		optionsConfig.OverflowBufferSize = 8192; //Overflow buffer block quantity.  Adjust higher as you subscribe to more channels.
+		optionsConfig.Delayed = false; //Used to force to 15minute delayed mode if you have access to realtime but want delayed. 
+		 
+		//Provide the plugins to feed events to, as well as callbacks for each event type. 
+		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsConfig, optionsPlugins);
+		//_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, OnOptionsRefresh, OnOptionsUnusualActivity, optionsPlugins);
+		await _optionsClient.Start();
+		await _optionsClient.Join();
+		//await _optionsClient.JoinLobby(false); //Firehose - subscribe to everything all at once. Do NOT subscribe to any individual channels if you subscribe to this channel. This is resource intensive (especially with quotes). You need more than a 2 core machine to subscribe to this... 
+		//await _optionsClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		
+		//Maintain a list of options plugins that we want the equity socket to send events to
+		List<Intrinio.Realtime.Equities.ISocketPlugIn> equitiesPlugins = new List<Intrinio.Realtime.Equities.ISocketPlugIn>();
+		equitiesPlugins.Add(_equitiesCandleStickClient1Minute);
+		equitiesPlugins.Add(_equitiesCandleStickClient15Minute);
+		equitiesPlugins.Add(_dataCache);
+		
+		//You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
+		//If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
+		//Serilog.Log.Logger = new LoggerConfiguration().WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information).CreateLogger();
+		Intrinio.Realtime.Equities.Config equitiesConfig = new Intrinio.Realtime.Equities.Config();
+		equitiesConfig.Provider = Intrinio.Realtime.Equities.Provider.NASDAQ_BASIC;
+		equitiesConfig.ApiKey = "API_KEY_HERE";
+		equitiesConfig.Symbols = new string[] {"MSFT", "AAPL"};
+		equitiesConfig.NumThreads = 2; //Adjust this higher as you subscribe to more channels, or you will fall behind and will drop messages out of your local buffer.
+		equitiesConfig.TradesOnly = false; //If true, don't send separate quote events.
+		equitiesConfig.BufferSize = 2048; //Primary buffer block quantity.  Adjust higher as you subscribe to more channels.
+		equitiesConfig.OverflowBufferSize = 4096; //Overflow buffer block quantity.  Adjust higher as you subscribe to more channels.
+		
+		//Provide the plugins to feed events to, as well as callbacks for each event type.
+		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesConfig, equitiesPlugins);
+		//_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesPlugins);
+		await _equitiesClient.Start();
+		await _equitiesClient.Join();
+		//await _equitiesClient.JoinLobby(false); //Firehose - subscribe to everything all at once. Do NOT subscribe to any individual channels if you subscribe to this channel. This is resource intensive (especially with quotes). You need more than a 2 core machine to subscribe to this...
+		//await _equitiesClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		
+		//Summarize app performance and event metrics periodically.
+		timer = new Timer(TimerCallback, null, 60000, 60000);
+		
+		Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
 ```

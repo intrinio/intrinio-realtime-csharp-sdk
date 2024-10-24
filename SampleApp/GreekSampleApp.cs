@@ -121,6 +121,7 @@ public class GreekSampleApp
 		_optionsConfig = Intrinio.Realtime.Options.Config.LoadConfig();
 		_greekClient = new GreekClient(updateFrequency, OnGreek, _optionsConfig.ApiKey, _dataCache);
 		_greekClient.AddBlackScholes();
+		//_greekClient.TryAddOrUpdateGreekCalculation("MyGreekCalculation", MyCalculateNewGreekDelegate); //Hint: Use the dataCache.SetOptionSupplementalDatum inside your delegate to save the value.
 		_greekClient.Start();
 		_optionsClient = new OptionsWebSocketClient(OnOptionsTrade, OnOptionsQuote, null, null, _optionsConfig, new Intrinio.Realtime.Options.ISocketPlugIn[]{_dataCache, _greekClient});
 		await _optionsClient.Start();
