@@ -428,6 +428,8 @@ static void Main(string[] _)
 ## Realtime Options Greeks
 It is possible to calculate greek values in realtime with this client.  It has a built-in Black-Scholes calculator, but you may also add your own, and we'll probably add more methods in the future. You can specify on which events they recalculate. 
 The greek client automatically downloads the risk free interest rate and dividend yields via the REST SDK (product plan authorization required) and stores both in the DataCache.
+Pass in an OnGreek delegate callback to be notified when a greek calculation updates.
+Utilized the DataCache to compare values across contexts.
 ```csharp
         _dataCache = DataCacheFactory.Create();
 		GreekUpdateFrequency updateFrequency = GreekUpdateFrequency.EveryDividendYieldUpdate |
@@ -485,6 +487,7 @@ The greek client automatically downloads the risk free interest rate and dividen
 The DataCache is a local in-memory cache of the most recent event of each event type (ex: last trade) for securities, option contracts, and candlesticks, and other scalar data. To populate it, pass it in to the constructor of a websocket client, and the client will insert the events.
 It is thread-safe, but non-transactional - the cache is always updating as it's passed around. You may also hook in to events that fire when a specific type of data is updated, and the event will have the appropriate context and scope of the cache slots changed.
 ```csharp
+        //Kitchen sink - let's use everything!
         //Create a cache so we can have the latest even of all types
 		_dataCache = DataCacheFactory.Create();
 		
