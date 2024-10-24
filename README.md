@@ -379,7 +379,7 @@ config.Symbols = new[] { "AAPL", "MSFT" };
 config.NumThreads = 2;
 config.BufferSize = 2048;
 config.OverflowBufferSize = 4096;
-client = new Client(onTrade, onQuote, config);
+client = new EquitiesWebSocketClient(onTrade, onQuote, config);
 client.Start();
 ```
 
@@ -416,7 +416,7 @@ static void Main(string[] _)
 	onQuote += _candleStickClient.OnQuote;
 	_candleStickClient.Start();
 	
-	client = new Client(onTrade, onQuote);
+	client = new EquitiesWebSocketClient(onTrade, onQuote);
 	timer = new Timer(TimerCallback, client, 10000, 10000);
 	client.Join(); //Load symbols from your config or config.json
 	//client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
