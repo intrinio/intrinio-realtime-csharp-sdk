@@ -85,7 +85,7 @@ public class Config
             Log.Debug("Key: {0}, Value:{1}", kvp.Key, kvp.Value);
         }
         
-        rawConfig.Bind("Config", config);
+        rawConfig.Bind("EquitiesConfig", config);
         config.Validate();
         return config;
     }

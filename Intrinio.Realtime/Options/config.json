@@ -1,5 +1,5 @@
 {
-	"Config": {
+	"OptionsConfig": {
 		"ApiKey": "API_KEY_HERE",
 		"NumThreads": 16,
 		"Provider": "OPRA",

@@ -1,5 +1,5 @@
 {
-	"Config": {
+	"EquitiesConfig": {
 		"ApiKey": "API_KEY_HERE",
 		"NumThreads": 4,
 		"Provider": "REALTIME",

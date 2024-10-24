@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Intrinio.Realtime.Equities;
@@ -21,4 +22,5 @@ public interface IEquitiesWebSocketClient
     public UInt64 TradeCount { get; }
     public UInt64 QuoteCount { get; }
     public void LogMessage(LogLevel logLevel, string messageTemplate, params object[] propertyValues);
+    public IEnumerable<ISocketPlugIn> PlugIns { get; }
 }

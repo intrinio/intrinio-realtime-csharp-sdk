@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Net;
 using System.Net.WebSockets;
+using Intrinio.Realtime.Composite;
 
 namespace Intrinio.Realtime;
 
@@ -40,7 +41,7 @@ public abstract class WebSocketClient
     private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv11.0";
     private readonly ThreadPriority _mainThreadPriority;
     private readonly Thread[] _threads;
-    private Thread _receiveThread;
+    private Thread? _receiveThread;
     private bool _started;
     #endregion //Data Members
     
@@ -48,9 +49,11 @@ public abstract class WebSocketClient
     /// <summary>
     /// Create a new Equities websocket client.
     /// </summary>
-    /// <param name="onTrade"></param>
-    /// <param name="onQuote"></param>
-    /// <param name="config"></param>
+    /// <param name="processingThreadsQuantity"></param>
+    /// <param name="bufferSize"></param>
+    /// <param name="overflowBufferSize"></param>
+    /// <param name="maxMessageSize"></param>
+    /// <param name="dataCache"></param>
     public WebSocketClient(uint processingThreadsQuantity, uint bufferSize, uint overflowBufferSize, uint maxMessageSize)
     {
         _started = false;
@@ -65,7 +68,7 @@ public abstract class WebSocketClient
         _data = new SingleProducerRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
         _overflowData = new DropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_overflowBufferSize));
         
-        _httpClient.Timeout = TimeSpan.FromSeconds(5.0);
+        //_httpClient.Timeout = TimeSpan.FromMinutes(10.0);
         
         _tryReconnect = async () =>
         {
@@ -253,7 +256,7 @@ public abstract class WebSocketClient
     protected abstract List<KeyValuePair<string, string>> GetCustomSocketHeaders();
     protected abstract byte[] MakeJoinMessage(string channel);
     protected abstract byte[] MakeLeaveMessage(string channel);
-    protected abstract void HandleMessage(ReadOnlySpan<byte> bytes);
+    protected abstract void HandleMessage(in ReadOnlySpan<byte> bytes);
     protected abstract int GetNextChunkLength(ReadOnlySpan<byte> bytes);
     
     #endregion //Abstract Methods
@@ -288,26 +291,27 @@ public abstract class WebSocketClient
         return CloseType.Other;
     }
 
-    private async void ReceiveFn()
+    private void ReceiveFn()
     {
         CancellationToken token = _ctSource.Token;
         Thread.CurrentThread.Priority = ThreadPriority.Highest;
         byte[] buffer = new byte[_bufferBlockSize];
+        ReadOnlySpan<byte> bufferSpan = new Span<byte>(buffer);
         while (!token.IsCancellationRequested)
         {
             try
             {
                 if (_wsState.IsConnected)
                 {
-                    var result = await _wsState.WebSocket.ReceiveAsync(buffer, token);
+                    var result = _wsState.WebSocket.ReceiveAsync(buffer, token).Result;
                     switch (result.MessageType)
                     {
                         case WebSocketMessageType.Binary:
                             if (result.Count > 0)
                             {
                                 Interlocked.Increment(ref _dataMsgCount);
-                                if (!_data.TryEnqueue(buffer))
-                                    _overflowData.Enqueue(buffer);
+                                if (!_data.TryEnqueue(in bufferSpan))
+                                    _overflowData.Enqueue(in bufferSpan);
                             }
                             break;
                         case WebSocketMessageType.Text:
@@ -319,7 +323,7 @@ public abstract class WebSocketClient
                     }
                 }
                 else
-                    await Task.Delay(1000, token);
+                    Task.Delay(1000, token).Wait(token);
             }
             catch (NullReferenceException ex)
             {
@@ -362,7 +366,7 @@ public abstract class WebSocketClient
         {
             try
             {
-                if (_data.TryDequeue(datum) || _overflowData.TryDequeue(datum))
+                if (_data.TryDequeue(in datum) || _overflowData.TryDequeue(in datum))
                 {
                     // These are grouped (many) messages.
                     // The first byte tells us how many messages there are.
@@ -377,7 +381,7 @@ public abstract class WebSocketClient
                         {
                             msgLength = GetNextChunkLength(datum.Slice(startIndex));
                             ReadOnlySpan<byte> chunk = datum.Slice(startIndex, msgLength);
-                            HandleMessage(chunk);
+                            HandleMessage(in chunk);
                         }
                         catch(Exception e) {LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", new object[]{e.Message, e.StackTrace});}
                         finally

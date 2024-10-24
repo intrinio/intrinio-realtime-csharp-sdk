@@ -60,7 +60,7 @@ internal class SingleProducerRingBuffer
     /// blockToWrite MUST be of length BlockSize!
     /// </summary>
     /// <param name="blockToWrite"></param>
-    public bool TryEnqueue(ReadOnlySpan<byte> blockToWrite)
+    public bool TryEnqueue(in ReadOnlySpan<byte> blockToWrite)
     {
         if (IsFullNoLock())
         {
@@ -81,7 +81,7 @@ internal class SingleProducerRingBuffer
     /// blockBuffer MUST be of length BlockSize!
     /// </summary>
     /// <param name="blockBuffer"></param>
-    public bool TryDequeue(Span<byte> blockBuffer)
+    public bool TryDequeue(in Span<byte> blockBuffer)
     {
         lock (_readLock)
         {

@@ -120,14 +120,14 @@ public class OptionsSampleApp
 		Action<Quote> onQuote = OnQuote;
 		Action<Refresh> onRefresh = OnRefresh;
 		Action<UnusualActivity> onUnusualActivity = OnUnusualActivity;
+		List<ISocketPlugIn> plugIns = new List<ISocketPlugIn>();
 		
 		// //Subscribe the candlestick client to trade and/or quote events as well.  It's important any method subscribed this way handles exceptions so as to not cause issues for other subscribers!
 		// _useTradeCandleSticks = true;
 		// _useQuoteCandleSticks = true;
 		// _candleStickClient = new CandleStickClient(OnTradeCandleStick, OnQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0);
-		// onTrade += _candleStickClient.OnTrade;
-		// onQuote += _candleStickClient.OnQuote;
 		// _candleStickClient.Start();
+		// plugIns.Add(_candleStickClient);
 
 		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
 		// //If you don't have a config.json, don't forget to also give Serilog a config so it can write to console
@@ -140,9 +140,9 @@ public class OptionsSampleApp
 		// config.TradesOnly = false;
 		// config.BufferSize = 2048;
 		// config.OverflowBufferSize = 4096;
-		// client = new Client(onTrade, onQuote, onRefresh, onUnusualActivity, config);
 		
-		client = new OptionsWebSocketClient(onTrade, onQuote, onRefresh, onUnusualActivity);
+		// client = new OptionsWebSocketClient(onTrade, onQuote, onRefresh, onUnusualActivity, config, plugIns.Count == 0 ? null : plugIns);
+		client = new OptionsWebSocketClient(onTrade, onQuote, onRefresh, onUnusualActivity, plugIns.Count == 0 ? null : plugIns);
 		await client.Start();
 		timer = new Timer(TimerCallback, client, 60000, 60000);
 		await client.Join(); //Load symbols from your config or config.json

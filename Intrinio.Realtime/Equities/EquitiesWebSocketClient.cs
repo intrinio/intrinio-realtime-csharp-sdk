@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Intrinio.Realtime.Composite;
 
 namespace Intrinio.Realtime.Equities;
 
@@ -15,12 +16,14 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     private const string LobbyName = "lobby";
     private bool _useOnTrade;
     private bool _useOnQuote;
-    private Action<Trade> _onTrade;
+    private Action<Trade>? _onTrade;
+    private readonly IEnumerable<ISocketPlugIn> _plugIns;
+    public IEnumerable<ISocketPlugIn> PlugIns { get { return _plugIns; } }
 
     /// <summary>
     /// The callback for when a trade event occurs.
     /// </summary>
-    public Action<Trade> OnTrade
+    public Action<Trade>? OnTrade
     {
         set
         {
@@ -29,12 +32,12 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         }
     }
 
-    private Action<Quote> _onQuote;
+    private Action<Quote>? _onQuote;
 
     /// <summary>
     /// The callback for when a quote event occurs.
     /// </summary>
-    public Action<Quote> OnQuote
+    public Action<Quote>? OnQuote
     {
         set
         {
@@ -52,7 +55,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     private readonly string _logPrefix;
     private const string MessageVersionHeaderKey = "UseNewEquitiesFormat";
     private const string MessageVersionHeaderValue = "v2";
-    private const uint MaxMessageSize = 64u;
+    private const uint MaxMessageSize = 86u;
     private const string ChannelFormat = "{0}|TradesOnly|{1}";
     #endregion //Data Members
     
@@ -63,12 +66,14 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
     /// <param name="config"></param>
-    public EquitiesWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config) 
+    /// <param name="plugIns"></param>
+    public EquitiesWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Config config, IEnumerable<ISocketPlugIn>? plugIns = null) 
         : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
     {
         OnTrade = onTrade;
         OnQuote = onQuote;
         _config = config;
+        _plugIns = plugIns ?? Array.Empty<ISocketPlugIn>();
         
         if (ReferenceEquals(null, _config))
             throw new ArgumentException("Config may not be null.");
@@ -80,7 +85,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// Create a new Equities websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
-    public EquitiesWebSocketClient(Action<Trade> onTrade) : this(onTrade, null, Config.LoadConfig())
+    public EquitiesWebSocketClient(Action<Trade> onTrade, IEnumerable<ISocketPlugIn>? plugIns = null) : this(onTrade, null, Config.LoadConfig(), plugIns)
     {
     }
 
@@ -88,7 +93,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// Create a new Equities websocket client.
     /// </summary>
     /// <param name="onQuote"></param>
-    public EquitiesWebSocketClient(Action<Quote> onQuote) : this(null, onQuote, Config.LoadConfig())
+    public EquitiesWebSocketClient(Action<Quote> onQuote, IEnumerable<ISocketPlugIn>? plugIns = null) : this(null, onQuote, Config.LoadConfig(), plugIns)
     {
     }
     
@@ -97,7 +102,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// </summary>
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
-    public EquitiesWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote) : this(onTrade, onQuote, Config.LoadConfig())
+    public EquitiesWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, IEnumerable<ISocketPlugIn>? plugIns = null) : this(onTrade, onQuote, Config.LoadConfig(), plugIns)
     {
     }
     #endregion //Constructors
@@ -276,21 +281,35 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         return new Quote(type, symbol, price, size, timestamp, subProvider, marketCenter, condition);
     }
 
-    protected override void HandleMessage(ReadOnlySpan<byte> bytes)
+    protected override void HandleMessage(in ReadOnlySpan<byte> bytes)
     { 
         MessageType msgType = (MessageType)Convert.ToInt32(bytes[0]);
         switch (msgType)
         {
             case MessageType.Trade:
             {
+                Trade trade = ParseTrade(bytes);
+                Interlocked.Increment(ref _dataTradeCount);
                 if (_useOnTrade)
                 {
-                    Trade trade = ParseTrade(bytes);
-                    Interlocked.Increment(ref _dataTradeCount);
-                    try { _onTrade.Invoke(trade); }
+                    try
+                    {
+                        _onTrade.Invoke(trade);
+                    }
                     catch (Exception e)
                     {
                         LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                    }
+                }
+                foreach (ISocketPlugIn socketPlugIn in _plugIns)
+                {
+                    try
+                    {
+                        socketPlugIn.OnTrade(trade);
+                    }
+                    catch (Exception e)
+                    {
+                        LogMessage(LogLevel.ERROR, "Error while invoking plugin supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
                     }
                 }
                 break;
@@ -298,14 +317,29 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
             case MessageType.Ask:
             case MessageType.Bid:
             {
+                Quote quote = ParseQuote(bytes);
+                Interlocked.Increment(ref _dataQuoteCount);
                 if (_useOnQuote)
                 {
-                    Quote quote = ParseQuote(bytes);
-                    Interlocked.Increment(ref _dataQuoteCount);
-                    try { _onQuote.Invoke(quote); }
+                    try
+                    {
+                        _onQuote.Invoke(quote);
+                    }
                     catch (Exception e)
                     {
                         LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                    }
+                }
+
+                foreach (ISocketPlugIn socketPlugIn in _plugIns)
+                {
+                    try
+                    {
+                        socketPlugIn.OnQuote(quote);
+                    }
+                    catch (Exception e)
+                    {
+                        LogMessage(LogLevel.ERROR, "Error while invoking plugin supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
                     }
                 }
                 break;

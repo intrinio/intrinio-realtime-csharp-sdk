@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Intrinio.Realtime.Composite;
 
 namespace Intrinio.Realtime.Options;
 
@@ -13,7 +14,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     #region Data Members
 
     private const string LobbyName = "lobby";
-    private const uint MaxMessageSize = 75u;
+    private const uint MaxMessageSize = 86u;
     private const int MessageTypeIndex = 22;
     private const int TradeMessageSize = 72;
     private const int QuoteMessageSize = 52;
@@ -23,12 +24,14 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     private bool _useOnQuote;
     private bool _useOnRefresh;
     private bool _useOnUnusualActivity;
-    private Action<Trade> _onTrade;
+    private Action<Trade>? _onTrade;
+    private readonly IEnumerable<ISocketPlugIn> _plugIns;
+    public IEnumerable<ISocketPlugIn> PlugIns { get { return _plugIns; } }
 
     /// <summary>
     /// The callback for when a trade event occurs.
     /// </summary>
-    public Action<Trade> OnTrade
+    public Action<Trade>? OnTrade
     {
         set
         {
@@ -37,12 +40,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         }
     }
 
-    private Action<Quote> _onQuote;
+    private Action<Quote>? _onQuote;
 
     /// <summary>
     /// The callback for when a quote event occurs.
     /// </summary>
-    public Action<Quote> OnQuote
+    public Action<Quote>? OnQuote
     {
         set
         {
@@ -51,12 +54,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         }
     }
     
-    private Action<Refresh> _onRefresh;
+    private Action<Refresh>? _onRefresh;
 
     /// <summary>
     /// The callback for when a refresh event occurs.
     /// </summary>
-    public Action<Refresh> OnRefresh
+    public Action<Refresh>? OnRefresh
     {
         set
         {
@@ -65,12 +68,12 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         }
     }
 
-    private Action<UnusualActivity> _onUnusualActivity;
+    private Action<UnusualActivity>? _onUnusualActivity;
 
     /// <summary>
     /// The callback for when an unusual activity event occurs.
     /// </summary>
-    public Action<UnusualActivity> OnUnusualActivity
+    public Action<UnusualActivity>? OnUnusualActivity
     {
         set
         {
@@ -106,9 +109,11 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// <param name="onRefresh"></param>
     /// <param name="onUnusualActivity"></param>
     /// <param name="config"></param>
-    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity, Config config) 
+    /// <param name="plugIns"></param>
+    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity, Config config, IEnumerable<ISocketPlugIn>? plugIns = null) 
         : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
     {
+        _plugIns = plugIns ?? Array.Empty<ISocketPlugIn>();
         OnTrade = onTrade;
         OnQuote = onQuote;
         OnRefresh = onRefresh;
@@ -125,7 +130,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// Create a new Options websocket client.
     /// </summary>
     /// <param name="onTrade"></param>
-    public OptionsWebSocketClient(Action<Trade> onTrade) : this(onTrade, null, null, null, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade>? onTrade, IEnumerable<ISocketPlugIn>? plugIns = null) : this(onTrade, null, null, null, Config.LoadConfig(), plugIns)
     {
     }
 
@@ -133,7 +138,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// Create a new Options websocket client.
     /// </summary>
     /// <param name="onQuote"></param>
-    public OptionsWebSocketClient(Action<Quote> onQuote) : this(null, onQuote, null, null, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Quote>? onQuote, IEnumerable<ISocketPlugIn>? plugIns = null) : this(null, onQuote, null, null, Config.LoadConfig(), plugIns)
     {
     }
     
@@ -142,7 +147,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// </summary>
     /// <param name="onTrade"></param>
     /// <param name="onQuote"></param>
-    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote) : this(onTrade, onQuote, null, null, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, IEnumerable<ISocketPlugIn>? plugIns = null) : this(onTrade, onQuote, null, null, Config.LoadConfig(), plugIns)
     {
     }
     
@@ -153,7 +158,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// <param name="onQuote"></param>
     /// <param name="onRefresh"></param>
     /// <param name="onUnusualActivity"></param>
-    public OptionsWebSocketClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity) : this(onTrade, onQuote, onRefresh, onUnusualActivity, Config.LoadConfig())
+    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity, IEnumerable<ISocketPlugIn>? plugIns = null) : this(onTrade, onQuote, onRefresh, onUnusualActivity, Config.LoadConfig(), plugIns)
     {
     }
     #endregion //Constructors
@@ -473,7 +478,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         );
     }
 
-    protected override void HandleMessage(ReadOnlySpan<byte> bytes)
+    protected override void HandleMessage(in ReadOnlySpan<byte> bytes)
     { 
         byte msgType = bytes[MessageTypeIndex];
         
@@ -481,40 +486,96 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         {
             Quote quote = ParseQuote(bytes);
             Interlocked.Increment(ref _dataQuoteCount);
-            try { _onQuote.Invoke(quote); }
+            try
+            {
+                _onQuote.Invoke(quote);
+            }
             catch (Exception e)
             {
                 LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
+            }
+            foreach (ISocketPlugIn socketPlugIn in _plugIns)
+            {
+                try
+                {
+                    socketPlugIn.OnQuote(quote);
+                }
+                catch (Exception e)
+                {
+                    LogMessage(LogLevel.ERROR, "Error while invoking plugin supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                }
             }
         }
         if (msgType == 0u && _useOnTrade)
         {
             Trade trade = ParseTrade(bytes);
             Interlocked.Increment(ref _dataTradeCount);
-            try { _onTrade.Invoke(trade); }
+            try
+            {
+                _onTrade.Invoke(trade);
+            }
             catch (Exception e)
             {
                 LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
+            }
+            foreach (ISocketPlugIn socketPlugIn in _plugIns)
+            {
+                try
+                {
+                    socketPlugIn.OnTrade(trade);
+                }
+                catch (Exception e)
+                {
+                    LogMessage(LogLevel.ERROR, "Error while invoking plugin supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                }
             }
         }
         if (msgType == 2u && _useOnRefresh)
         {
             Refresh refresh = ParseRefresh(bytes);
             Interlocked.Increment(ref _dataRefreshCount);
-            try { _onRefresh.Invoke(refresh); }
+            try
+            {
+                _onRefresh.Invoke(refresh);
+            }
             catch (Exception e)
             {
                 LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnRefresh: {0}; {1}", new object[]{e.Message, e.StackTrace});
+            }
+            foreach (ISocketPlugIn socketPlugIn in _plugIns)
+            {
+                try
+                {
+                    socketPlugIn.OnRefresh(refresh);
+                }
+                catch (Exception e)
+                {
+                    LogMessage(LogLevel.ERROR, "Error while invoking plugin supplied OnRefresh: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                }
             }
         }
         if (msgType > 2u && _useOnUnusualActivity)
         {
             UnusualActivity unusualActivity = ParseUnusualActivity(bytes);
             Interlocked.Increment(ref _dataUnusualActivityCount);
-            try { _onUnusualActivity.Invoke(unusualActivity); }
+            try
+            {
+                _onUnusualActivity.Invoke(unusualActivity);
+            }
             catch (Exception e)
             {
                 LogMessage(LogLevel.ERROR, "Error while invoking user supplied OnUnusualActivity: {0}; {1}", new object[]{e.Message, e.StackTrace});
+            }
+            foreach (ISocketPlugIn socketPlugIn in _plugIns)
+            {
+                try
+                {
+                    socketPlugIn.OnUnusualActivity(unusualActivity);
+                }
+                catch (Exception e)
+                {
+                    LogMessage(LogLevel.ERROR, "Error while invoking plugin supplied OnUnusualActivity: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                }
             }
         }
     }
