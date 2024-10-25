@@ -488,7 +488,7 @@ The DataCache is a local in-memory cache of the most recent event of each event 
 It is thread-safe, but non-transactional - the cache is always updating as it's passed around. You may also hook in to events that fire when a specific type of data is updated, and the event will have the appropriate context and scope of the cache slots changed.
 ```csharp
         //Kitchen sink - let's use everything!
-        //Create a cache so we can have the latest even of all types
+        //Create a cache so we can have the latest event of all types
 		_dataCache = DataCacheFactory.Create();
 		
 		//Hook in to the on-updated events of the cache
@@ -544,7 +544,7 @@ It is thread-safe, but non-transactional - the cache is always updating as it's 
 		//await _optionsClient.JoinLobby(false); //Firehose - subscribe to everything all at once. Do NOT subscribe to any individual channels if you subscribe to this channel. This is resource intensive (especially with quotes). You need more than a 2 core machine to subscribe to this... 
 		//await _optionsClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
-		//Maintain a list of options plugins that we want the equity socket to send events to
+		//Maintain a list of equities plugins that we want the equity socket to send events to
 		List<Intrinio.Realtime.Equities.ISocketPlugIn> equitiesPlugins = new List<Intrinio.Realtime.Equities.ISocketPlugIn>();
 		equitiesPlugins.Add(_equitiesCandleStickClient1Minute);
 		equitiesPlugins.Add(_equitiesCandleStickClient15Minute);

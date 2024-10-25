@@ -344,7 +344,7 @@ public class KitchenSinkSampleApp
 		//await _optionsClient.JoinLobby(false); //Firehose - subscribe to everything all at once. Do NOT subscribe to any individual channels if you subscribe to this channel. This is resource intensive (especially with quotes). You need more than a 2 core machine to subscribe to this... 
 		//await _optionsClient.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
-		//Maintain a list of options plugins that we want the equity socket to send events to
+		//Maintain a list of equities plugins that we want the equity socket to send events to
 		List<Intrinio.Realtime.Equities.ISocketPlugIn> equitiesPlugins = new List<Intrinio.Realtime.Equities.ISocketPlugIn>();
 		equitiesPlugins.Add(_equitiesCandleStickClient1Minute);
 		equitiesPlugins.Add(_equitiesCandleStickClient15Minute);
