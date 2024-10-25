@@ -10,6 +10,7 @@ public static class BlackScholesGreekCalculator
     private const double VOL_TOLERANCE = 0.0001D;
     private const double MIN_Z_SCORE = -8.0D;
     private const double MAX_Z_SCORE = 8.0D;
+    private static readonly double rootPi = System.Math.Sqrt(2.0D * System.Math.PI);
 
     
     public static Greek Calculate( double riskFreeInterestRate, 
@@ -18,22 +19,26 @@ public static class BlackScholesGreekCalculator
                                     Intrinio.Realtime.Options.Trade latestOptionTrade, 
                                     Intrinio.Realtime.Options.Quote latestOptionQuote) 
     {
-        if (latestOptionQuote.AskPrice <= 0.0D || latestOptionQuote.BidPrice <= 0.0D)
+        if (latestOptionQuote.AskPrice <= 0.0D || latestOptionQuote.BidPrice <= 0.0D || riskFreeInterestRate <= 0.0D || underlyingTrade.Price <= 0.0D)
             return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
-        if (riskFreeInterestRate <= 0.0D)
-            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);;
-
-        bool isPut = latestOptionTrade.IsPut();
+        
+        double daysToExpiration = GetDaysToExpiration(latestOptionTrade, latestOptionQuote);
         double underlyingPrice = underlyingTrade.Price;
         double strike = latestOptionTrade.GetStrikePrice();
-        double daysToExpiration = GetDaysToExpiration(latestOptionTrade, latestOptionQuote);
+        bool isPut = latestOptionTrade.IsPut();
         double marketPrice = (latestOptionQuote.AskPrice + latestOptionQuote.BidPrice) / 2.0D;
-        double impliedVolatility = CalcImpliedVolatility(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice);
-        double sigma = impliedVolatility;
-        double delta = CalcDelta(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-        double gamma = CalcGamma(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-        double theta = CalcTheta(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-        double vega = CalcVega(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
+        
+        if (daysToExpiration <= 0.0D || strike <= 0.0D)
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+        
+        double impliedVolatility = CalcImpliedVolatility(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice); //sigma
+        if (impliedVolatility == 0.0D)
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+        
+        double delta = CalcDelta(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, impliedVolatility);
+        double gamma = CalcGamma(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, impliedVolatility);
+        double theta = CalcTheta(isPut, underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, impliedVolatility);
+        double vega = CalcVega(underlyingPrice, strike, daysToExpiration, riskFreeInterestRate, dividendYield, marketPrice, impliedVolatility);
 
         return new Greek(impliedVolatility, delta, gamma, theta, vega, true);
     }
@@ -167,8 +172,7 @@ public static class BlackScholesGreekCalculator
     private static double Phi(double x)
     {
         double numerator = System.Math.Exp(-1.0D * x*x / 2.0D);
-        double denominator = System.Math.Sqrt(2.0D * System.Math.PI);
-        return numerator / denominator;
+        return numerator / rootPi;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
