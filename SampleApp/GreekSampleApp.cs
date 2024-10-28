@@ -51,7 +51,7 @@ public class GreekSampleApp
 	{
 		Interlocked.Increment(ref _greekUpdatedEventCount);
 		//Log("Greek: {0}\t\t{1}\t\t{2}", optionsContractData.Contract, key, datum?.ToString() ?? String.Empty);
-		_seenGreekTickers.TryAdd(optionsContractData.Contract, optionsContractData.Contract);
+		_seenGreekTickers.TryAdd(securityData.TickerSymbol, optionsContractData.Contract);
 	}
 
 	static void TimerCallback(object obj)
