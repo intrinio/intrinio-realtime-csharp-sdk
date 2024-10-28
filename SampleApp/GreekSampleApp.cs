@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using Intrinio.Realtime;
 using Intrinio.Realtime.Composite;
 using Intrinio.Realtime.Equities;
@@ -13,6 +14,7 @@ public class GreekSampleApp
 	private static Timer timer = null;
 	private static GreekClient _greekClient;
 	private static IDataCache _dataCache;
+	private static ConcurrentDictionary<string, string> _seenGreekTickers = new ConcurrentDictionary<string, string>();
 	
     private static IOptionsWebSocketClient _optionsClient = null;
 	private static Intrinio.Realtime.Options.Config _optionsConfig;
@@ -49,6 +51,7 @@ public class GreekSampleApp
 	{
 		Interlocked.Increment(ref _greekUpdatedEventCount);
 		//Log("Greek: {0}\t\t{1}\t\t{2}", optionsContractData.Contract, key, datum?.ToString() ?? String.Empty);
+		_seenGreekTickers.TryAdd(optionsContractData.Contract, optionsContractData.Contract);
 	}
 
 	static void TimerCallback(object obj)
@@ -79,6 +82,7 @@ public class GreekSampleApp
 		
 		Log("Greek updates: {0}", _greekUpdatedEventCount);
 		Log("Data Cache Security Count: {0}", _dataCache.AllSecurityData.Count);
+		Log("Unique Securities with Greeks Count: {0}", _seenGreekTickers.Count);
 	}
 
 	static void Cancel(object sender, ConsoleCancelEventArgs args)

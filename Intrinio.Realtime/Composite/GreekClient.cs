@@ -247,7 +247,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                 {
                     try
                     {
-                        decimal? result = _companyApi.GetCompanyDataPointNumber(seenTicker.Key, dividendYieldTag);
+                        decimal? result = _companyApi.GetCompanyDataPointNumberAsync(seenTicker.Key, dividendYieldTag).Result;
                         _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
                         _seenTickers[seenTicker.Key] = DateTime.UtcNow;
                         Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
