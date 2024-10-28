@@ -30,6 +30,8 @@ Be sure to update [config.json](https://github.com/intrinio/intrinio-realtime-cs
 * Receive streaming, real-time pricing (trades, NBBO bid, ask)
 * Subscribe to updates from individual securities, individual contracts, or
 * Subscribe to updates for all securities (Lobby/Firehose mode)
+* Can automatically create trade and ask/quote candlesticks
+* Replay a specific day (at actual pace or as fast as it loads) while the servers are down, either for testing or fetching missed data.
 
 ### Options
 
@@ -40,6 +42,8 @@ Be sure to update [config.json](https://github.com/intrinio/intrinio-realtime-cs
   * unusual activity(block trades, sweeps, whale trades, unusual sweeps)
 * Subscribe to updates from individual options contracts (or option chains)
 * Subscribe to updates for the entire universe of option contracts (~1.5M option contracts)
+* Can automatically create trade and ask/quote candlesticks
+* Can automatically calculate realtime greek values.
 
 ## Example Usage
 ```csharp
