@@ -193,13 +193,13 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
             switch (DateTime.UtcNow.DayOfWeek)
             {
                 case DayOfWeek.Sunday:
-                    subtract = TimeSpan.FromDays(-2);
+                    subtract = TimeSpan.FromDays(2);
                     break;
                 case DayOfWeek.Monday:
-                    subtract = TimeSpan.FromDays(-3);
+                    subtract = TimeSpan.FromDays(3);
                     break;
                 default:
-                    subtract = TimeSpan.FromDays(-1);
+                    subtract = TimeSpan.FromDays(1);
                     break;
             }
             DateTime date = DateTime.Today - subtract; //Assume we're starting morning-ish, so today's values aren't available
