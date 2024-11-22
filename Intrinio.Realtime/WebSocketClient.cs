@@ -35,7 +35,7 @@ public abstract class WebSocketClient
     private readonly uint _bufferBlockSize;
     private readonly SingleProducerRingBuffer _data;
     private readonly DropOldestRingBuffer _overflowData;
-    private readonly Action _tryReconnect;
+    private readonly Func<Task> _tryReconnect;
     private readonly HttpClient _httpClient = new ();
     private const string ClientInfoHeaderKey = "Client-Information";
     private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.1";
@@ -70,24 +70,7 @@ public abstract class WebSocketClient
         
         //_httpClient.Timeout = TimeSpan.FromMinutes(10.0);
         
-        _tryReconnect = async () =>
-        {
-            DoBackoff(() =>
-            {
-                LogMessage(LogLevel.INFORMATION, "Websocket - Reconnecting...", Array.Empty<object>());
-                if (_wsState.IsReady)
-                    return true;
-                
-                lock (_wsLock)
-                {
-                    _wsState.IsReconnecting = true;
-                }
-
-                string token = GetToken();
-                ResetWebSocket(token).Wait();
-                return false;
-            });
-        };
+        _tryReconnect = async () => await DoBackoff(Reconnect);
     }
     #endregion //Constructors
     
@@ -108,7 +91,7 @@ public abstract class WebSocketClient
         {
             _httpClient.DefaultRequestHeaders.Add(customSocketHeader.Key, customSocketHeader.Value);
         }
-        string token = GetToken();
+        string token = await GetToken(CancellationToken);
         await InitializeWebSockets(token);
     }
     
@@ -127,7 +110,7 @@ public abstract class WebSocketClient
                 LogMessage(LogLevel.INFORMATION, "Websocket - Closing...", Array.Empty<object>());
                 try
                 {
-                    await _wsState.WebSocket.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, null, _ctSource.Token);
+                    await _wsState.WebSocket.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, null, CancellationToken);
                 }
                 catch (Exception e)
                 {
@@ -212,7 +195,7 @@ public abstract class WebSocketClient
             LogMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0}", new object[]{channel});
             try
             {
-                await _wsState.WebSocket.SendAsync(message, WebSocketMessageType.Binary, true, _ctSource.Token);
+                await _wsState.WebSocket.SendAsync(message, WebSocketMessageType.Binary, true, CancellationToken);
             }
             catch(Exception e)
             {
@@ -225,19 +208,20 @@ public abstract class WebSocketClient
     {
         foreach (string channel in channels)
         {
-            JoinImpl(channel, skipAddCheck);
+            await JoinImpl(channel, skipAddCheck);
         }
     }
     
     protected async Task JoinImpl(string channel, bool skipAddCheck = false)
     {
-        if (_channels.Add(channel) || skipAddCheck)
+        System.Threading.CancellationToken ct = CancellationToken;
+        if (!ct.IsCancellationRequested && (_channels.Add(channel) || skipAddCheck))
         {
             byte[] message = MakeJoinMessage(channel);
             LogMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0}", new object[]{channel});
             try
             {
-                await _wsState.WebSocket.SendAsync(message, WebSocketMessageType.Binary, true, _ctSource.Token);
+                await _wsState.WebSocket.SendAsync(message, WebSocketMessageType.Binary, true, ct);
             }
             catch(Exception e)
             {
@@ -289,6 +273,22 @@ public abstract class WebSocketClient
             return CloseType.Unavailable;
         }
         return CloseType.Other;
+    }
+
+    private async Task<bool> Reconnect(CancellationToken ct)
+    {
+        LogMessage(LogLevel.INFORMATION, "Websocket - Reconnecting...", Array.Empty<object>());
+        if (_wsState.IsReady)
+            return true;
+                
+        lock (_wsLock)
+        {
+            _wsState.IsReconnecting = true;
+        }
+
+        string token = await GetToken(ct);
+        await ResetWebSocket(ct, token);
+        return false;
     }
 
     private void ReceiveFn()
@@ -403,21 +403,23 @@ public abstract class WebSocketClient
         };
     }
     
-    private void DoBackoff(Func<bool> fn)
+    private async Task DoBackoff(Func<CancellationToken, Task<bool>> fn)
     {
         int i = 0;
         int backoff = _selfHealBackoffs[i];
-        bool success = fn();
-        while (!success)
+        CancellationToken ct = CancellationToken;
+        bool success = !ct.IsCancellationRequested && await fn(ct);
+        while (!success && !ct.IsCancellationRequested)
         {
-            Thread.Sleep(backoff);
+            await Task.Delay(backoff, ct);
+            //Thread.Sleep(backoff);
             i = Math.Min(i + 1, _selfHealBackoffs.Length - 1);
             backoff = _selfHealBackoffs[i];
-            success = fn();
+            success = !ct.IsCancellationRequested && await fn(ct);
         }
     }
 
-    private async Task<bool> TrySetToken()
+    private async Task<bool> TrySetToken(CancellationToken ct)
     {
         LogMessage(LogLevel.INFORMATION, "Authorizing...", Array.Empty<object>());
         string authUrl = GetAuthUrl();
@@ -463,11 +465,11 @@ public abstract class WebSocketClient
         } 
     }
     
-    private string GetToken()
+    private async Task<string> GetToken(CancellationToken ct)
     {
         lock (_tLock)
         {
-            DoBackoff((() => TrySetToken().Result));
+            DoBackoff(TrySetToken).Wait(ct);
         }
 
         return _token.Item1;
@@ -510,7 +512,7 @@ public abstract class WebSocketClient
 
                     if (!_ctSource.IsCancellationRequested)
                     {
-                        Task.Run(_tryReconnect);
+                        Task.Run(_tryReconnect, CancellationToken);
                     }
                 }
             }
@@ -527,7 +529,7 @@ public abstract class WebSocketClient
         LogMessage(LogLevel.ERROR, "Error received: {0}", Encoding.ASCII.GetString(message));
     }
 
-    private async Task ResetWebSocket(string token)
+    private async Task ResetWebSocket(CancellationToken ct, string token)
     {
         LogMessage(LogLevel.INFORMATION, "Websocket - Resetting", Array.Empty<object>());
         Uri wsUrl = new Uri(GetWebSocketUrl(token));
@@ -539,7 +541,7 @@ public abstract class WebSocketClient
             _wsState.WebSocket = ws;
             _wsState.Reset();
         }
-        await _wsState.WebSocket.ConnectAsync(wsUrl, _ctSource.Token);
+        await _wsState.WebSocket.ConnectAsync(wsUrl, ct);
         await OnOpen();
     }
 
