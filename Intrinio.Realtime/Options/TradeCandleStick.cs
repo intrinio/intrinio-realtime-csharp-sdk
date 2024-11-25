@@ -19,8 +19,8 @@ public class TradeCandleStick : CandleStick, IEquatable<TradeCandleStick>, IComp
         _contract = contract;
     }
     
-    public TradeCandleStick(string contract, UInt32 volume, double high, double low, double closePrice, double openPrice, double openTimestamp, double closeTimestamp, double firstTimestamp, double lastTimestamp, bool complete, double average, double change, IntervalType interval)
-        :base(volume, high, low, closePrice, openPrice, openTimestamp, closeTimestamp, firstTimestamp, lastTimestamp, complete, average, change, interval)
+    public TradeCandleStick(string contract, UInt32 volume, double high, double low, double closePrice, double openPrice, double openTimestamp, double closeTimestamp, double firstTimestamp, double lastTimestamp, bool complete, double average, double change, IntervalType interval, UInt32 tradeCount)
+        :base(volume, high, low, closePrice, openPrice, openTimestamp, closeTimestamp, firstTimestamp, lastTimestamp, complete, average, change, interval, tradeCount)
     {
         _contract = contract;
     }
