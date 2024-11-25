@@ -15,15 +15,15 @@
 		<tags>fintech stocks options prices websocket real-time market finance</tags>
 		<dependencies>
 			<group targetFramework="net8.0">
-				<dependency id="Microsoft.Extensions.Configuration" version="9.0.0-rc.1.24431.7" />
-				<dependency id="Microsoft.Extensions.Configuration.Binder" version="9.0.0-rc.1.24431.7" />
-				<dependency id="Microsoft.Extensions.Configuration.Json" version="9.0.0-rc.1.24431.7" />
-				<dependency id="Serilog" version="4.0.2-dev-02232" />
-				<dependency id="Serilog.Settings.Configuration" version="8.0.2" />
+				<dependency id="Microsoft.Extensions.Configuration" version="9.0.0" />
+				<dependency id="Microsoft.Extensions.Configuration.Binder" version="9.0.0" />
+				<dependency id="Microsoft.Extensions.Configuration.Json" version="9.0.0" />
+				<dependency id="Serilog" version="4.1.0" />
+				<dependency id="Serilog.Settings.Configuration" version="8.0.4" />
 				<dependency id="Serilog.Sinks.Console" version="6.0.0" />
 				<dependency id="Serilog.Sinks.File" version="6.0.0" />
-				<dependency id="System.Text.Json" version="9.0.0-rc.1.24431.7" />
-				<dependency id="Intrinio.SDK" version="7.9.0" />
+				<dependency id="System.Text.Json" version="9.0.0" />
+				<dependency id="Intrinio.SDK" version="7.11.0" />
 			</group>
 		</dependencies>
 	</metadata>
