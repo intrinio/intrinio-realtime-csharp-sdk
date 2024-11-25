@@ -23,8 +23,8 @@ public class QuoteCandleStick : CandleStick, IEquatable<QuoteCandleStick>, IComp
         _quoteType = quoteType;
     }
     
-    public QuoteCandleStick(string symbol, UInt32 volume, double high, double low, double closePrice, double openPrice, QuoteType quoteType, double openTimestamp, double closeTimestamp, double firstTimestamp, double lastTimestamp, bool complete, double average, double change, IntervalType interval)
-        : base(volume, high, low, closePrice, openPrice, openTimestamp, closeTimestamp, firstTimestamp, lastTimestamp, complete, average, change, interval)
+    public QuoteCandleStick(string symbol, UInt32 volume, double high, double low, double closePrice, double openPrice, QuoteType quoteType, double openTimestamp, double closeTimestamp, double firstTimestamp, double lastTimestamp, bool complete, double average, double change, IntervalType interval, UInt32 tradeCount)
+        : base(volume, high, low, closePrice, openPrice, openTimestamp, closeTimestamp, firstTimestamp, lastTimestamp, complete, average, change, interval, tradeCount)
     {
         _symbol = symbol;
         _quoteType = quoteType;

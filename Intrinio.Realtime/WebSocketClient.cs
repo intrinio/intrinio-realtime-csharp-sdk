@@ -1,7 +1,5 @@
 using System.Linq;
-using System.Net;
 using System.Net.WebSockets;
-using Intrinio.Realtime.Composite;
 
 namespace Intrinio.Realtime;
 
@@ -38,7 +36,7 @@ public abstract class WebSocketClient
     private readonly Func<Task> _tryReconnect;
     private readonly HttpClient _httpClient = new ();
     private const string ClientInfoHeaderKey = "Client-Information";
-    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.2";
+    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.3";
     private readonly ThreadPriority _mainThreadPriority;
     private readonly Thread[] _threads;
     private Thread? _receiveThread;
