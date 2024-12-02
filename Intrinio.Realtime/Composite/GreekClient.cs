@@ -29,6 +29,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
     private Timer? _riskFreeInterestRateFetchTimer;
     private readonly Intrinio.SDK.Client.ApiClient _apiClient;
     private readonly Intrinio.SDK.Api.CompanyApi _companyApi;
+    private readonly Intrinio.SDK.Api.SecurityApi _securityApi;
     private readonly Intrinio.SDK.Api.IndexApi _indexApi;
     private readonly Intrinio.SDK.Api.OptionsApi _optionsApi;
     private readonly ConcurrentDictionary<string, DateTime> _seenTickers;
@@ -86,6 +87,8 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         _indexApi.Configuration.ApiKey.TryAdd("api_key", apiKey);
         _optionsApi = new OptionsApi();
         _optionsApi.Configuration.ApiKey.TryAdd("api_key", apiKey);
+        _securityApi = new SecurityApi();
+        _securityApi.Configuration.ApiKey.TryAdd("api_key", apiKey);
     }
     #endregion //Constructors
     
@@ -247,16 +250,16 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                 {
                     try
                     {
-                        decimal? result = _companyApi.GetCompanyDataPointNumberAsync(seenTicker.Key, dividendYieldTag).Result;
+                        decimal? result = _securityApi.GetSecurityDataPointNumberAsync(_securityApi.GetSecurityByIdAsync($"{seenTicker.Key}:US").Result.Id, dividendYieldTag).Result;
                         _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
                         _seenTickers[seenTicker.Key] = DateTime.UtcNow;
-                        Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+                        Thread.Sleep(2 * ApiCallSpacerMilliseconds); //don't try to get rate limited.
                     }
                     catch (Exception e)
                     {
                         _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, 0.0D, _updateFunc);
                         _seenTickers[seenTicker.Key] = DateTime.UtcNow;
-                        Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+                        Thread.Sleep(2 * ApiCallSpacerMilliseconds); //don't try to get rate limited.
                     }
                 }
             }
