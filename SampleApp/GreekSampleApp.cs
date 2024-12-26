@@ -82,6 +82,7 @@ public class GreekSampleApp
 		
 		Log("Greek updates: {0}", _greekUpdatedEventCount);
 		Log("Data Cache Security Count: {0}", _dataCache.AllSecurityData.Count);
+		Log("Dividend Yield Count: {0}", _dataCache.AllSecurityData.Where(kvp => kvp.Value.GetSupplementaryDatum("DividendYield").HasValue).Count());
 		Log("Unique Securities with Greeks Count: {0}", _seenGreekTickers.Count);
 	}
 

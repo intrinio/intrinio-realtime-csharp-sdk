@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+
 namespace Intrinio.Realtime.Composite;
 
 using Serilog;
@@ -96,10 +98,25 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
 
     public void Start()
     {
-        FetchInitialCompanyDividends();
+        Task.Run(() =>
+        {
+            Log.Information("Fetching company daily metrics in bulk");
+            for(int i = 365; i >= 0; i--)
+                FetchInitialCompanyDividends(i);
+        });
+        Task.Run(() =>
+        {
+            Log.Information("Fetching list of tickers with options associated");
+            CacheListOfOptionableTickers();
+        });
+        Task.Run(() =>
+        {
+            Log.Information("Fetching list of all securities.");
+            CacheAllSecurities();
+        });
         Log.Information("Fetching risk free interest rate and periodically additional new dividend yields");
         _riskFreeInterestRateFetchTimer = new Timer(FetchRiskFreeInterestRate, null, 0, 11*60*60*1000);
-        _dividendFetchTimer = new Timer(FetchDividendYields, null, 60*1000, 30*1000);
+        _dividendFetchTimer = new Timer(RefreshDividendYields, null, 60*1000, 30*1000);
     }
     
     public void Stop()
@@ -185,52 +202,15 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
     
     #region Private Methods
 
-    private void FetchInitialCompanyDividends()
+    private void CacheListOfOptionableTickers()
     {
-        Log.Information("Fetching company daily metrics in bulk");
-        //Fetch daily metrics in bulk
-        try
-        {
-            string? nextPage = null;
-            TimeSpan subtract;
-            switch (DateTime.UtcNow.DayOfWeek)
-            {
-                case DayOfWeek.Sunday:
-                    subtract = TimeSpan.FromDays(2);
-                    break;
-                case DayOfWeek.Monday:
-                    subtract = TimeSpan.FromDays(3);
-                    break;
-                default:
-                    subtract = TimeSpan.FromDays(1);
-                    break;
-            }
-            DateTime date = DateTime.Today - subtract; //Assume we're starting morning-ish, so today's values aren't available
-            do
-            {
-                ApiResponseCompanyDailyMetrics result = _companyApi.GetAllCompaniesDailyMetrics(date, 1000, nextPage, null);
-                foreach (CompanyDailyMetric companyDailyMetric in result.DailyMetrics)
-                {
-                    if (!String.IsNullOrWhiteSpace(companyDailyMetric.Company.Ticker) && companyDailyMetric.DividendYield.HasValue)
-                    {
-                        _cache.SetSecuritySupplementalDatum(companyDailyMetric.Company.Ticker, DividendYieldKeyName, Convert.ToDouble(companyDailyMetric.DividendYield ?? 0m), _updateFunc);
-                        _seenTickers[String.Intern(companyDailyMetric.Company.Ticker)] = DateTime.UtcNow;
-                    }
-                }
-                Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
-            } while (!String.IsNullOrWhiteSpace(nextPage));
-        }
-        catch (Exception e)
-        {
-            Log.Warning(e, e.Message);
-        }
-
-        Log.Information("Fetching list of tickers with options assiciated");
         //Fetch known options tickers
         try
         {
-            foreach (string ticker in (_optionsApi.GetAllOptionsTickers()).Tickers)
+            ApiResponseOptionsTickers result = _optionsApi.GetAllOptionsTickers();
+            foreach (string ticker in result.Tickers)
                 _seenTickers.TryAdd(String.Intern(ticker), DateTime.MinValue);
+            Log.Information($"Found {result.Tickers.Count} optionable tickers.");
         }
         catch (Exception e)
         {
@@ -238,29 +218,109 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         }
     }
     
-    private void FetchDividendYields(object? _)
+    private void CacheAllSecurities()
     {
-        const string dividendYieldTag = "trailing_dividend_yield";
+        //Fetch known options tickers
+        try
+        {
+            string nextPage = null;
+            do
+            {
+                try
+                {
+                    ApiResponseSecurities response = _securityApi.GetAllSecurities(active: true, delisted: false, primaryListing: true, compositeMic: "USCOMP", pageSize: 9999, nextPage: nextPage);
+                    nextPage = response.NextPage;
+                    foreach (SecuritySummary securitySummary in response.Securities)
+                    {
+                        _seenTickers.TryAdd(String.Intern(securitySummary.Ticker), DateTime.MinValue);
+                    }
+                    Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+                }
+                catch (Exception e)
+                {
+                    Log.Warning(e, e.Message);
+                    Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+                }
+            }while (!String.IsNullOrWhiteSpace(nextPage));
+        }
+        catch (Exception e)
+        {
+            Log.Warning(e, e.Message);
+        }
+    }
+
+    private void FetchInitialCompanyDividends(int daysAgo)
+    {
         if (!_dividendYieldWorking)
         {
             _dividendYieldWorking = true;
             try
             {
+                string? nextPage = null;
+                TimeSpan subtract = TimeSpan.FromDays(daysAgo);
+                DateTime date = DateTime.Today - subtract; //Assume we're starting morning-ish, so today's values aren't available
+                do
+                {
+                    ApiResponseCompanyDailyMetrics result = _companyApi.GetAllCompaniesDailyMetrics(date, 1000, nextPage, null);
+                    nextPage = result.NextPage;
+                    foreach (CompanyDailyMetric companyDailyMetric in result.DailyMetrics)
+                    {
+                        if (!String.IsNullOrWhiteSpace(companyDailyMetric.Company.Ticker) && companyDailyMetric.DividendYield.HasValue)
+                        {
+                            _cache.SetSecuritySupplementalDatum(companyDailyMetric.Company.Ticker, DividendYieldKeyName, Convert.ToDouble(companyDailyMetric.DividendYield ?? 0m), _updateFunc);
+                            _seenTickers[String.Intern(companyDailyMetric.Company.Ticker)] = DateTime.UtcNow;
+                        }
+                    }
+                    Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+                } while (!String.IsNullOrWhiteSpace(nextPage));
+            }
+            catch (Exception e)
+            {
+                Log.Warning(e, e.Message);
+            }
+            finally
+            {
+                _dividendYieldWorking = false;
+            }
+        }
+    }
+
+    private void RefreshDividendYield(string ticker)
+    {
+        const string dividendYieldTag = "trailing_dividend_yield";
+        try
+        {
+            string securityId = _securityApi.GetSecurityByIdAsync($"{ticker}:US").Result.Id;
+            Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+            decimal? result = _securityApi.GetSecurityDataPointNumberAsync(securityId, dividendYieldTag).Result;
+            _cache.SetSecuritySupplementalDatum(ticker, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
+            _seenTickers[ticker] = DateTime.UtcNow;
+            Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+        }
+        catch (Exception e)
+        {
+            _cache.SetSecuritySupplementalDatum(ticker, DividendYieldKeyName, 0.0D, _updateFunc);
+            _seenTickers[ticker] = DateTime.UtcNow;
+            Thread.Sleep(ApiCallSpacerMilliseconds); //don't try to get rate limited.
+        }
+    }  
+    
+    private void RefreshDividendYields(object? _)
+    {
+        if (!_dividendYieldWorking)
+        {
+            _dividendYieldWorking = true;
+            try
+            {
+                RefreshDividendYield("SPY");
+                RefreshDividendYield("SPX");
+                RefreshDividendYield("SPXW");
+                RefreshDividendYield("RUT");
+                RefreshDividendYield("VIX");
+                Log.Information($"Refreshing dividend yields for {_seenTickers.Count} tickers...");
                 foreach (KeyValuePair<string,DateTime> seenTicker in _seenTickers.Where(t => t.Value < (DateTime.UtcNow - TimeSpan.FromHours(DividendYieldUpdatePeriodHours))))
                 {
-                    try
-                    {
-                        decimal? result = _securityApi.GetSecurityDataPointNumberAsync(_securityApi.GetSecurityByIdAsync($"{seenTicker.Key}:US").Result.Id, dividendYieldTag).Result;
-                        _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
-                        _seenTickers[seenTicker.Key] = DateTime.UtcNow;
-                        Thread.Sleep(2 * ApiCallSpacerMilliseconds); //don't try to get rate limited.
-                    }
-                    catch (Exception e)
-                    {
-                        _cache.SetSecuritySupplementalDatum(seenTicker.Key, DividendYieldKeyName, 0.0D, _updateFunc);
-                        _seenTickers[seenTicker.Key] = DateTime.UtcNow;
-                        Thread.Sleep(2 * ApiCallSpacerMilliseconds); //don't try to get rate limited.
-                    }
+                    RefreshDividendYield(seenTicker.Key);
                 }
             }
             catch (Exception e)
