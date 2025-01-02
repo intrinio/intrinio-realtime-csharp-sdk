@@ -288,3 +288,7 @@ __pycache__/
 *.xsd.cs
 
  Test.cs
+ 
+ **/.idea/**
+ .DS_Store
+ **/.DS_Store
