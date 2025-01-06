@@ -1,9 +1,8 @@
-using System.Runtime.CompilerServices;
-
 namespace Intrinio.Realtime.Equities;
 
 using System;
 using System.Text;
+using System.Runtime.CompilerServices;
 
 public class Tick
 {
