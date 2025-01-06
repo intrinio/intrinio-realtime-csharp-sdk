@@ -1,9 +1,8 @@
-using System.Runtime.CompilerServices;
-
 namespace Intrinio.Realtime.Options;
 
 using System;
 using System.Text;
+using System.Runtime.CompilerServices;
 
 public class Tick
 {
@@ -74,6 +73,45 @@ public class Tick
         
         return bytes;
     }
+    
+    public static bool GetTradeBytes(Span<byte> bufferToWriteTo, Trade trade, out int length)
+    {
+        // byte 0       | type | byte
+        // byte 1       | messageLength (includes bytes 0 and 1) | byte
+        // byte 2       | contractLength | byte
+        // bytes [3...] | contract | string (ascii)
+        // next byte    | exchange | char
+        // next 8 bytes | price | float64
+        // next 4 bytes | size | uint32
+        // next 8 bytes | timestamp | float64
+        // next 8 bytes | totalvolume | uint64
+        // next 4 bytes | qualifiers | 4 byte struct tuple
+        // next 8 bytes | askpriceatexecution | float64
+        // next 8 bytes | bidpriceatexecution | float64
+        // next 8 bytes | underlyingpriceatexecution | float64
+        
+        int contractLength = Encoding.ASCII.GetBytes(trade.Contract.AsSpan(), bufferToWriteTo.Slice(3, trade.Contract.Length));
+        length = 60 + contractLength;
+        Conditions qualifiers = trade.Qualifiers;
+        
+        bufferToWriteTo[0] = Convert.ToByte((int)(Options.MessageType.Trade));
+        bufferToWriteTo[1] = Convert.ToByte(length);
+        bufferToWriteTo[2] = Convert.ToByte(contractLength);
+        bufferToWriteTo[3 + contractLength] = (byte)(char)trade.Exchange;
+        bool success = BitConverter.TryWriteBytes(bufferToWriteTo.Slice(4 + contractLength, 8), trade.Price);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(12 + contractLength, 4), trade.Size);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(16 + contractLength, 8), trade.Timestamp);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(24 + contractLength, 8), trade.TotalVolume);
+        bufferToWriteTo[32 + contractLength] = qualifiers[0];
+        bufferToWriteTo[33 + contractLength] = qualifiers[1];
+        bufferToWriteTo[34 + contractLength] = qualifiers[2];
+        bufferToWriteTo[35 + contractLength] = qualifiers[3];
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(36 + contractLength, 8), trade.AskPriceAtExecution);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(44 + contractLength, 8), trade.BidPriceAtExecution);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(52 + contractLength, 8), trade.UnderlyingPriceAtExecution);
+        
+        return success;
+    }
 
     public static byte[] GetQuoteBytes(Quote quote)
     {
@@ -111,6 +149,33 @@ public class Tick
         
         return bytes;
     }
+    
+    public static bool GetQuoteBytes(Span<byte> bufferToWriteTo, Quote quote, out int length)
+    {
+        // byte 0       | type | byte
+        // byte 1       | messageLength (includes bytes 0 and 1) | byte
+        // byte 2       | contractLength | byte
+        // bytes [3...] | contract | string (ascii)
+        // next 8 bytes | askPrice | float64
+        // next 4 bytes | askSize | uint32
+        // next 8 bytes | bidPrice | float64
+        // next 4 bytes | bidSize | uint32
+        // next 8 bytes | timestamp | float64
+        
+        int contractLength = Encoding.ASCII.GetBytes(quote.Contract.AsSpan(), bufferToWriteTo.Slice(3, quote.Contract.Length));
+        length = 35 + contractLength;
+        
+        bufferToWriteTo[0] = System.Convert.ToByte((int)(Options.MessageType.Quote));
+        bufferToWriteTo[1] = Convert.ToByte(length);
+        bufferToWriteTo[2] = System.Convert.ToByte(contractLength);
+        bool success = BitConverter.TryWriteBytes(bufferToWriteTo.Slice(3 + contractLength, 8), quote.AskPrice);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(11 + contractLength, 4), quote.AskSize);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(15 + contractLength, 8), quote.BidPrice);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(23 + contractLength, 4), quote.BidSize);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(27 + contractLength, 8), quote.Timestamp);
+        
+        return success;
+    }
 
     public static byte[] GetRefreshBytes(Refresh refresh)
     {
@@ -147,6 +212,33 @@ public class Tick
         Array.Copy(lowPriceBytes, 0, bytes, 31 + contractLengthInt32, lowPriceBytes.Length);
         
         return bytes;
+    }
+    
+    public static bool GetRefreshBytes(Span<byte> bufferToWriteTo, Refresh refresh, out int length)
+    {
+        // byte 0       | type | byte
+        // byte 1       | messageLength (includes bytes 0 and 1) | byte
+        // byte 2       | contractLength | byte
+        // bytes [3...] | contract | string (ascii)
+        // next 4 bytes | openInterest | uint32
+        // next 8 bytes | openPrice | float64
+        // next 8 bytes | closePrice | float64
+        // next 8 bytes | highPrice | float64
+        // next 8 bytes | lowPrice | float64
+        
+        int contractLength = Encoding.ASCII.GetBytes(refresh.Contract.AsSpan(), bufferToWriteTo.Slice(3, refresh.Contract.Length));
+        length = 39 + contractLength;
+        
+        bufferToWriteTo[0] = System.Convert.ToByte((int)(Options.MessageType.Refresh));
+        bufferToWriteTo[1] = Convert.ToByte(length);
+        bufferToWriteTo[2] = System.Convert.ToByte(contractLength);
+        bool success = BitConverter.TryWriteBytes(bufferToWriteTo.Slice(3 + contractLength, 4), refresh.OpenInterest);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(7 + contractLength, 8), refresh.OpenPrice);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(15 + contractLength, 8), refresh.ClosePrice);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(23 + contractLength, 8), refresh.HighPrice);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(31 + contractLength, 8), refresh.LowPrice);
+        
+        return success;
     }
 
     public static byte[] GetUnusualActivityBytes(UnusualActivity unusualActivity)
@@ -199,6 +291,41 @@ public class Tick
         
         return bytes;
     }
+    
+    public static bool GetUnusualActivityBytes(Span<byte> bufferToWriteTo, UnusualActivity unusualActivity, out int length)
+    {
+        //// byte 0       | type | byte
+        //// byte 1       | messageLength (includes bytes 0 and 1) | byte
+        //// byte 2       | contractLength | byte
+        //// bytes [3...] | contract | string (ascii)
+        //// next byte    | unusualActivityType | char
+        //// next byte    | sentiment | char
+        //// next 8 bytes | totalValue | float64
+        //// next 4 bytes | totalSize | uint32
+        //// next 8 bytes | averagePrice | float64
+        //// next 8 bytes | askPriceAtExecution | float64
+        //// next 8 bytes | bidPriceAtExecution | float64
+        //// next 8 bytes | underlyingPriceAtExecution | float64
+        //// next 8 bytes | timestamp | float64
+        
+        int contractLength = Encoding.ASCII.GetBytes(unusualActivity.Contract.AsSpan(), bufferToWriteTo.Slice(3, unusualActivity.Contract.Length));
+        length = 57 + contractLength;
+        
+        bufferToWriteTo[0] = System.Convert.ToByte((int)(Options.MessageType.UnusualActivity));
+        bufferToWriteTo[1] = Convert.ToByte(length);
+        bufferToWriteTo[2] = System.Convert.ToByte(contractLength);
+        bufferToWriteTo[3 + contractLength] = (byte)(int)unusualActivity.UnusualActivityType;
+        bufferToWriteTo[4 + contractLength] = (byte)(int)unusualActivity.Sentiment;
+        bool success = BitConverter.TryWriteBytes(bufferToWriteTo.Slice(5 + contractLength, 8), unusualActivity.TotalValue);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(13 + contractLength, 4), unusualActivity.TotalSize);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(17 + contractLength, 8), unusualActivity.AveragePrice);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(25 + contractLength, 8), unusualActivity.AskPriceAtExecution);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(33 + contractLength, 8), unusualActivity.BidPriceAtExecution);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(41 + contractLength, 8), unusualActivity.UnderlyingPriceAtExecution);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(49 + contractLength, 8), unusualActivity.Timestamp);
+        
+        return success;
+    }
 
     public DateTime TimeReceived { get { return _timeReceived; } }
 
@@ -224,6 +351,12 @@ public class Tick
     {
         return BitConverter.GetBytes(System.Convert.ToUInt64((_timeReceived - DateTime.UnixEpoch).Ticks) * 100UL);
     }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool GetTimeReceivedBytes(Span<byte> bufferToWriteTo)
+    {
+        return BitConverter.TryWriteBytes(bufferToWriteTo.Slice(0, 8), Convert.ToUInt64((_timeReceived - DateTime.UnixEpoch).Ticks) * 100UL);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public byte[] GetEventBytes()
@@ -237,5 +370,18 @@ public class Tick
                     : _unusualActivity.HasValue
                         ? GetUnusualActivityBytes(_unusualActivity.Value)
                         : Array.Empty<byte>();
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool GetEventBytes(Span<byte> bufferToWriteTo, out int length)
+    {
+        length = 0;
+        return _trade.HasValue
+            ? GetTradeBytes(bufferToWriteTo, _trade.Value, out length)
+            : _quote.HasValue
+                ? GetQuoteBytes(bufferToWriteTo, _quote.Value, out length)
+                : _refresh.HasValue
+                    ? GetRefreshBytes(bufferToWriteTo, _refresh.Value, out length)
+                    : _unusualActivity.HasValue && GetUnusualActivityBytes(bufferToWriteTo, _unusualActivity.Value, out length);
     }
 }

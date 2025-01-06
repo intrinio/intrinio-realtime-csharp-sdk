@@ -1,6 +1,3 @@
-using System.Linq;
-using System.Net.WebSockets;
-
 namespace Intrinio.Realtime;
 
 using System;
@@ -10,6 +7,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Net.Sockets;
+using System.Linq;
+using System.Net.WebSockets;
+using Intrinio.Collections.RingBuffers;
 
 public abstract class WebSocketClient
 {
@@ -36,7 +36,7 @@ public abstract class WebSocketClient
     private readonly Func<Task> _tryReconnect;
     private readonly HttpClient _httpClient = new ();
     private const string ClientInfoHeaderKey = "Client-Information";
-    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.5";
+    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.6";
     private readonly ThreadPriority _mainThreadPriority;
     private readonly Thread[] _threads;
     private Thread? _receiveThread;
@@ -309,7 +309,7 @@ public abstract class WebSocketClient
                             {
                                 Interlocked.Increment(ref _dataMsgCount);
                                 if (!_data.TryEnqueue(in bufferSpan))
-                                    _overflowData.Enqueue(in bufferSpan);
+                                    _overflowData.TryEnqueue(in bufferSpan);
                             }
                             break;
                         case WebSocketMessageType.Text:
