@@ -88,7 +88,7 @@ public class Tick
         bufferToWriteTo[26 + symbolLength] = Convert.ToByte(conditionLength);
         
         bool success = BitConverter.TryWriteBytes(bufferToWriteTo.Slice(4 + symbolLength, 2), trade.MarketCenter);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(6 + symbolLength, 4), trade.Price);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(6 + symbolLength, 4), Convert.ToSingle(trade.Price));
         success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(10 + symbolLength, 4), trade.Size);
         success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(14 + symbolLength, 8), Convert.ToUInt64((trade.Timestamp - DateTime.UnixEpoch).Ticks) * 100UL);
         success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(22 + symbolLength, 4), Convert.ToUInt32(trade.TotalVolume));
@@ -163,7 +163,7 @@ public class Tick
         bufferToWriteTo[22 + symbolLength] = Convert.ToByte(conditionLength);
         
         bool success = BitConverter.TryWriteBytes(bufferToWriteTo.Slice(4 + symbolLength, 2), quote.MarketCenter);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(6 + symbolLength, 4), quote.Price);
+        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(6 + symbolLength, 4), Convert.ToSingle(quote.Price));
         success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(10 + symbolLength, 4), quote.Size);
         success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(14 + symbolLength, 8), Convert.ToUInt64((quote.Timestamp - DateTime.UnixEpoch).Ticks) * 100UL);
         
