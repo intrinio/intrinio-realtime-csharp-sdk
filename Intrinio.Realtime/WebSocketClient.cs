@@ -149,16 +149,16 @@ public abstract class WebSocketClient
         switch (logLevel)
         {
             case LogLevel.DEBUG:
-                Serilog.Log.Debug(GetLogPrefix + messageTemplate, propertyValues);
+                Serilog.Log.Debug(GetLogPrefix() + messageTemplate, propertyValues);
                 break;
             case LogLevel.INFORMATION:
-                Serilog.Log.Information(GetLogPrefix + messageTemplate, propertyValues);
+                Serilog.Log.Information(GetLogPrefix() + messageTemplate, propertyValues);
                 break;
             case LogLevel.WARNING:
-                Serilog.Log.Warning(GetLogPrefix + messageTemplate, propertyValues);
+                Serilog.Log.Warning(GetLogPrefix() + messageTemplate, propertyValues);
                 break;
             case LogLevel.ERROR:
-                Serilog.Log.Error(GetLogPrefix + messageTemplate, propertyValues);
+                Serilog.Log.Error(GetLogPrefix() + messageTemplate, propertyValues);
                 break;
             default:
                 throw new ArgumentException("LogLevel not specified!");
