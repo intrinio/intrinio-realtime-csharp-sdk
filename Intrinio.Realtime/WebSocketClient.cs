@@ -36,7 +36,7 @@ public abstract class WebSocketClient
     private readonly Func<Task> _tryReconnect;
     private readonly HttpClient _httpClient = new ();
     private const string ClientInfoHeaderKey = "Client-Information";
-    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.7";
+    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.8";
     private readonly ThreadPriority _mainThreadPriority;
     private readonly Thread[] _threads;
     private Thread? _receiveThread;
@@ -308,8 +308,8 @@ public abstract class WebSocketClient
                             if (result.Count > 0)
                             {
                                 Interlocked.Increment(ref _dataMsgCount);
-                                if (!_data.TryEnqueue(in bufferSpan))
-                                    _overflowData.TryEnqueue(in bufferSpan);
+                                if (!_data.TryEnqueue(bufferSpan))
+                                    _overflowData.TryEnqueue(bufferSpan);
                             }
                             break;
                         case WebSocketMessageType.Text:
@@ -364,7 +364,7 @@ public abstract class WebSocketClient
         {
             try
             {
-                if (_data.TryDequeue(in datum) || _overflowData.TryDequeue(in datum))
+                if (_data.TryDequeue(datum) || _overflowData.TryDequeue(datum))
                 {
                     // These are grouped (many) messages.
                     // The first byte tells us how many messages there are.
