@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Collections.Generic;
 using System.Threading;
@@ -17,7 +18,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     private bool _useOnTrade;
     private bool _useOnQuote;
     private Action<Trade>? _onTrade;
-    private readonly IEnumerable<ISocketPlugIn> _plugIns;
+    private readonly ConcurrentBag<ISocketPlugIn> _plugIns;
     public IEnumerable<ISocketPlugIn> PlugIns { get { return _plugIns; } }
 
     /// <summary>
@@ -73,7 +74,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         OnTrade = onTrade;
         OnQuote = onQuote;
         _config = config;
-        _plugIns = plugIns ?? Array.Empty<ISocketPlugIn>();
+        _plugIns = ReferenceEquals(plugIns, null) ? new ConcurrentBag<ISocketPlugIn>() : new ConcurrentBag<ISocketPlugIn>(plugIns);
         
         if (ReferenceEquals(null, _config))
             throw new ArgumentException("Config may not be null.");
@@ -108,6 +109,20 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     #endregion //Constructors
     
     #region Public Methods
+
+    public bool AddPlugin(ISocketPlugIn plugin)
+    {
+        try
+        {
+            _plugIns.Add(plugin);
+            return true;
+        }
+        catch (Exception e)
+        {
+            return false;
+        }
+    }
+    
     public async Task Join()
     {
         while (!IsReady())

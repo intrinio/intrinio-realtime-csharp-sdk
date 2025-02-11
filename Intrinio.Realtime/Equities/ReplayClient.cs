@@ -42,14 +42,14 @@ public class ReplayClient : IEquitiesWebSocketClient
     private readonly Thread _replayThread;
     public UInt64 TradeCount { get { return Interlocked.Read(ref _dataTradeCount); } }
     public UInt64 QuoteCount { get { return Interlocked.Read(ref _dataQuoteCount); } }
-    private readonly IEnumerable<ISocketPlugIn> _plugIns;
+    private readonly ConcurrentBag<ISocketPlugIn> _plugIns;
     public IEnumerable<ISocketPlugIn> PlugIns { get { return _plugIns; } }
     #endregion //Data Members
 
     #region Constructors
     public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IEnumerable<ISocketPlugIn>? plugIns = null)
     {
-        _plugIns = plugIns ?? Array.Empty<ISocketPlugIn>();
+        _plugIns = ReferenceEquals(plugIns, null) ? new ConcurrentBag<ISocketPlugIn>() : new ConcurrentBag<ISocketPlugIn>(plugIns);
         OnTrade = onTrade;
         OnQuote = onQuote;
         _config = config;
@@ -95,6 +95,18 @@ public class ReplayClient : IEquitiesWebSocketClient
     #endregion //Constructors
     
     #region Public Methods
+    public bool AddPlugin(ISocketPlugIn plugin)
+    {
+        try
+        {
+            _plugIns.Add(plugin);
+            return true;
+        }
+        catch (Exception e)
+        {
+            return false;
+        }
+    }
     
     public Task Join()
     {
