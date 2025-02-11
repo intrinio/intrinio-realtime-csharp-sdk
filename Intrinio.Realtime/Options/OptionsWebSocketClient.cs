@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Collections.Generic;
 using System.Threading;
@@ -25,7 +26,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     private bool _useOnRefresh;
     private bool _useOnUnusualActivity;
     private Action<Trade>? _onTrade;
-    private readonly IEnumerable<ISocketPlugIn> _plugIns;
+    private readonly ConcurrentBag<ISocketPlugIn> _plugIns;
     public IEnumerable<ISocketPlugIn> PlugIns { get { return _plugIns; } }
 
     /// <summary>
@@ -113,7 +114,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity, Config config, IEnumerable<ISocketPlugIn>? plugIns = null) 
         : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
     {
-        _plugIns = plugIns ?? Array.Empty<ISocketPlugIn>();
+        _plugIns = ReferenceEquals(plugIns, null) ? new ConcurrentBag<ISocketPlugIn>() : new ConcurrentBag<ISocketPlugIn>(plugIns);
         OnTrade = onTrade;
         OnQuote = onQuote;
         OnRefresh = onRefresh;
@@ -164,6 +165,19 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     #endregion //Constructors
     
     #region Public Methods
+    public bool AddPlugin(ISocketPlugIn plugin)
+    {
+        try
+        {
+            _plugIns.Add(plugin);
+            return true;
+        }
+        catch (Exception e)
+        {
+            return false;
+        }
+    }
+    
     public async Task Join()
     {
         while (!IsReady())

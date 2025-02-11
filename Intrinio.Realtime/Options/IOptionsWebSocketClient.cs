@@ -27,4 +27,5 @@ public interface IOptionsWebSocketClient
     public UInt64 UnusualActivityCount { get; }
     public void LogMessage(LogLevel logLevel, string messageTemplate, params object[] propertyValues);
     public IEnumerable<ISocketPlugIn> PlugIns { get; }
+    public bool AddPlugin(ISocketPlugIn plugin);
 }

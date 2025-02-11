@@ -23,4 +23,5 @@ public interface IEquitiesWebSocketClient
     public UInt64 QuoteCount { get; }
     public void LogMessage(LogLevel logLevel, string messageTemplate, params object[] propertyValues);
     public IEnumerable<ISocketPlugIn> PlugIns { get; }
+    public bool AddPlugin(ISocketPlugIn plugin);
 }
