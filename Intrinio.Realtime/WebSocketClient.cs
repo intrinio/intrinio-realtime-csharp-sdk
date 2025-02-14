@@ -36,7 +36,7 @@ public abstract class WebSocketClient
     private readonly Func<Task> _tryReconnect;
     private readonly HttpClient _httpClient = new ();
     private const string ClientInfoHeaderKey = "Client-Information";
-    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.10";
+    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.11";
     private readonly ThreadPriority _mainThreadPriority;
     private readonly Thread[] _threads;
     private Thread? _receiveThread;
@@ -551,6 +551,7 @@ public abstract class WebSocketClient
         {
             LogMessage(LogLevel.INFORMATION, "Websocket - Connecting...", Array.Empty<object>());
             ClientWebSocket ws = new ClientWebSocket();
+            ws.Options.SetBuffer(Convert.ToInt32(_bufferBlockSize * _bufferSize), Convert.ToInt32(_bufferBlockSize * _bufferSize));
             headers.ForEach(h => ws.Options.SetRequestHeader(h.Key, h.Value));
             _wsState = new WebSocketState(ws);
         }
