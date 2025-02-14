@@ -82,7 +82,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
             _cache.EquitiesQuoteUpdatedCallback += UpdateGreeks;
 
         _apiClient = new ApiClient();
-        _apiClient.Configuration.ApiKey.Add("api_key", apiKey);
+        _apiClient.Configuration.ApiKey.TryAdd("api_key", apiKey);
         _companyApi = new CompanyApi();
         _companyApi.Configuration.ApiKey.TryAdd("api_key", apiKey);
         _indexApi = new IndexApi();
