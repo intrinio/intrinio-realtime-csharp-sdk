@@ -36,7 +36,7 @@ public abstract class WebSocketClient
     private readonly Func<Task> _tryReconnect;
     private readonly HttpClient _httpClient = new ();
     private const string ClientInfoHeaderKey = "Client-Information";
-    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.11";
+    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.12";
     private readonly ThreadPriority _mainThreadPriority;
     private readonly Thread[] _threads;
     private Thread? _receiveThread;
@@ -321,7 +321,7 @@ public abstract class WebSocketClient
                     }
                 }
                 else
-                    Task.Delay(1000, token).Wait(token);
+                    Thread.Sleep(1000);
             }
             catch (NullReferenceException ex)
             {
@@ -510,7 +510,7 @@ public abstract class WebSocketClient
 
                     if (!_ctSource.IsCancellationRequested)
                     {
-                        Task.Run(_tryReconnect, CancellationToken);
+                        Task.Factory.StartNew(_tryReconnect, CancellationToken);
                     }
                 }
             }
