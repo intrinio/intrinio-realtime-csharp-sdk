@@ -527,16 +527,21 @@ public abstract class WebSocketClient
         LogMessage(LogLevel.ERROR, "Error received: {0}", Encoding.ASCII.GetString(message));
     }
 
+    private ClientWebSocket CreateWebSocket(string token)
+    {
+        ClientWebSocket ws = new ClientWebSocket();
+        ws.Options.SetBuffer(Convert.ToInt32(_bufferBlockSize * _bufferSize), Convert.ToInt32(_bufferBlockSize * _bufferSize));
+        GetCustomSocketHeaders().ForEach(h => ws.Options.SetRequestHeader(h.Key, h.Value));
+        return ws;
+    }
+
     private async Task ResetWebSocket(CancellationToken ct, string token)
     {
         LogMessage(LogLevel.INFORMATION, "Websocket - Resetting", Array.Empty<object>());
         Uri wsUrl = new Uri(GetWebSocketUrl(token));
-        List<KeyValuePair<string, string>> headers = GetCustomSocketHeaders();
-        ClientWebSocket ws = new ClientWebSocket();
-        headers.ForEach(h => ws.Options.SetRequestHeader(h.Key, h.Value));
         lock (_wsLock)
         {
-            _wsState.WebSocket = ws;
+            _wsState.WebSocket = CreateWebSocket(token);
             _wsState.Reset();
         }
         await _wsState.WebSocket.ConnectAsync(wsUrl, ct);
@@ -546,13 +551,10 @@ public abstract class WebSocketClient
     private async Task InitializeWebSockets(string token)
     {
         Uri wsUrl = new Uri(GetWebSocketUrl(token));
-        List<KeyValuePair<string, string>> headers = GetCustomSocketHeaders();
         lock (_wsLock)
         {
             LogMessage(LogLevel.INFORMATION, "Websocket - Connecting...", Array.Empty<object>());
-            ClientWebSocket ws = new ClientWebSocket();
-            ws.Options.SetBuffer(Convert.ToInt32(_bufferBlockSize * _bufferSize), Convert.ToInt32(_bufferBlockSize * _bufferSize));
-            headers.ForEach(h => ws.Options.SetRequestHeader(h.Key, h.Value));
+            ClientWebSocket ws = CreateWebSocket(token);
             _wsState = new WebSocketState(ws);
         }
         await _wsState.WebSocket.ConnectAsync(wsUrl, _ctSource.Token);
