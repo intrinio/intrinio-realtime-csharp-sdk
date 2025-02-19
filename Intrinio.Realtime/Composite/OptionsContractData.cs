@@ -78,13 +78,13 @@ internal class OptionsContractData : IOptionsContractData
         {
             try
             {
-                Task.Factory.StartNew(o => 
-                        onOptionsTradeUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
-                        ), 
-                    new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                //onOptionsTradeUpdated(this, dataCache, securityData);
+                // Task.Factory.StartNew(o => 
+                //         onOptionsTradeUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
+                //         ), 
+                //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
+                onOptionsTradeUpdated(this, dataCache, securityData);
             }
             catch (Exception e)
             {
@@ -112,13 +112,13 @@ internal class OptionsContractData : IOptionsContractData
         {
             try
             {
-                Task.Factory.StartNew(o => 
-                        onOptionsQuoteUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
-                        ), 
-                    new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                //onOptionsQuoteUpdated(this, dataCache, securityData);
+                // Task.Factory.StartNew(o => 
+                //         onOptionsQuoteUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
+                //         ), 
+                //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
+                onOptionsQuoteUpdated(this, dataCache, securityData);
             }
             catch (Exception e)
             {
@@ -141,13 +141,13 @@ internal class OptionsContractData : IOptionsContractData
         {
             try
             {
-                Task.Factory.StartNew(o => 
-                        onOptionsRefreshUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
-                        ), 
-                    new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                //onOptionsRefreshUpdated(this, dataCache, securityData);
+                // Task.Factory.StartNew(o => 
+                //         onOptionsRefreshUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
+                //         ), 
+                //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
+                onOptionsRefreshUpdated(this, dataCache, securityData);
             }
             catch (Exception e)
             {
@@ -170,13 +170,13 @@ internal class OptionsContractData : IOptionsContractData
         {
             try
             {
-                Task.Factory.StartNew(o => 
-                        onOptionsUnusualActivityUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
-                        ), 
-                    new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                //onOptionsUnusualActivityUpdated(this, dataCache, securityData);
+                // Task.Factory.StartNew(o => 
+                //         onOptionsUnusualActivityUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
+                //         ), 
+                //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
+                onOptionsUnusualActivityUpdated(this, dataCache, securityData);
             }
             catch (Exception e)
             {
@@ -204,13 +204,13 @@ internal class OptionsContractData : IOptionsContractData
         {
             try
             {
-                Task.Factory.StartNew(o => 
-                        onOptionsTradeCandleStickUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
-                        ), 
-                    new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                //onOptionsTradeCandleStickUpdated(this, dataCache, securityData);
+                // Task.Factory.StartNew(o => 
+                //         onOptionsTradeCandleStickUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
+                //         ), 
+                //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
+                onOptionsTradeCandleStickUpdated(this, dataCache, securityData);
             }
             catch (Exception e)
             {
@@ -257,13 +257,13 @@ internal class OptionsContractData : IOptionsContractData
         {
             try
             {
-                Task.Factory.StartNew(o => 
-                        onOptionsQuoteCandleStickUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
-                            ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
-                        ), 
-                    new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                //onOptionsQuoteCandleStickUpdated(this, dataCache, securityData);
+                // Task.Factory.StartNew(o => 
+                //         onOptionsQuoteCandleStickUpdated( ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item1, 
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item2,
+                //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
+                //         ), 
+                //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
+                onOptionsQuoteCandleStickUpdated(this, dataCache, securityData);
             }
             catch (Exception e)
             {
@@ -290,15 +290,15 @@ internal class OptionsContractData : IOptionsContractData
         {
             try
             {
-                Task.Factory.StartNew(o => 
-                        onOptionsContractSupplementalDatumUpdated( ((Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>)o).Item1, 
-                            ((Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>)o).Item2,
-                            ((Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>)o).Item3,
-                            ((Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>)o).Item4,
-                            ((Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>)o).Item5
-                        ), 
-                    new Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>(key, datum, this, securityData, dataCache));
-                //onOptionsContractSupplementalDatumUpdated(key, datum, this, securityData, dataCache);
+                // Task.Factory.StartNew(o => 
+                //         onOptionsContractSupplementalDatumUpdated( ((Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>)o).Item1, 
+                //             ((Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>)o).Item2,
+                //             ((Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>)o).Item3,
+                //             ((Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>)o).Item4,
+                //             ((Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>)o).Item5
+                //         ), 
+                //     new Tuple<string, double?, IOptionsContractData, ISecurityData, IDataCache>(key, datum, this, securityData, dataCache));
+                onOptionsContractSupplementalDatumUpdated(key, datum, this, securityData, dataCache);
             }
             catch (Exception e)
             {
