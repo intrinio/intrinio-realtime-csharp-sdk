@@ -54,11 +54,13 @@ public class ReplayClient : IOptionsWebSocketClient
     #endregion //Data Members
 
     #region Constructors
-    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IEnumerable<ISocketPlugIn>? plugIns = null)
+    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity, Config config, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IEnumerable<ISocketPlugIn>? plugIns = null)
     {
         _plugIns = ReferenceEquals(plugIns, null) ? new ConcurrentBag<ISocketPlugIn>() : new ConcurrentBag<ISocketPlugIn>(plugIns);
         this.OnTrade = onTrade;
         this.OnQuote = onQuote;
+        this.OnRefresh = onRefresh;
+        this.OnUnusualActivity = onUnusualActivity;
         this._config = config;
         this._date = date;
         this._withSimulatedDelay = withSimulatedDelay;
@@ -675,54 +677,54 @@ public class ReplayClient : IOptionsWebSocketClient
         }
     }
 
-    // private void ReplayThreadFn()
-    // {
-    //     CancellationToken ct = _ctSource.Token;
-    //     SubProvider[] subProviders = MapProviderToSubProviders(_config.Provider);
-    //     string[] replayFiles = new string[subProviders.Length];
-    //     IEnumerable<Tick>[] allTicks = new IEnumerable<Tick>[subProviders.Length];
-    //
-    //     try
-    //     {
-    //         for (int i = 0; i < subProviders.Length; i++)
-    //         {
-    //             LogMessage(LogLevel.INFORMATION, "Downloading Replay file for {0} on {1}...", subProviders[i].ToString(), _date.Date.ToString());
-    //             replayFiles[i] = FetchReplayFile(subProviders[i]);
-    //             LogMessage(LogLevel.INFORMATION, "Downloaded Replay file to: {0}", replayFiles[i]);
-    //             allTicks[i] = ReplayTickFileWithoutDelay(replayFiles[i], 100, ct);
-    //         }
-    //
-    //         IEnumerable<Tick> aggregatedTicks = _withSimulatedDelay
-    //             ? ReplayFileGroupWithDelay(allTicks, ct)
-    //             : ReplayFileGroupWithoutDelay(allTicks, ct);
-    //
-    //         foreach (Tick tick in aggregatedTicks)
-    //         {
-    //             if (!ct.IsCancellationRequested)
-    //             {
-    //                 Interlocked.Increment(ref _dataEventCount);
-    //                 Interlocked.Increment(ref _dataMsgCount);
-    //                 _data.Enqueue(tick);
-    //             }
-    //         }
-    //     }
-    //     catch (Exception e)
-    //     {
-    //         LogMessage(LogLevel.ERROR, "Error while replaying file: {0}", e.Message);
-    //     }
-    //
-    //     if (_deleteFileWhenDone)
-    //     {
-    //         foreach (string deleteFilePath in replayFiles)
-    //         {
-    //             if (File.Exists(deleteFilePath))
-    //             {
-    //                 LogMessage(LogLevel.INFORMATION, "Deleting Replay file: {0}", deleteFilePath);
-    //                 File.Delete(deleteFilePath);
-    //             }
-    //         }
-    //     }
-    // }
+    private void ReplayThreadFn()
+    {
+        CancellationToken ct = _ctSource.Token;
+        SubProvider[] subProviders = MapProviderToSubProviders(_config.Provider);
+        string[] replayFiles = new string[subProviders.Length];
+        IEnumerable<Tick>[] allTicks = new IEnumerable<Tick>[subProviders.Length];
+    
+        try
+        {
+            for (int i = 0; i < subProviders.Length; i++)
+            {
+                LogMessage(LogLevel.INFORMATION, "Downloading Replay file for {0} on {1}...", subProviders[i].ToString(), _date.Date.ToString());
+                replayFiles[i] = FetchReplayFile(subProviders[i]);
+                LogMessage(LogLevel.INFORMATION, "Downloaded Replay file to: {0}", replayFiles[i]);
+                allTicks[i] = ReplayTickFileWithoutDelay(replayFiles[i], 100, ct);
+            }
+    
+            IEnumerable<Tick> aggregatedTicks = _withSimulatedDelay
+                ? ReplayFileGroupWithDelay(allTicks, ct)
+                : ReplayFileGroupWithoutDelay(allTicks, ct);
+    
+            foreach (Tick tick in aggregatedTicks)
+            {
+                if (!ct.IsCancellationRequested)
+                {
+                    Interlocked.Increment(ref _dataEventCount);
+                    Interlocked.Increment(ref _dataMsgCount);
+                    _data.Enqueue(tick);
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            LogMessage(LogLevel.ERROR, "Error while replaying file: {0}", e.Message);
+        }
+    
+        if (_deleteFileWhenDone)
+        {
+            foreach (string deleteFilePath in replayFiles)
+            {
+                if (File.Exists(deleteFilePath))
+                {
+                    LogMessage(LogLevel.INFORMATION, "Deleting Replay file: {0}", deleteFilePath);
+                    File.Delete(deleteFilePath);
+                }
+            }
+        }
+    }
 
     private void Join(string symbol, bool tradesOnly)
     {
