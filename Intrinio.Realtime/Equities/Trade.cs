@@ -38,6 +38,19 @@ public readonly struct Trade
 
     public bool IsDarkpool()
     {
-        return MarketCenter.Equals((char)0) || MarketCenter.Equals('D') || MarketCenter.Equals('E') || Char.IsWhiteSpace(MarketCenter);
+        switch (SubProvider)
+        {
+            case SubProvider.CTA_A:
+            case SubProvider.CTA_B:
+            case SubProvider.UTP:
+            case SubProvider.OTC:
+                return MarketCenter.Equals((char)0) || MarketCenter.Equals('D') || MarketCenter.Equals('E') || Char.IsWhiteSpace(MarketCenter); 
+                break;
+            case SubProvider.NASDAQ_BASIC:
+                return MarketCenter.Equals((char)0) || MarketCenter.Equals('L') || MarketCenter.Equals('2') || Char.IsWhiteSpace(MarketCenter); 
+                break;
+            default:
+                return false;
+        }
     }
 }
