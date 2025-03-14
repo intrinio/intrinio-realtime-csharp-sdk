@@ -82,25 +82,12 @@ public class ReplayClient : IOptionsWebSocketClient
         _threads = new Thread[config.NumThreads];
         for (int i = 0; i < _threads.Length; i++)
             _threads[i] = new Thread(ThreadFn);
-        // _replayThread = new Thread(ReplayThreadFn);
+        _replayThread = new Thread(ReplayThreadFn);
 
         config.Validate();
     }
 
-    public ReplayClient(Action<Trade> onTrade, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(onTrade, null, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
-    {
-        
-    }
-
-    public ReplayClient(Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(null, onQuote, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
-    {
-        
-    }
-
-    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(onTrade, onQuote, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
-    {
-        
-    }
+    public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IEnumerable<ISocketPlugIn>? plugIns = null) : this(onTrade, onQuote, onRefresh, onUnusualActivity, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath, plugIns) { }
     #endregion //Constructors
     
     #region Public Methods
@@ -298,6 +285,46 @@ public class ReplayClient : IOptionsWebSocketClient
         //
         // return quote;
     }
+    
+    private Refresh ParseRefresh(ReadOnlySpan<byte> bytes)
+    {
+        throw new NotImplementedException();
+        // int symbolLength = Convert.ToInt32(bytes[2]);
+        // int conditionLength = Convert.ToInt32(bytes[22 + symbolLength]);
+        //
+        // Quote quote = new Quote(
+        //     (QuoteType)(Convert.ToInt32(bytes[0])),
+        //     Encoding.ASCII.GetString(bytes.Slice(3, symbolLength)),
+        //     (Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4)))),
+        //     BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4)),
+        //     DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL)),
+        //     (SubProvider)(Convert.ToInt32(bytes[3 + symbolLength])),
+        //     BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2)),
+        //     conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) : String.Empty
+        // );
+        //
+        // return quote;
+    }
+    
+    private UnusualActivity ParseUnusualActivity(ReadOnlySpan<byte> bytes)
+    {
+        throw new NotImplementedException();
+        // int symbolLength = Convert.ToInt32(bytes[2]);
+        // int conditionLength = Convert.ToInt32(bytes[22 + symbolLength]);
+        //
+        // Quote quote = new Quote(
+        //     (QuoteType)(Convert.ToInt32(bytes[0])),
+        //     Encoding.ASCII.GetString(bytes.Slice(3, symbolLength)),
+        //     (Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4)))),
+        //     BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4)),
+        //     DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL)),
+        //     (SubProvider)(Convert.ToInt32(bytes[3 + symbolLength])),
+        //     BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2)),
+        //     conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) : String.Empty
+        // );
+        //
+        // return quote;
+    }
 
     private void WriteRowToOpenCsvWithoutLock(IEnumerable<string> row)
     {
@@ -365,10 +392,46 @@ public class ReplayClient : IOptionsWebSocketClient
         // yield return quote.MarketCenter.ToString();
         // yield return quote.Condition;   
     }
+    
+    private IEnumerable<string> MapRefreshToRow(Refresh refresh)
+    {
+        throw new NotImplementedException();
+        // yield return quote.Type.ToString();
+        // yield return quote.Symbol;
+        // yield return DoubleRoundSecRule612(quote.Price);
+        // yield return quote.Size.ToString();
+        // yield return quote.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
+        // yield return quote.SubProvider.ToString();
+        // yield return quote.MarketCenter.ToString();
+        // yield return quote.Condition;   
+    }
+    
+    private IEnumerable<string> MapUnusualActivityToRow(UnusualActivity unusualActivity)
+    {
+        throw new NotImplementedException();
+        // yield return quote.Type.ToString();
+        // yield return quote.Symbol;
+        // yield return DoubleRoundSecRule612(quote.Price);
+        // yield return quote.Size.ToString();
+        // yield return quote.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
+        // yield return quote.SubProvider.ToString();
+        // yield return quote.MarketCenter.ToString();
+        // yield return quote.Condition;   
+    }
 
     private void WriteQuoteToCsv(Quote quote)
     {
         WriteRowToOpenCsvWithLock(MapQuoteToRow(quote));
+    }
+    
+    private void WriteRefreshToCsv(Refresh refresh)
+    {
+        WriteRowToOpenCsvWithLock(MapRefreshToRow(refresh));
+    }
+    
+    private void WriteUnusualActivityToCsv(UnusualActivity unusualActivity)
+    {
+        WriteRowToOpenCsvWithLock(MapUnusualActivityToRow(unusualActivity));
     }
 
     private void WriteHeaderRow()
@@ -440,166 +503,189 @@ public class ReplayClient : IOptionsWebSocketClient
         }
     }
 
-    // /// <summary>
-    // /// The results of this should be streamed and not ToList-ed.
-    // /// </summary>
-    // /// <param name="fullFilePath"></param>
-    // /// <param name="byteBufferSize"></param>
-    // /// <returns></returns>
-    // private IEnumerable<Tick> ReplayTickFileWithoutDelay(string fullFilePath, int byteBufferSize, CancellationToken ct)
-    // {
-    //     if (File.Exists(fullFilePath))
-    //     {
-    //         using (FileStream fRead = new FileStream(fullFilePath, FileMode.Open, FileAccess.Read, FileShare.None))
-    //         {
-    //             if (fRead.CanRead)
-    //             {
-    //                 int readResult = fRead.ReadByte(); //This is message type
-    //
-    //                 while (readResult != -1)
-    //                 {
-    //                     if (!ct.IsCancellationRequested)
-    //                     {
-    //                         byte[] eventBuffer = new byte[byteBufferSize];
-    //                         byte[] timeReceivedBuffer = new byte[8];
-    //                         ReadOnlySpan<byte> eventSpanBuffer = new ReadOnlySpan<byte>(eventBuffer);
-    //                         ReadOnlySpan<byte> timeReceivedSpanBuffer = new ReadOnlySpan<byte>(timeReceivedBuffer);
-    //                         eventBuffer[0] = (byte)readResult; //This is message type
-    //                         eventBuffer[1] = (byte)(fRead.ReadByte()); //This is message length, including this and the previous byte.
-    //                         int bytesRead = fRead.Read(eventBuffer, 2, (System.Convert.ToInt32(eventBuffer[1]) - 2)); //read the rest of the message
-    //                         int timeBytesRead = fRead.Read(timeReceivedBuffer, 0, 8); //get the time received
-    //                         DateTime timeReceived = ParseTimeReceived(timeReceivedSpanBuffer);
-    //
-    //                         switch ((MessageType)(Convert.ToInt32(eventBuffer[0])))
-    //                         {
-    //                             case MessageType.Trade:
-    //                                 Trade trade = ParseTrade(eventSpanBuffer);
-    //                                 if (_channels.Contains(new Channel(LobbyName, true)) 
-    //                                     || _channels.Contains(new Channel(LobbyName, false)) 
-    //                                     || _channels.Contains(new Channel(trade.Contract, true)) 
-    //                                     || _channels.Contains(new Channel(trade.Contract, false)))
-    //                                 {
-    //                                     if (_writeToCsv)
-    //                                         WriteTradeToCsv(trade);
-    //                                     yield return new Tick(timeReceived, trade, null);
-    //                                 }
-    //                                 break;
-    //                             case MessageType.Ask:
-    //                             case MessageType.Bid:
-    //                                 Quote quote = ParseQuote(eventSpanBuffer);
-    //                                 if (_channels.Contains (new Channel(LobbyName, false)) || _channels.Contains (new Channel(quote.Contract, false)))
-    //                                 {
-    //                                     if (_writeToCsv)
-    //                                         WriteQuoteToCsv(quote);
-    //                                     yield return new Tick(timeReceived, null, quote);
-    //                                 }
-    //                                 break;
-    //                             default:
-    //                                 LogMessage(LogLevel.ERROR, "Invalid MessageType: {0}", eventBuffer[0]);
-    //                                 break;
-    //                         }
-    //
-    //                         //Set up the next iteration
-    //                         readResult = fRead.ReadByte();
-    //                     }
-    //                     else
-    //                         readResult = -1;
-    //                 }
-    //             }
-    //             else
-    //                 throw new FileLoadException("Unable to read replay file.");
-    //         }
-    //     }
-    //     else
-    //     {
-    //         yield break;
-    //     }
-    // }
+    /// <summary>
+    /// The results of this should be streamed and not ToList-ed.
+    /// </summary>
+    /// <param name="fullFilePath"></param>
+    /// <param name="byteBufferSize"></param>
+    /// <returns></returns>
+    private IEnumerable<Tick> ReplayTickFileWithoutDelay(string fullFilePath, int byteBufferSize, CancellationToken ct)
+    {
+        if (File.Exists(fullFilePath))
+        {
+            using (FileStream fRead = new FileStream(fullFilePath, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                if (fRead.CanRead)
+                {
+                    int readResult = fRead.ReadByte(); //This is message type
+    
+                    while (readResult != -1)
+                    {
+                        if (!ct.IsCancellationRequested)
+                        {
+                            byte[] eventBuffer = new byte[byteBufferSize];
+                            byte[] timeReceivedBuffer = new byte[8];
+                            ReadOnlySpan<byte> eventSpanBuffer = new ReadOnlySpan<byte>(eventBuffer);
+                            ReadOnlySpan<byte> timeReceivedSpanBuffer = new ReadOnlySpan<byte>(timeReceivedBuffer);
+                            eventBuffer[0] = (byte)readResult; //This is message type
+                            eventBuffer[1] = (byte)(fRead.ReadByte()); //This is message length, including this and the previous byte.
+                            int bytesRead = fRead.Read(eventBuffer, 2, (System.Convert.ToInt32(eventBuffer[1]) - 2)); //read the rest of the message
+                            int timeBytesRead = fRead.Read(timeReceivedBuffer, 0, 8); //get the time received
+                            DateTime timeReceived = ParseTimeReceived(timeReceivedSpanBuffer);
+    
+                            switch ((MessageType)(Convert.ToInt32(eventBuffer[0])))
+                            {
+                                case MessageType.Trade:
+                                    Trade trade = ParseTrade(eventSpanBuffer);
+                                    if (_channels.Contains(new Channel(LobbyName, true)) 
+                                        || _channels.Contains(new Channel(LobbyName, false)) 
+                                        || _channels.Contains(new Channel(trade.Contract, true)) 
+                                        || _channels.Contains(new Channel(trade.Contract, false)))
+                                    {
+                                        if (_writeToCsv)
+                                            WriteTradeToCsv(trade);
+                                        yield return new Tick(timeReceived, trade, null, null, null);
+                                    }
+                                    break;
+                                case MessageType.Quote:
+                                    Quote quote = ParseQuote(eventSpanBuffer);
+                                    if (_channels.Contains (new Channel(LobbyName, false)) || _channels.Contains (new Channel(quote.Contract, false)))
+                                    {
+                                        if (_writeToCsv)
+                                            WriteQuoteToCsv(quote);
+                                        yield return new Tick(timeReceived, null, quote, null, null);
+                                    }
+                                    break;
+                                case MessageType.Refresh:
+                                    Refresh refresh = ParseRefresh(eventSpanBuffer);
+                                    if (_channels.Contains(new Channel(LobbyName, true)) 
+                                        || _channels.Contains(new Channel(LobbyName, false)) 
+                                        || _channels.Contains(new Channel(refresh.Contract, true)) 
+                                        || _channels.Contains(new Channel(refresh.Contract, false)))
+                                    {
+                                        if (_writeToCsv)
+                                            WriteRefreshToCsv(refresh);
+                                        yield return new Tick(timeReceived, null, null, refresh, null);
+                                    }
+                                    break;
+                                case MessageType.UnusualActivity:
+                                    UnusualActivity unusualActivity = ParseUnusualActivity(eventSpanBuffer);
+                                    if (_channels.Contains(new Channel(LobbyName, true)) 
+                                        || _channels.Contains(new Channel(LobbyName, false)) 
+                                        || _channels.Contains(new Channel(unusualActivity.Contract, true)) 
+                                        || _channels.Contains(new Channel(unusualActivity.Contract, false)))
+                                    {
+                                        if (_writeToCsv)
+                                            WriteUnusualActivityToCsv(unusualActivity);
+                                        yield return new Tick(timeReceived, null, null, null, unusualActivity);
+                                    }
+                                    break;
+                                default:
+                                    LogMessage(LogLevel.ERROR, "Invalid MessageType: {0}", eventBuffer[0]);
+                                    break;
+                            }
+    
+                            //Set up the next iteration
+                            readResult = fRead.ReadByte();
+                        }
+                        else
+                            readResult = -1;
+                    }
+                }
+                else
+                    throw new FileLoadException("Unable to read replay file.");
+            }
+        }
+        else
+        {
+            yield break;
+        }
+    }
 
-    // /// <summary>
-    // /// The results of this should be streamed and not ToList-ed.
-    // /// </summary>
-    // /// <param name="fullFilePath"></param>
-    // /// <param name="byteBufferSize"></param>
-    // /// <returns></returns>returns
-    // private IEnumerable<Tick> ReplayTickFileWithDelay(string fullFilePath, int byteBufferSize, CancellationToken ct)
-    // {
-    //     long start = DateTime.UtcNow.Ticks;
-    //     long offset = 0L;
-    //     foreach (Tick tick in ReplayTickFileWithoutDelay(fullFilePath, byteBufferSize, ct))
-    //     {
-    //         if (offset == 0L)
-    //             offset = start - tick.TimeReceived().Ticks;
-    //
-    //         if (!ct.IsCancellationRequested)
-    //         {
-    //             SpinWait.SpinUntil(() => (tick.TimeReceived().Ticks + offset) <= DateTime.UtcNow.Ticks);
-    //             yield return tick;
-    //         }
-    //     }
-    // }
+    /// <summary>
+    /// The results of this should be streamed and not ToList-ed.
+    /// </summary>
+    /// <param name="fullFilePath"></param>
+    /// <param name="byteBufferSize"></param>
+    /// <returns></returns>returns
+    private IEnumerable<Tick> ReplayTickFileWithDelay(string fullFilePath, int byteBufferSize, CancellationToken ct)
+    {
+        long start = DateTime.UtcNow.Ticks;
+        long offset = 0L;
+        foreach (Tick tick in ReplayTickFileWithoutDelay(fullFilePath, byteBufferSize, ct))
+        {
+            if (offset == 0L)
+                offset = start - tick.TimeReceived.Ticks;
+    
+            if (!ct.IsCancellationRequested)
+            {
+                SpinWait.SpinUntil(() => (tick.TimeReceived.Ticks + offset) <= DateTime.UtcNow.Ticks);
+                yield return tick;
+            }
+        }
+    }
 
-    // private string MapSubProviderToApiValue(SubProvider subProvider)
-    // {
-    //     switch (subProvider)
-    //     {
-    //         case SubProvider.IEX: return "iex";
-    //         case SubProvider.UTP: return "utp_delayed";
-    //         case SubProvider.CTA_A: return "cta_a_delayed";
-    //         case SubProvider.CTA_B: return "cta_b_delayed";
-    //         case SubProvider.OTC: return "otc_delayed";
-    //         case SubProvider.NASDAQ_BASIC: return "nasdaq_basic";
-    //         default: return "iex";
-    //     }
-    // }
+    private string MapSubProviderToApiValue(Provider subProvider)
+    {
+        switch (subProvider)
+        {
+            case Provider.NONE: return String.Empty;
+            case Provider.OPRA: return "opra";
+            case Provider.MANUAL: return "manual";
+            default: return "opra";
+        }
+    }
 
-    // private SubProvider[] MapProviderToSubProviders(Intrinio.Realtime.Equities.Provider provider)
-    // {
-    //     switch (provider)
-    //     {
-    //         case Provider.NONE: return Array.Empty<SubProvider>();
-    //         case Provider.MANUAL: return Array.Empty<SubProvider>();
-    //         case Provider.REALTIME: return new SubProvider[]{SubProvider.IEX};
-    //         case Provider.DELAYED_SIP: return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
-    //         case Provider.NASDAQ_BASIC: return new SubProvider[]{SubProvider.NASDAQ_BASIC};
-    //         default: return new SubProvider[0];
-    //     }
-    // }
+    private Provider[] MapProviderToSubProviders(Intrinio.Realtime.Options.Provider provider)
+    {
+        return new Provider[] { provider};
+        // switch (provider)
+        // {
+        //     case Provider.NONE: return Array.Empty<SubProvider>();
+        //     case Provider.MANUAL: return Array.Empty<SubProvider>();
+        //     case Provider.REALTIME: return new SubProvider[]{SubProvider.IEX};
+        //     case Provider.DELAYED_SIP: return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
+        //     case Provider.NASDAQ_BASIC: return new SubProvider[]{SubProvider.NASDAQ_BASIC};
+        //     default: return new SubProvider[0];
+        // }
+    }
 
-    // private string FetchReplayFile(SubProvider subProvider)
-    // {
-    //     Intrinio.SDK.Api.SecurityApi api = new Intrinio.SDK.Api.SecurityApi();
-    //     
-    //     if (!api.Configuration.ApiKey.ContainsKey("api_key"))
-    //         api.Configuration.ApiKey.Add("api_key", _config.ApiKey);
-    //
-    //     try
-    //     {
-    //         SecurityReplayFileResult result = api.GetSecurityReplayFile(MapSubProviderToApiValue(subProvider), _date);
-    //         string decodedUrl = result.Url.Replace(@"\u0026", "&");
-    //         string tempDir = System.IO.Path.GetTempPath();
-    //         string fileName = Path.Combine(tempDir, result.Name);
-    //
-    //         using (FileStream outputFile = new FileStream(fileName,System.IO.FileMode.Create))
-    //         using (HttpClient httpClient = new HttpClient())
-    //         {
-    //             httpClient.Timeout = TimeSpan.FromHours(1);
-    //             httpClient.BaseAddress = new Uri(decodedUrl);
-    //             using (HttpResponseMessage response = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result)
-    //             using (Stream streamToReadFrom = response.Content.ReadAsStreamAsync().Result)
-    //             {
-    //                 streamToReadFrom.CopyTo(outputFile);
-    //             }
-    //         }
-    //         
-    //         return fileName;
-    //     }
-    //     catch (Exception e)
-    //     {
-    //         LogMessage(LogLevel.ERROR, "Error while fetching {0} file: {1}", subProvider.ToString(), e.Message);
-    //         return null;
-    //     }
-    // }
+    private string FetchReplayFile(Provider subProvider)
+    {
+        throw new NotImplementedException();
+        
+        //Intrinio.SDK.Api.OptionsApi api = new Intrinio.SDK.Api.OptionsApi();
+        //
+        // if (!api.Configuration.ApiKey.ContainsKey("api_key"))
+        //     api.Configuration.ApiKey.Add("api_key", _config.ApiKey);
+    
+        try
+        {
+            // OptionsReplayFileResult result = api.GetOptionsReplayFile(MapSubProviderToApiValue(subProvider), _date);
+            // string decodedUrl = result.Url.Replace(@"\u0026", "&");
+            // string tempDir = System.IO.Path.GetTempPath();
+            // string fileName = Path.Combine(tempDir, result.Name);
+            
+            // using (FileStream outputFile = new FileStream(fileName,System.IO.FileMode.Create))
+            // using (HttpClient httpClient = new HttpClient())
+            // {
+            //     httpClient.Timeout = TimeSpan.FromHours(1);
+            //     httpClient.BaseAddress = new Uri(decodedUrl);
+            //     using (HttpResponseMessage response = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result)
+            //     using (Stream streamToReadFrom = response.Content.ReadAsStreamAsync().Result)
+            //     {
+            //         streamToReadFrom.CopyTo(outputFile);
+            //     }
+            // }
+            
+            //return fileName;
+        }
+        catch (Exception e)
+        {
+            LogMessage(LogLevel.ERROR, "Error while fetching {0} file: {1}", subProvider.ToString(), e.Message);
+            return null;
+        }
+    }
 
     private void FillNextTicks(IEnumerator<Tick>[] enumerators, Tick[] nextTicks)
     {
@@ -680,7 +766,7 @@ public class ReplayClient : IOptionsWebSocketClient
     private void ReplayThreadFn()
     {
         CancellationToken ct = _ctSource.Token;
-        SubProvider[] subProviders = MapProviderToSubProviders(_config.Provider);
+        Provider[] subProviders = MapProviderToSubProviders(_config.Provider);
         string[] replayFiles = new string[subProviders.Length];
         IEnumerable<Tick>[] allTicks = new IEnumerable<Tick>[subProviders.Length];
     
