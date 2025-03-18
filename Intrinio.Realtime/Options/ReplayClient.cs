@@ -1,4 +1,5 @@
 // using System.Linq;
+// using System.Runtime.CompilerServices;
 //
 // namespace Intrinio.Realtime.Options;
 //
@@ -40,6 +41,8 @@
 //     private bool _useOnQuote { get {return !(ReferenceEquals(OnQuote, null));} }
 //     private bool _useOnRefresh { get {return !(ReferenceEquals(OnRefresh, null));} }
 //     private bool _useOnUnusualActivity { get {return !(ReferenceEquals(OnUnusualActivity, null));} }
+//     private readonly ConcurrentBag<ISocketPlugIn> _plugIns;
+//     public IEnumerable<ISocketPlugIn> PlugIns { get { return _plugIns; } }
 //
 //     private readonly string _logPrefix;
 //     private readonly object _csvLock;
@@ -52,10 +55,13 @@
 //     #endregion //Data Members
 //
 //     #region Constructors
-//     public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, Config config, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath)
+//     public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity, Config config, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IEnumerable<ISocketPlugIn>? plugIns = null)
 //     {
+//         _plugIns = ReferenceEquals(plugIns, null) ? new ConcurrentBag<ISocketPlugIn>() : new ConcurrentBag<ISocketPlugIn>(plugIns);
 //         this.OnTrade = onTrade;
 //         this.OnQuote = onQuote;
+//         this.OnRefresh = onRefresh;
+//         this.OnUnusualActivity = onUnusualActivity;
 //         this._config = config;
 //         this._date = date;
 //         this._withSimulatedDelay = withSimulatedDelay;
@@ -77,25 +83,12 @@
 //         _threads = new Thread[config.NumThreads];
 //         for (int i = 0; i < _threads.Length; i++)
 //             _threads[i] = new Thread(ThreadFn);
-//         // _replayThread = new Thread(ReplayThreadFn);
+//         _replayThread = new Thread(ReplayThreadFn);
 //
 //         config.Validate();
 //     }
 //
-//     public ReplayClient(Action<Trade> onTrade, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(onTrade, null, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
-//     {
-//         
-//     }
-//
-//     public ReplayClient(Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(null, onQuote, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
-//     {
-//         
-//     }
-//
-//     public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath) : this(onTrade, onQuote, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath)
-//     {
-//         
-//     }
+//     public ReplayClient(Action<Trade> onTrade, Action<Quote> onQuote, Action<Refresh> onRefresh, Action<UnusualActivity> onUnusualActivity, DateTime date, bool withSimulatedDelay, bool deleteFileWhenDone, bool writeToCsv, string csvFilePath, IEnumerable<ISocketPlugIn>? plugIns = null) : this(onTrade, onQuote, onRefresh, onUnusualActivity, Config.LoadConfig(), date, withSimulatedDelay, deleteFileWhenDone, writeToCsv, csvFilePath, plugIns) { }
 //     #endregion //Constructors
 //     
 //     #region Public Methods
@@ -233,6 +226,20 @@
 //                 break;
 //         }
 //     }
+//
+//     public bool AddPlugin(ISocketPlugIn plugin)
+//     {
+//         try
+//         {
+//             _plugIns.Add(plugin);
+//             return true;
+//         }
+//         catch (Exception e)
+//         {
+//             return false;
+//         }
+//     }
+//
 //     #endregion //Public Methods
 //     
 //     #region Private Methods
@@ -240,44 +247,187 @@
 //     {
 //         return DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes) / 100UL));
 //     }
+//     
+//     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+//     private string FormatContract(ReadOnlySpan<byte> alternateFormattedChars)
+//     {
+//         //Transform from server format to normal format
+//         //From this: AAPL_201016C100.00 or ABC_201016C100.003
+//         //Patch: some upstream contracts now have 4 decimals. We are truncating the last decimal for now to fit in this format.
+//         //To this:   AAPL__201016C00100000 or ABC___201016C00100003
+//         //  strike: 5 whole digits, 3 decimal digits
+//         
+//         Span<byte> contractChars = stackalloc byte[21];
+//         contractChars[0] = (byte)'_';
+//         contractChars[1] = (byte)'_';
+//         contractChars[2] = (byte)'_';
+//         contractChars[3] = (byte)'_';
+//         contractChars[4] = (byte)'_';
+//         contractChars[5] = (byte)'_';
+//         contractChars[6] = (byte)'2';
+//         contractChars[7] = (byte)'2';
+//         contractChars[8] = (byte)'0';
+//         contractChars[9] = (byte)'1';
+//         contractChars[10] = (byte)'0';
+//         contractChars[11] = (byte)'1';
+//         contractChars[12] = (byte)'C';
+//         contractChars[13] = (byte)'0';
+//         contractChars[14] = (byte)'0';
+//         contractChars[15] = (byte)'0';
+//         contractChars[16] = (byte)'0';
+//         contractChars[17] = (byte)'0';
+//         contractChars[18] = (byte)'0';
+//         contractChars[19] = (byte)'0';
+//         contractChars[20] = (byte)'0';
 //
+//         int underscoreIndex = alternateFormattedChars.IndexOf((byte)'_');
+//         int decimalIndex = alternateFormattedChars.Slice(9).IndexOf((byte)'.') + 9; //ignore decimals in tickersymbol
+//
+//         alternateFormattedChars.Slice(0, underscoreIndex).CopyTo(contractChars); //copy symbol        
+//         alternateFormattedChars.Slice(underscoreIndex + 1, 6).CopyTo(contractChars.Slice(6)); //copy date
+//         alternateFormattedChars.Slice(underscoreIndex + 7, 1).CopyTo(contractChars.Slice(12)); //copy put/call
+//         alternateFormattedChars.Slice(underscoreIndex + 8, decimalIndex - underscoreIndex - 8).CopyTo(contractChars.Slice(18 - (decimalIndex - underscoreIndex - 8))); //whole number copy
+//         alternateFormattedChars.Slice(decimalIndex + 1, Math.Min(3, alternateFormattedChars.Length - decimalIndex - 1)).CopyTo(contractChars.Slice(18)); //decimal number copy. Truncate decimals over 3 digits for now.
+//
+//         return Encoding.ASCII.GetString(contractChars);
+//     }
+//     
+//     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+//     private Exchange ParseExchange(char c)
+//     {
+//         switch (c)
+//         {
+//             case 'A':
+//             case 'a':    
+//                 return Exchange.NYSE_AMERICAN;
+//             case 'B':
+//             case 'b':    
+//                 return Exchange.BOSTON;
+//             case 'C':
+//             case 'c':    
+//                 return Exchange.CBOE;
+//             case 'D':
+//             case 'd':    
+//                 return Exchange.MIAMI_EMERALD;
+//             case 'E':
+//             case 'e':    
+//                 return Exchange.BATS_EDGX;
+//             case 'H':
+//             case 'h':    
+//                 return Exchange.ISE_GEMINI;
+//             case 'I':
+//             case 'i':    
+//                 return Exchange.ISE;
+//             case 'J':
+//             case 'j':    
+//                 return Exchange.MERCURY;
+//             case 'M':
+//             case 'm':    
+//                 return Exchange.MIAMI;
+//             case 'N':
+//             case 'n':
+//             case 'P':
+//             case 'p':  
+//                 return Exchange.NYSE_ARCA;
+//             case 'O':
+//             case 'o':    
+//                 return Exchange.MIAMI_PEARL;
+//             case 'Q':
+//             case 'q':    
+//                 return Exchange.NASDAQ;
+//             case 'S':
+//             case 's':    
+//                 return Exchange.MIAX_SAPPHIRE;
+//             case 'T':
+//             case 't':    
+//                 return Exchange.NASDAQ_BX;
+//             case 'U':
+//             case 'u':    
+//                 return Exchange.MEMX;
+//             case 'W':
+//             case 'w':    
+//                 return Exchange.CBOE_C2;
+//             case 'X':
+//             case 'x':    
+//                 return Exchange.PHLX;
+//             case 'Z':
+//             case 'z':    
+//                 return Exchange.BATS_BZX;
+//             default:
+//                 return Exchange.UNKNOWN;
+//         }
+//     }
+//
+//     [MethodImpl(MethodImplOptions.AggressiveInlining)]
 //     private Trade ParseTrade(ReadOnlySpan<byte> bytes)
 //     {
 //         throw new NotImplementedException();
-//         // int symbolLength = Convert.ToInt32(bytes[2]);
-//         // int conditionLength = Convert.ToInt32(bytes[26 + symbolLength]);
-//         // Trade trade = new Trade(
-//         //     Encoding.ASCII.GetString(bytes.Slice(3, symbolLength)),
-//         //     Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4))),
-//         //     BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4)),
-//         //     BitConverter.ToUInt32(bytes.Slice(22 + symbolLength, 4)),
-//         //     DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL)),
-//         //     (SubProvider)Convert.ToInt32(bytes[3 + symbolLength]),
-//         //     BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2)),
-//         //     conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(27 + symbolLength, conditionLength)) : String.Empty
-//         // );
-//         //
-//         // return trade;
 //     }
 //
+//     [MethodImpl(MethodImplOptions.AggressiveInlining)]
 //     private Quote ParseQuote(ReadOnlySpan<byte> bytes)
 //     {
 //         throw new NotImplementedException();
-//         // int symbolLength = Convert.ToInt32(bytes[2]);
-//         // int conditionLength = Convert.ToInt32(bytes[22 + symbolLength]);
-//         //
-//         // Quote quote = new Quote(
-//         //     (QuoteType)(Convert.ToInt32(bytes[0])),
-//         //     Encoding.ASCII.GetString(bytes.Slice(3, symbolLength)),
-//         //     (Convert.ToDouble(BitConverter.ToSingle(bytes.Slice(6 + symbolLength, 4)))),
-//         //     BitConverter.ToUInt32(bytes.Slice(10 + symbolLength, 4)),
-//         //     DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes.Slice(14 + symbolLength, 8)) / 100UL)),
-//         //     (SubProvider)(Convert.ToInt32(bytes[3 + symbolLength])),
-//         //     BitConverter.ToChar(bytes.Slice(4 + symbolLength, 2)),
-//         //     conditionLength > 0 ? Encoding.ASCII.GetString(bytes.Slice(23 + symbolLength, conditionLength)) : String.Empty
-//         // );
-//         //
-//         // return quote;
+//     }
+//     
+//     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+//     private Refresh ParseRefresh(ReadOnlySpan<byte> bytes)
+//     {
+//         throw new NotImplementedException();
+//     }
+//     
+//     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+//     private UnusualActivity ParseUnusualActivity(ReadOnlySpan<byte> bytes)
+//     {
+//         //// byte 0       | type | byte
+//         //// byte 1       | messageLength (includes bytes 0 and 1) | byte
+//         //// byte 2       | contractLength | byte
+//         //// bytes [3...] | contract | string (ascii)
+//         //// next byte    | unusualActivityType | char
+//         //// next byte    | sentiment | char
+//         //// next 8 bytes | totalValue | float64
+//         //// next 4 bytes | totalSize | uint32
+//         //// next 8 bytes | averagePrice | float64
+//         //// next 8 bytes | askPriceAtExecution | float64
+//         //// next 8 bytes | bidPriceAtExecution | float64
+//         //// next 8 bytes | underlyingPriceAtExecution | float64
+//         //// next 8 bytes | timestamp | float64
+//
+//         byte priceType = (byte)4;
+//         int i = 0;
+//         Options.MessageType type = (Options.MessageType)bytes[i++];
+//         int messageLength = (int)bytes[i++];
+//         int contractLength = (int)bytes[i++];
+//         string contract = Encoding.ASCII.GetString(bytes.Slice(i, contractLength));
+//         i += contractLength;
+//         Options.UAType unusualActivityType = (Options.UAType)bytes[i++];
+//         Options.UASentiment sentiment = (Options.UASentiment)bytes[i++];
+//         double totalValue = BitConverter.ToDouble(bytes.Slice(i, 8));
+//         i += 8;
+//         UInt32 totalSize = BitConverter.ToUInt32(bytes.Slice(i, 4));
+//         i += 4;
+//         double averagePrice = BitConverter.ToDouble(bytes.Slice(i, 8));
+//         i += 8;
+//         double askPriceAtExecution = BitConverter.ToDouble(bytes.Slice(i, 8));
+//         i += 8;
+//         double bidPriceAtExecution = BitConverter.ToDouble(bytes.Slice(i, 8));
+//         i += 8;
+//         double underlyingPriceAtExecution = BitConverter.ToDouble(bytes.Slice(i, 8));
+//         i += 8;
+//         ulong timestamp = Convert.ToUInt64(BitConverter.ToDouble(bytes.Slice(i, 8)) * 1_000_000_000.0D);
+//
+//         return new UnusualActivity(contract, 
+//             unusualActivityType, 
+//             sentiment, 
+//             priceType, 
+//             priceType, 
+//             Convert.ToUInt64(totalValue * 10_000D), 
+//             totalSize, 
+//             Convert.ToInt32(averagePrice * 10_000D), 
+//             Convert.ToInt32(askPriceAtExecution * 10_000D), 
+//             Convert.ToInt32(bidPriceAtExecution * 10_000D), 
+//             Convert.ToInt32(underlyingPriceAtExecution * 10_000D), 
+//             timestamp);
 //     }
 //
 //     private void WriteRowToOpenCsvWithoutLock(IEnumerable<string> row)
@@ -346,10 +496,46 @@
 //         // yield return quote.MarketCenter.ToString();
 //         // yield return quote.Condition;   
 //     }
+//     
+//     private IEnumerable<string> MapRefreshToRow(Refresh refresh)
+//     {
+//         throw new NotImplementedException();
+//         // yield return quote.Type.ToString();
+//         // yield return quote.Symbol;
+//         // yield return DoubleRoundSecRule612(quote.Price);
+//         // yield return quote.Size.ToString();
+//         // yield return quote.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
+//         // yield return quote.SubProvider.ToString();
+//         // yield return quote.MarketCenter.ToString();
+//         // yield return quote.Condition;   
+//     }
+//     
+//     private IEnumerable<string> MapUnusualActivityToRow(UnusualActivity unusualActivity)
+//     {
+//         throw new NotImplementedException();
+//         // yield return quote.Type.ToString();
+//         // yield return quote.Symbol;
+//         // yield return DoubleRoundSecRule612(quote.Price);
+//         // yield return quote.Size.ToString();
+//         // yield return quote.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffK");
+//         // yield return quote.SubProvider.ToString();
+//         // yield return quote.MarketCenter.ToString();
+//         // yield return quote.Condition;   
+//     }
 //
 //     private void WriteQuoteToCsv(Quote quote)
 //     {
 //         WriteRowToOpenCsvWithLock(MapQuoteToRow(quote));
+//     }
+//     
+//     private void WriteRefreshToCsv(Refresh refresh)
+//     {
+//         WriteRowToOpenCsvWithLock(MapRefreshToRow(refresh));
+//     }
+//     
+//     private void WriteUnusualActivityToCsv(UnusualActivity unusualActivity)
+//     {
+//         WriteRowToOpenCsvWithLock(MapUnusualActivityToRow(unusualActivity));
 //     }
 //
 //     private void WriteHeaderRow()
@@ -366,21 +552,46 @@
 //             {
 //                 if (_data.TryDequeue(out Tick datum))
 //                 {
-//                     if (datum.IsTrade())
+//                     switch (datum.MessageType())
 //                     {
-//                         if (_useOnTrade)
-//                         {
-//                             Interlocked.Increment(ref _dataTradeCount);
-//                             OnTrade.Invoke(datum.Trade);
-//                         }
-//                     }
-//                     else
-//                     {
-//                         if (_useOnQuote)
-//                         {
-//                             Interlocked.Increment(ref _dataQuoteCount);
-//                             OnQuote.Invoke(datum.Quote);
-//                         }
+//                         case MessageType.Trade:
+//                             if (_useOnTrade)
+//                             {
+//                                 Interlocked.Increment(ref _dataTradeCount);
+//                                 OnTrade.Invoke(datum.Trade);
+//                                 foreach (ISocketPlugIn socketPlugIn in _plugIns)
+//                                     socketPlugIn.OnTrade(datum.Trade);
+//                             }
+//                             break;
+//                         case MessageType.Quote:
+//                             if (_useOnQuote)
+//                             {
+//                                 Interlocked.Increment(ref _dataQuoteCount);
+//                                 OnQuote.Invoke(datum.Quote);
+//                                 foreach (ISocketPlugIn socketPlugIn in _plugIns)
+//                                     socketPlugIn.OnQuote(datum.Quote);
+//                             }
+//                             break;
+//                         case MessageType.UnusualActivity:
+//                             if (_useOnUnusualActivity)
+//                             {
+//                                 Interlocked.Increment(ref _dataUnusualActivityCount);
+//                                 OnUnusualActivity.Invoke(datum.UnusualActivity);
+//                                 foreach (ISocketPlugIn socketPlugIn in _plugIns)
+//                                     socketPlugIn.OnUnusualActivity(datum.UnusualActivity);
+//                             }
+//                             break;
+//                         case MessageType.Refresh:
+//                             if (_useOnRefresh)
+//                             {
+//                                 Interlocked.Increment(ref _dataRefreshCount);
+//                                 OnRefresh.Invoke(datum.Refresh);
+//                                 foreach (ISocketPlugIn socketPlugIn in _plugIns)
+//                                     socketPlugIn.OnRefresh(datum.Refresh);
+//                             }
+//                             break;
+//                         default:
+//                             break;
 //                     }
 //                 }
 //                 else
@@ -395,167 +606,197 @@
 //             }
 //         }
 //     }
+//     
+//     private DateTime ParseTimeReceived(double secondsSinceEpoch)
+//     {
+//         return DateTime.UnixEpoch + TimeSpan.FromSeconds(secondsSinceEpoch);
+//     }
 //
-//     // /// <summary>
-//     // /// The results of this should be streamed and not ToList-ed.
-//     // /// </summary>
-//     // /// <param name="fullFilePath"></param>
-//     // /// <param name="byteBufferSize"></param>
-//     // /// <returns></returns>
-//     // private IEnumerable<Tick> ReplayTickFileWithoutDelay(string fullFilePath, int byteBufferSize, CancellationToken ct)
-//     // {
-//     //     if (File.Exists(fullFilePath))
-//     //     {
-//     //         using (FileStream fRead = new FileStream(fullFilePath, FileMode.Open, FileAccess.Read, FileShare.None))
-//     //         {
-//     //             if (fRead.CanRead)
-//     //             {
-//     //                 int readResult = fRead.ReadByte(); //This is message type
-//     //
-//     //                 while (readResult != -1)
-//     //                 {
-//     //                     if (!ct.IsCancellationRequested)
-//     //                     {
-//     //                         byte[] eventBuffer = new byte[byteBufferSize];
-//     //                         byte[] timeReceivedBuffer = new byte[8];
-//     //                         ReadOnlySpan<byte> eventSpanBuffer = new ReadOnlySpan<byte>(eventBuffer);
-//     //                         ReadOnlySpan<byte> timeReceivedSpanBuffer = new ReadOnlySpan<byte>(timeReceivedBuffer);
-//     //                         eventBuffer[0] = (byte)readResult; //This is message type
-//     //                         eventBuffer[1] = (byte)(fRead.ReadByte()); //This is message length, including this and the previous byte.
-//     //                         int bytesRead = fRead.Read(eventBuffer, 2, (System.Convert.ToInt32(eventBuffer[1]) - 2)); //read the rest of the message
-//     //                         int timeBytesRead = fRead.Read(timeReceivedBuffer, 0, 8); //get the time received
-//     //                         DateTime timeReceived = ParseTimeReceived(timeReceivedSpanBuffer);
-//     //
-//     //                         switch ((MessageType)(Convert.ToInt32(eventBuffer[0])))
-//     //                         {
-//     //                             case MessageType.Trade:
-//     //                                 Trade trade = ParseTrade(eventSpanBuffer);
-//     //                                 if (_channels.Contains(new Channel(LobbyName, true)) 
-//     //                                     || _channels.Contains(new Channel(LobbyName, false)) 
-//     //                                     || _channels.Contains(new Channel(trade.Contract, true)) 
-//     //                                     || _channels.Contains(new Channel(trade.Contract, false)))
-//     //                                 {
-//     //                                     if (_writeToCsv)
-//     //                                         WriteTradeToCsv(trade);
-//     //                                     yield return new Tick(timeReceived, trade, null);
-//     //                                 }
-//     //                                 break;
-//     //                             case MessageType.Ask:
-//     //                             case MessageType.Bid:
-//     //                                 Quote quote = ParseQuote(eventSpanBuffer);
-//     //                                 if (_channels.Contains (new Channel(LobbyName, false)) || _channels.Contains (new Channel(quote.Contract, false)))
-//     //                                 {
-//     //                                     if (_writeToCsv)
-//     //                                         WriteQuoteToCsv(quote);
-//     //                                     yield return new Tick(timeReceived, null, quote);
-//     //                                 }
-//     //                                 break;
-//     //                             default:
-//     //                                 LogMessage(LogLevel.ERROR, "Invalid MessageType: {0}", eventBuffer[0]);
-//     //                                 break;
-//     //                         }
-//     //
-//     //                         //Set up the next iteration
-//     //                         readResult = fRead.ReadByte();
-//     //                     }
-//     //                     else
-//     //                         readResult = -1;
-//     //                 }
-//     //             }
-//     //             else
-//     //                 throw new FileLoadException("Unable to read replay file.");
-//     //         }
-//     //     }
-//     //     else
-//     //     {
-//     //         yield break;
-//     //     }
-//     // }
+//     /// <summary>
+//     /// The results of this should be streamed and not ToList-ed.
+//     /// </summary>
+//     /// <param name="fullFilePath"></param>
+//     /// <param name="byteBufferSize"></param>
+//     /// <returns></returns>
+//     private IEnumerable<Tick> ReplayTickFileWithoutDelay(string fullFilePath, int byteBufferSize, CancellationToken ct)
+//     {
+//         if (File.Exists(fullFilePath))
+//         {
+//             using (FileStream fRead = new FileStream(fullFilePath, FileMode.Open, FileAccess.Read, FileShare.None))
+//             {
+//                 if (fRead.CanRead)
+//                 {
+//                     int readResult = fRead.ReadByte(); //This is message type
+//     
+//                     while (readResult != -1)
+//                     {
+//                         if (!ct.IsCancellationRequested)
+//                         {
+//                             byte[] eventBuffer = new byte[byteBufferSize];
+//                             byte[] timeReceivedBuffer = new byte[8];
+//                             
+//                             ReadOnlySpan<byte> timeReceivedSpanBuffer = new ReadOnlySpan<byte>(timeReceivedBuffer);
+//                             eventBuffer[0] = (byte)readResult; //This is message type
+//                             eventBuffer[1] = (byte)(fRead.ReadByte()); //This is message length, including this and the previous byte.
+//                             ReadOnlySpan<byte> eventSpanBuffer = new ReadOnlySpan<byte>(eventBuffer, 0, eventBuffer[1]);
+//                             int bytesRead = fRead.Read(eventBuffer, 2, (System.Convert.ToInt32(eventBuffer[1]) - 2)); //read the rest of the message
+//                             int timeBytesRead = fRead.Read(timeReceivedBuffer, 0, 8); //get the time received
+//                             DateTime timeReceived = ParseTimeReceived(timeReceivedSpanBuffer);
+//     
+//                             switch ((MessageType)(Convert.ToInt32(eventBuffer[0])))
+//                             {
+//                                 case MessageType.Trade:
+//                                     Trade trade = ParseTrade(eventSpanBuffer);
+//                                     if (_channels.Contains(new Channel(LobbyName, true)) 
+//                                         || _channels.Contains(new Channel(LobbyName, false)) 
+//                                         || _channels.Contains(new Channel(trade.Contract, true)) 
+//                                         || _channels.Contains(new Channel(trade.Contract, false)))
+//                                     {
+//                                         if (_writeToCsv)
+//                                             WriteTradeToCsv(trade);
+//                                         yield return new Tick(timeReceived, trade, null, null, null);
+//                                     }
+//                                     break;
+//                                 case MessageType.Quote:
+//                                     Quote quote = ParseQuote(eventSpanBuffer);
+//                                     if (_channels.Contains (new Channel(LobbyName, false)) || _channels.Contains (new Channel(quote.Contract, false)))
+//                                     {
+//                                         if (_writeToCsv)
+//                                             WriteQuoteToCsv(quote);
+//                                         yield return new Tick(timeReceived, null, quote, null, null);
+//                                     }
+//                                     break;
+//                                 case MessageType.Refresh:
+//                                     Refresh refresh = ParseRefresh(eventSpanBuffer);
+//                                     if (_channels.Contains(new Channel(LobbyName, true)) 
+//                                         || _channels.Contains(new Channel(LobbyName, false)) 
+//                                         || _channels.Contains(new Channel(refresh.Contract, true)) 
+//                                         || _channels.Contains(new Channel(refresh.Contract, false)))
+//                                     {
+//                                         if (_writeToCsv)
+//                                             WriteRefreshToCsv(refresh);
+//                                         yield return new Tick(timeReceived, null, null, refresh, null);
+//                                     }
+//                                     break;
+//                                 case MessageType.UnusualActivity:
+//                                     UnusualActivity unusualActivity = ParseUnusualActivity(eventSpanBuffer);
+//                                     if (_channels.Contains(new Channel(LobbyName, true)) 
+//                                         || _channels.Contains(new Channel(LobbyName, false)) 
+//                                         || _channels.Contains(new Channel(unusualActivity.Contract, true)) 
+//                                         || _channels.Contains(new Channel(unusualActivity.Contract, false)))
+//                                     {
+//                                         if (_writeToCsv)
+//                                             WriteUnusualActivityToCsv(unusualActivity);
+//                                         
+//                                         yield return new Tick(timeReceived, null, null, null, unusualActivity);
+//                                     }
+//                                     break;
+//                                 default:
+//                                     LogMessage(LogLevel.ERROR, "Invalid MessageType: {0}", eventBuffer[0]);
+//                                     break;
+//                             }
+//     
+//                             //Set up the next iteration
+//                             readResult = fRead.ReadByte();
+//                         }
+//                         else
+//                             readResult = -1;
+//                     }
+//                 }
+//                 else
+//                     throw new FileLoadException("Unable to read replay file.");
+//             }
+//         }
+//         else
+//         {
+//             yield break;
+//         }
+//     }
 //
-//     // /// <summary>
-//     // /// The results of this should be streamed and not ToList-ed.
-//     // /// </summary>
-//     // /// <param name="fullFilePath"></param>
-//     // /// <param name="byteBufferSize"></param>
-//     // /// <returns></returns>returns
-//     // private IEnumerable<Tick> ReplayTickFileWithDelay(string fullFilePath, int byteBufferSize, CancellationToken ct)
-//     // {
-//     //     long start = DateTime.UtcNow.Ticks;
-//     //     long offset = 0L;
-//     //     foreach (Tick tick in ReplayTickFileWithoutDelay(fullFilePath, byteBufferSize, ct))
-//     //     {
-//     //         if (offset == 0L)
-//     //             offset = start - tick.TimeReceived().Ticks;
-//     //
-//     //         if (!ct.IsCancellationRequested)
-//     //         {
-//     //             SpinWait.SpinUntil(() => (tick.TimeReceived().Ticks + offset) <= DateTime.UtcNow.Ticks);
-//     //             yield return tick;
-//     //         }
-//     //     }
-//     // }
+//     /// <summary>
+//     /// The results of this should be streamed and not ToList-ed.
+//     /// </summary>
+//     /// <param name="fullFilePath"></param>
+//     /// <param name="byteBufferSize"></param>
+//     /// <returns></returns>returns
+//     private IEnumerable<Tick> ReplayTickFileWithDelay(string fullFilePath, int byteBufferSize, CancellationToken ct)
+//     {
+//         long start = DateTime.UtcNow.Ticks;
+//         long offset = 0L;
+//         foreach (Tick tick in ReplayTickFileWithoutDelay(fullFilePath, byteBufferSize, ct))
+//         {
+//             if (offset == 0L)
+//                 offset = start - tick.TimeReceived.Ticks;
+//     
+//             if (!ct.IsCancellationRequested)
+//             {
+//                 SpinWait.SpinUntil(() => (tick.TimeReceived.Ticks + offset) <= DateTime.UtcNow.Ticks);
+//                 yield return tick;
+//             }
+//         }
+//     }
 //
-//     // private string MapSubProviderToApiValue(SubProvider subProvider)
-//     // {
-//     //     switch (subProvider)
-//     //     {
-//     //         case SubProvider.IEX: return "iex";
-//     //         case SubProvider.UTP: return "utp_delayed";
-//     //         case SubProvider.CTA_A: return "cta_a_delayed";
-//     //         case SubProvider.CTA_B: return "cta_b_delayed";
-//     //         case SubProvider.OTC: return "otc_delayed";
-//     //         case SubProvider.NASDAQ_BASIC: return "nasdaq_basic";
-//     //         default: return "iex";
-//     //     }
-//     // }
+//     private string MapSubProviderToApiValue(Provider subProvider)
+//     {
+//         switch (subProvider)
+//         {
+//             case Provider.NONE: return String.Empty;
+//             case Provider.OPRA: return "opra";
+//             case Provider.MANUAL: return "manual";
+//             default: return "opra";
+//         }
+//     }
 //
-//     // private SubProvider[] MapProviderToSubProviders(Intrinio.Realtime.Equities.Provider provider)
-//     // {
-//     //     switch (provider)
-//     //     {
-//     //         case Provider.NONE: return Array.Empty<SubProvider>();
-//     //         case Provider.MANUAL: return Array.Empty<SubProvider>();
-//     //         case Provider.REALTIME: return new SubProvider[]{SubProvider.IEX};
-//     //         case Provider.DELAYED_SIP: return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
-//     //         case Provider.NASDAQ_BASIC: return new SubProvider[]{SubProvider.NASDAQ_BASIC};
-//     //         default: return new SubProvider[0];
-//     //     }
-//     // }
+//     private Provider[] MapProviderToSubProviders(Intrinio.Realtime.Options.Provider provider)
+//     {
+//         return new Provider[] { provider};
+//         // switch (provider)
+//         // {
+//         //     case Provider.NONE: return Array.Empty<SubProvider>();
+//         //     case Provider.MANUAL: return Array.Empty<SubProvider>();
+//         //     case Provider.REALTIME: return new SubProvider[]{SubProvider.IEX};
+//         //     case Provider.DELAYED_SIP: return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
+//         //     case Provider.NASDAQ_BASIC: return new SubProvider[]{SubProvider.NASDAQ_BASIC};
+//         //     default: return new SubProvider[0];
+//         // }
+//     }
 //
-//     // private string FetchReplayFile(SubProvider subProvider)
-//     // {
-//     //     Intrinio.SDK.Api.SecurityApi api = new Intrinio.SDK.Api.SecurityApi();
-//     //     
-//     //     if (!api.Configuration.ApiKey.ContainsKey("api_key"))
-//     //         api.Configuration.ApiKey.Add("api_key", _config.ApiKey);
-//     //
-//     //     try
-//     //     {
-//     //         SecurityReplayFileResult result = api.GetSecurityReplayFile(MapSubProviderToApiValue(subProvider), _date);
-//     //         string decodedUrl = result.Url.Replace(@"\u0026", "&");
-//     //         string tempDir = System.IO.Path.GetTempPath();
-//     //         string fileName = Path.Combine(tempDir, result.Name);
-//     //
-//     //         using (FileStream outputFile = new FileStream(fileName,System.IO.FileMode.Create))
-//     //         using (HttpClient httpClient = new HttpClient())
-//     //         {
-//     //             httpClient.Timeout = TimeSpan.FromHours(1);
-//     //             httpClient.BaseAddress = new Uri(decodedUrl);
-//     //             using (HttpResponseMessage response = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result)
-//     //             using (Stream streamToReadFrom = response.Content.ReadAsStreamAsync().Result)
-//     //             {
-//     //                 streamToReadFrom.CopyTo(outputFile);
-//     //             }
-//     //         }
-//     //         
-//     //         return fileName;
-//     //     }
-//     //     catch (Exception e)
-//     //     {
-//     //         LogMessage(LogLevel.ERROR, "Error while fetching {0} file: {1}", subProvider.ToString(), e.Message);
-//     //         return null;
-//     //     }
-//     // }
+//     private string FetchReplayFile(Provider subProvider)
+//     {
+//         //Intrinio.SDK.Api.OptionsApi api = new Intrinio.SDK.Api.OptionsApi();
+//         //
+//         // if (!api.Configuration.ApiKey.ContainsKey("api_key"))
+//         //     api.Configuration.ApiKey.Add("api_key", _config.ApiKey);
+//     
+//         try
+//         {
+//             // OptionsReplayFileResult result = api.GetOptionsReplayFile(MapSubProviderToApiValue(subProvider), _date);
+//             // string decodedUrl = result.Url.Replace(@"\u0026", "&");
+//             // string tempDir = System.IO.Path.GetTempPath();
+//             // string fileName = Path.Combine(tempDir, result.Name);
+//             
+//             // using (FileStream outputFile = new FileStream(fileName,System.IO.FileMode.Create))
+//             // using (HttpClient httpClient = new HttpClient())
+//             // {
+//             //     httpClient.Timeout = TimeSpan.FromHours(1);
+//             //     httpClient.BaseAddress = new Uri(decodedUrl);
+//             //     using (HttpResponseMessage response = httpClient.GetAsync(decodedUrl, HttpCompletionOption.ResponseHeadersRead).Result)
+//             //     using (Stream streamToReadFrom = response.Content.ReadAsStreamAsync().Result)
+//             //     {
+//             //         streamToReadFrom.CopyTo(outputFile);
+//             //     }
+//             // }
+//             
+//             //return fileName;
+//
+//             return "/Users/shawnsnyder/Downloads/S3/OPRA_20250211.bin";
+//         }
+//         catch (Exception e)
+//         {
+//             LogMessage(LogLevel.ERROR, "Error while fetching {0} file: {1}", subProvider.ToString(), e.Message);
+//             return null;
+//         }
+//     }
 //
 //     private void FillNextTicks(IEnumerator<Tick>[] enumerators, Tick[] nextTicks)
 //     {
@@ -570,10 +811,10 @@
 //         DateTime t = DateTime.MaxValue;
 //         for (int i = 0; i < nextTicks.Length; i++)
 //         {
-//             if (nextTicks[i] != null && nextTicks[i].TimeReceived() < t)
+//             if (nextTicks[i] != null && nextTicks[i].TimeReceived < t)
 //             {
 //                 pullIndex = i;
-//                 t = nextTicks[i].TimeReceived();
+//                 t = nextTicks[i].TimeReceived;
 //             }
 //         }
 //
@@ -622,65 +863,65 @@
 //         {
 //             if (offset == 0L)
 //             {
-//                 offset = start - tick.TimeReceived().Ticks;
+//                 offset = start - tick.TimeReceived.Ticks;
 //             }
 //
 //             if (!ct.IsCancellationRequested)
 //             {
-//                 System.Threading.SpinWait.SpinUntil(() => (tick.TimeReceived().Ticks + offset) <= DateTime.UtcNow.Ticks);
+//                 System.Threading.SpinWait.SpinUntil(() => (tick.TimeReceived.Ticks + offset) <= DateTime.UtcNow.Ticks);
 //                 yield return tick;
 //             }
 //         }
 //     }
 //
-//     // private void ReplayThreadFn()
-//     // {
-//     //     CancellationToken ct = _ctSource.Token;
-//     //     SubProvider[] subProviders = MapProviderToSubProviders(_config.Provider);
-//     //     string[] replayFiles = new string[subProviders.Length];
-//     //     IEnumerable<Tick>[] allTicks = new IEnumerable<Tick>[subProviders.Length];
-//     //
-//     //     try
-//     //     {
-//     //         for (int i = 0; i < subProviders.Length; i++)
-//     //         {
-//     //             LogMessage(LogLevel.INFORMATION, "Downloading Replay file for {0} on {1}...", subProviders[i].ToString(), _date.Date.ToString());
-//     //             replayFiles[i] = FetchReplayFile(subProviders[i]);
-//     //             LogMessage(LogLevel.INFORMATION, "Downloaded Replay file to: {0}", replayFiles[i]);
-//     //             allTicks[i] = ReplayTickFileWithoutDelay(replayFiles[i], 100, ct);
-//     //         }
-//     //
-//     //         IEnumerable<Tick> aggregatedTicks = _withSimulatedDelay
-//     //             ? ReplayFileGroupWithDelay(allTicks, ct)
-//     //             : ReplayFileGroupWithoutDelay(allTicks, ct);
-//     //
-//     //         foreach (Tick tick in aggregatedTicks)
-//     //         {
-//     //             if (!ct.IsCancellationRequested)
-//     //             {
-//     //                 Interlocked.Increment(ref _dataEventCount);
-//     //                 Interlocked.Increment(ref _dataMsgCount);
-//     //                 _data.Enqueue(tick);
-//     //             }
-//     //         }
-//     //     }
-//     //     catch (Exception e)
-//     //     {
-//     //         LogMessage(LogLevel.ERROR, "Error while replaying file: {0}", e.Message);
-//     //     }
-//     //
-//     //     if (_deleteFileWhenDone)
-//     //     {
-//     //         foreach (string deleteFilePath in replayFiles)
-//     //         {
-//     //             if (File.Exists(deleteFilePath))
-//     //             {
-//     //                 LogMessage(LogLevel.INFORMATION, "Deleting Replay file: {0}", deleteFilePath);
-//     //                 File.Delete(deleteFilePath);
-//     //             }
-//     //         }
-//     //     }
-//     // }
+//     private void ReplayThreadFn()
+//     {
+//         CancellationToken ct = _ctSource.Token;
+//         Provider[] subProviders = MapProviderToSubProviders(_config.Provider);
+//         string[] replayFiles = new string[subProviders.Length];
+//         IEnumerable<Tick>[] allTicks = new IEnumerable<Tick>[subProviders.Length];
+//     
+//         try
+//         {
+//             for (int i = 0; i < subProviders.Length; i++)
+//             {
+//                 LogMessage(LogLevel.INFORMATION, "Downloading Replay file for {0} on {1}...", subProviders[i].ToString(), _date.Date.ToString());
+//                 replayFiles[i] = FetchReplayFile(subProviders[i]);
+//                 LogMessage(LogLevel.INFORMATION, "Downloaded Replay file to: {0}", replayFiles[i]);
+//                 allTicks[i] = ReplayTickFileWithoutDelay(replayFiles[i], 100, ct);
+//             }
+//     
+//             IEnumerable<Tick> aggregatedTicks = _withSimulatedDelay
+//                 ? ReplayFileGroupWithDelay(allTicks, ct)
+//                 : ReplayFileGroupWithoutDelay(allTicks, ct);
+//     
+//             foreach (Tick tick in aggregatedTicks)
+//             {
+//                 if (!ct.IsCancellationRequested)
+//                 {
+//                     Interlocked.Increment(ref _dataEventCount);
+//                     Interlocked.Increment(ref _dataMsgCount);
+//                     _data.Enqueue(tick);
+//                 }
+//             }
+//         }
+//         catch (Exception e)
+//         {
+//             LogMessage(LogLevel.ERROR, "Error while replaying file: {0}", e.Message);
+//         }
+//     
+//         if (_deleteFileWhenDone)
+//         {
+//             foreach (string deleteFilePath in replayFiles)
+//             {
+//                 if (File.Exists(deleteFilePath))
+//                 {
+//                     LogMessage(LogLevel.INFORMATION, "Deleting Replay file: {0}", deleteFilePath);
+//                     File.Delete(deleteFilePath);
+//                 }
+//             }
+//         }
+//     }
 //
 //     private void Join(string symbol, bool tradesOnly)
 //     {

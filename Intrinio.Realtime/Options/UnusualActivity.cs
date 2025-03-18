@@ -44,7 +44,7 @@ public struct UnusualActivity
     /// <param name="askPriceAtExecution">The best ask of this contract at the time of execution.</param>
     /// <param name="bidPriceAtExecution">The best bid of this contract at the time of execution.</param>
     /// <param name="underlyingPriceAtExecution">The dollar price of the underlying security at the time of execution.</param>
-    /// <param name="timestamp">The time that the unusual activity began (a unix timestamp representing the number of seconds (or better) since the unix epoch).</param>
+    /// <param name="timestamp">The time that the unusual activity began (a unix timestamp representing the number of nanoseconds since the unix epoch).</param>
     public UnusualActivity(string contract, UAType unusualActivityType, UASentiment sentiment, byte priceType , byte underlyingPriceType, UInt64 totalValue, UInt32 totalSize, int averagePrice, int askPriceAtExecution, int bidPriceAtExecution, int underlyingPriceAtExecution, UInt64 timestamp)
     {
         _contract = contract;

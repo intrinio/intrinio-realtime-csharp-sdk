@@ -426,10 +426,10 @@ public class ReplayClient : IEquitiesWebSocketClient
                         {
                             byte[] eventBuffer = new byte[byteBufferSize];
                             byte[] timeReceivedBuffer = new byte[8];
-                            ReadOnlySpan<byte> eventSpanBuffer = new ReadOnlySpan<byte>(eventBuffer);
                             ReadOnlySpan<byte> timeReceivedSpanBuffer = new ReadOnlySpan<byte>(timeReceivedBuffer);
                             eventBuffer[0] = (byte)readResult; //This is message type
                             eventBuffer[1] = (byte)(fRead.ReadByte()); //This is message length, including this and the previous byte.
+                            ReadOnlySpan<byte> eventSpanBuffer = new ReadOnlySpan<byte>(eventBuffer, 0, eventBuffer[1]);
                             int bytesRead = fRead.Read(eventBuffer, 2, (System.Convert.ToInt32(eventBuffer[1]) - 2)); //read the rest of the message
                             int timeBytesRead = fRead.Read(timeReceivedBuffer, 0, 8); //get the time received
                             DateTime timeReceived = ParseTimeReceived(timeReceivedSpanBuffer);
