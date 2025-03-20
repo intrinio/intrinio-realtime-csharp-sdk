@@ -82,10 +82,17 @@ public abstract class WebSocketClient
     /// <returns>Whether updating the backoffs was successful or not.</returns>
     public bool TrySetBackoffs([DisallowNull] uint[] newBackoffs)
     {
-        if (newBackoffs != null && newBackoffs.Length > 0 && newBackoffs.All(b => b != 0u))
+        if (newBackoffs != null && newBackoffs.Length > 0 && newBackoffs.All(b => b != 0u && b <= Convert.ToUInt32(Int32.MaxValue)))
         {
-            _selfHealBackoffs = newBackoffs.Select(System.Convert.ToInt32).ToArray();
-            return true;
+            try
+            {
+                _selfHealBackoffs = newBackoffs.Select(System.Convert.ToInt32).ToArray();
+                return true;
+            }
+            catch (Exception e)
+            {
+                return false;
+            }
         }
 
         return false;
