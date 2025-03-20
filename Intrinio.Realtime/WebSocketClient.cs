@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Net.Sockets;
 using System.Linq;
 using System.Net.WebSockets;
+using System.Diagnostics.CodeAnalysis;
 using Intrinio.Collections.RingBuffers;
 
 public abstract class WebSocketClient
@@ -17,7 +18,7 @@ public abstract class WebSocketClient
     private readonly uint _processingThreadsQuantity;
     private readonly uint _bufferSize;
     private readonly uint _overflowBufferSize;
-    private readonly int[] _selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
+    private int[] _selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
     private readonly object _tLock = new ();
     private readonly object _wsLock = new ();
     private Tuple<string, DateTime> _token = new (null, DateTime.Now);
@@ -73,6 +74,22 @@ public abstract class WebSocketClient
     #endregion //Constructors
     
     #region Public Methods
+
+    /// <summary>
+    /// Try to set the self-heal backoffs, used when trying to reconnect a broken websocket. 
+    /// </summary>
+    /// <param name="newBackoffs">An array of backoff times in milliseconds. May not be empty, may not have zero as a value, and values must be less than or equal to Int32.Max.</param>
+    /// <returns>Whether updating the backoffs was successful or not.</returns>
+    public bool TrySetBackoffs([DisallowNull] uint[] newBackoffs)
+    {
+        if (newBackoffs != null && newBackoffs.Length > 0 && newBackoffs.All(b => b != 0u))
+        {
+            _selfHealBackoffs = newBackoffs.Select(System.Convert.ToInt32).ToArray();
+            return true;
+        }
+
+        return false;
+    }
 
     public async Task Start()
     {
@@ -403,16 +420,17 @@ public abstract class WebSocketClient
     
     private async Task DoBackoff(Func<CancellationToken, Task<bool>> fn)
     {
+        int[] backoffsCopy = _selfHealBackoffs.ToArray(); //this could be swapped mid-method here, so get a local copy to work with. 
         int i = 0;
-        int backoff = _selfHealBackoffs[i];
+        int backoff = backoffsCopy[i];
         CancellationToken ct = CancellationToken;
         bool success = !ct.IsCancellationRequested && await fn(ct);
         while (!success && !ct.IsCancellationRequested)
         {
             await Task.Delay(backoff, ct);
             //Thread.Sleep(backoff);
-            i = Math.Min(i + 1, _selfHealBackoffs.Length - 1);
-            backoff = _selfHealBackoffs[i];
+            i = Math.Min(i + 1, backoffsCopy.Length - 1);
+            backoff = backoffsCopy[i];
             success = !ct.IsCancellationRequested && await fn(ct);
         }
     }
