@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Intrinio.Realtime.Composite;
 
@@ -95,6 +96,15 @@ public class ReplayClient : IEquitiesWebSocketClient
     #endregion //Constructors
     
     #region Public Methods
+    /// <summary>
+    /// Try to set the self-heal backoffs, used when trying to reconnect a broken websocket. 
+    /// </summary>
+    /// <param name="newBackoffs">An array of backoff times in milliseconds. May not be empty, may not have zero as a value, and values must be less than or equal to Int32.Max.</param>
+    /// <returns>Whether updating the backoffs was successful or not.</returns>
+    public bool TrySetBackoffs([DisallowNull] uint[] newBackoffs)
+    {
+        return true;
+    }
     public bool AddPlugin(ISocketPlugIn plugin)
     {
         try

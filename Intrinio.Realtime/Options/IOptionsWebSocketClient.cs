@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 
 namespace Intrinio.Realtime.Options;
@@ -28,4 +29,5 @@ public interface IOptionsWebSocketClient
     public void LogMessage(LogLevel logLevel, string messageTemplate, params object[] propertyValues);
     public IEnumerable<ISocketPlugIn> PlugIns { get; }
     public bool AddPlugin(ISocketPlugIn plugin);
+    public bool TrySetBackoffs([DisallowNull] uint[] newBackoffs);
 }
