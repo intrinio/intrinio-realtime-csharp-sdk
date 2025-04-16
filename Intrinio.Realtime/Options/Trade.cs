@@ -39,7 +39,7 @@ public struct Trade
     /// <param name="underlyingPriceType">The scalar for underlying price.</param>
     /// <param name="price">The dollar price of the last trade.</param>
     /// <param name="size">The number of contacts for the trade.</param>
-    /// <param name="timestamp">The time that the trade was executed (a unix timestamp representing the number of seconds (or better) since the unix epoch).</param>
+    /// <param name="timestamp">The time that the trade was executed (a unix timestamp representing the number of nanoseconds since the unix epoch).</param>
     /// <param name="totalVolume">The running total trade volume for this contract today.</param>
     /// <param name="qualifiers">The exchange provided trade qualifiers. These can be used to classify whether a trade should be used, for example, for open, close, volume, high, or low.</param>
     /// <param name="askPriceAtExecution">The dollar price of the best ask at execution.</param>
