@@ -211,6 +211,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     {
         switch (_config.Provider)
         {
+            case Provider.IEX:
             case Provider.REALTIME:
                 return $"https://realtime-mx.intrinio.com/auth?api_key={_config.ApiKey}";
                 break;
@@ -221,7 +222,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
                 return $"https://realtime-nasdaq-basic.intrinio.com/auth?api_key={_config.ApiKey}";
                 break;
             case Provider.CBOE_ONE:
-                return $"https://realtime-cboe-one.intrinio.com/auth?api_key={_config.ApiKey}";
+                return $"https://cboe-one.intrinio.com/auth?api_key={_config.ApiKey}";
                 break;
             case Provider.MANUAL:
                 return $"http://{_config.IPAddress}/auth?api_key={_config.ApiKey}";
@@ -236,6 +237,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     {
         switch (_config.Provider)
         {
+            case Provider.IEX:
             case Provider.REALTIME:
                 return $"wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
                 break;
@@ -246,7 +248,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
                 return $"wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
                 break;
             case Provider.CBOE_ONE:
-                return $"wss://realtime-cboe-one.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
+                return $"wss://cboe-one.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
                 break;
             case Provider.MANUAL:
                 return $"ws://{_config.IPAddress}/socket/websocket?vsn=1.0.0&token={token}";

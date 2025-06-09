@@ -531,12 +531,13 @@ public class ReplayClient : IEquitiesWebSocketClient
     {
         switch (provider)
         {
-            case Provider.NONE: return Array.Empty<SubProvider>();
-            case Provider.MANUAL: return Array.Empty<SubProvider>();
+            case Provider.NONE:         return Array.Empty<SubProvider>();
+            case Provider.MANUAL:       return Array.Empty<SubProvider>();
             case Provider.REALTIME: return new SubProvider[]{SubProvider.IEX};
-            case Provider.DELAYED_SIP: return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
+            case Provider.IEX: return new SubProvider[]{SubProvider.IEX};
+            case Provider.DELAYED_SIP:  return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
             case Provider.NASDAQ_BASIC: return new SubProvider[]{SubProvider.NASDAQ_BASIC};
-            default: return new SubProvider[0];
+            default:                    return new SubProvider[0];
         }
     }
 
