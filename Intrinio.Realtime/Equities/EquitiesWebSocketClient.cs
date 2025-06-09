@@ -220,6 +220,9 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
             case Provider.NASDAQ_BASIC:
                 return $"https://realtime-nasdaq-basic.intrinio.com/auth?api_key={_config.ApiKey}";
                 break;
+            case Provider.CBOE_ONE:
+                return $"https://realtime-cboe-one.intrinio.com/auth?api_key={_config.ApiKey}";
+                break;
             case Provider.MANUAL:
                 return $"http://{_config.IPAddress}/auth?api_key={_config.ApiKey}";
                 break;
@@ -241,6 +244,9 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
                 break;
             case Provider.NASDAQ_BASIC:
                 return $"wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
+                break;
+            case Provider.CBOE_ONE:
+                return $"wss://realtime-cboe-one.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
                 break;
             case Provider.MANUAL:
                 return $"ws://{_config.IPAddress}/socket/websocket?vsn=1.0.0&token={token}";

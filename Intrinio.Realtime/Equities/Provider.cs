@@ -6,5 +6,6 @@ public enum Provider
     REALTIME = 1,
     MANUAL = 2,
     DELAYED_SIP = 3,
-    NASDAQ_BASIC = 4
+    NASDAQ_BASIC = 4,
+    CBOE_ONE = 5
 }
