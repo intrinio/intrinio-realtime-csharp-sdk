@@ -14,7 +14,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
 {
     #region Data Members
 
-    private const string LobbyName = "lobby";
+    private const string FirehoseName = "lobby";
     private bool _useOnTrade;
     private bool _useOnQuote;
     private Action<Trade>? _onTrade;
@@ -144,7 +144,12 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     
     public async Task JoinLobby(bool? tradesOnly)
     {
-        await Join(LobbyName, tradesOnly);
+        await JoinFirehose(tradesOnly);
+    }
+    
+    public async Task JoinFirehose(bool? tradesOnly)
+    {
+        await Join(FirehoseName, tradesOnly);
     }
 
     public async Task Join(string[] symbols, bool? tradesOnly)
@@ -171,7 +176,12 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     
     public async Task LeaveLobby()
     {
-        await Leave(LobbyName);
+        await LeaveFirehose();
+    }
+    
+    public async Task LeaveFirehose()
+    {
+        await Leave(FirehoseName);
     }
 
     public async Task Leave(string[] symbols)
@@ -379,7 +389,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         bool tradesOnly = GetTradesOnlyFromChannel(channel);
         switch (symbol)
         {
-            case LobbyName:
+            case FirehoseName:
             {
                 byte[] message = new byte[11]; //1 + 1 + 9
                 message[0] = Convert.ToByte(74); //type: join (74uy) or leave (76uy)
@@ -404,7 +414,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         bool tradesOnly = GetTradesOnlyFromChannel(channel);
         switch (symbol)
         {
-            case LobbyName:
+            case FirehoseName:
             {
                 byte[] message = new byte[10]; // 1 (type = join) + 9 (symbol = $FIREHOSE)
                 message[0] = Convert.ToByte(76); //type: join (74uy) or leave (76uy)

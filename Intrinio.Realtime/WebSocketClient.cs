@@ -15,33 +15,33 @@ using Intrinio.Collections.RingBuffers;
 public abstract class WebSocketClient
 {
     #region Data Members
-    private readonly uint _processingThreadsQuantity;
-    private readonly uint _bufferSize;
-    private readonly uint _overflowBufferSize;
-    private int[] _selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
-    private readonly object _tLock = new ();
-    private readonly object _wsLock = new ();
-    private Tuple<string, DateTime> _token = new (null, DateTime.Now);
-    private WebSocketState _wsState = null;
-    private UInt64 _dataMsgCount = 0UL;
-    private UInt64 _dataEventCount = 0UL;
-    private UInt64 _textMsgCount = 0UL;
-    private readonly HashSet<string> _channels = new ();
-    protected IEnumerable<string> Channels { get { return _channels.ToArray(); } }
-    private readonly CancellationTokenSource _ctSource = new ();
-    protected CancellationToken CancellationToken { get { return _ctSource.Token; } }
-    private readonly uint _maxMessageSize;
-    private readonly uint _bufferBlockSize;
+    private readonly uint                     _processingThreadsQuantity;
+    private readonly uint                     _bufferSize;
+    private readonly uint                     _overflowBufferSize;
+    private          int[]                    _selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
+    private readonly object                   _tLock            = new ();
+    private readonly object                   _wsLock           = new ();
+    private          Tuple<string, DateTime>  _token            = new (null, DateTime.Now);
+    private          WebSocketState           _wsState          = null;
+    private          UInt64                   _dataMsgCount     = 0UL;
+    private          UInt64                   _dataEventCount   = 0UL;
+    private          UInt64                   _textMsgCount     = 0UL;
+    private readonly HashSet<string>          _channels         = new ();
+    protected        IEnumerable<string>      Channels { get { return _channels.ToArray(); } }
+    private readonly CancellationTokenSource  _ctSource = new ();
+    protected        CancellationToken        CancellationToken { get { return _ctSource.Token; } }
+    private readonly uint                     _maxMessageSize;
+    private readonly uint                     _bufferBlockSize;
     private readonly SingleProducerRingBuffer _data;
-    private readonly DropOldestRingBuffer _overflowData;
-    private readonly Func<Task> _tryReconnect;
-    private readonly HttpClient _httpClient = new ();
-    private const string ClientInfoHeaderKey = "Client-Information";
-    private const string ClientInfoHeaderValue = "IntrinioDotNetSDKv12.16";
-    private readonly ThreadPriority _mainThreadPriority;
-    private readonly Thread[] _threads;
-    private Thread? _receiveThread;
-    private bool _started;
+    private readonly DropOldestRingBuffer     _overflowData;
+    private readonly Func<Task>               _tryReconnect;
+    private readonly HttpClient               _httpClient           = new ();
+    private const    string                   ClientInfoHeaderKey   = "Client-Information";
+    private const    string                   ClientInfoHeaderValue = "IntrinioDotNetSDKv13.0";
+    private readonly ThreadPriority           _mainThreadPriority;
+    private readonly Thread[]                 _threads;
+    private          Thread?                  _receiveThread;
+    private          bool                     _started;
     #endregion //Data Members
     
     #region Constuctors

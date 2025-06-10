@@ -2,13 +2,15 @@
 	"EquitiesConfig": {
 		"ApiKey": "API_KEY_HERE",
 		"NumThreads": 4,
-		"Provider": "REALTIME",
+		//"Provider": "REALTIME", //IEX
+		"Provider": "IEX", //IEX
 		//"Provider": "DELAYED_SIP",
 		//"Provider": "NASDAQ_BASIC",
+		//"Provider": "CBOE_ONE",
 		//"Provider": "MANUAL",
 		//"IPAddress": "1.2.3.4",
-		"BufferSize": 2048,
-		"OverflowBufferSize": 2048,
+		"BufferSize": 16384,
+		"OverflowBufferSize": 16384,
 		"Symbols": [ "AAPL", "MSFT", "TSLA" ]
 		//"Symbols": [ "lobby" ]
 	},
