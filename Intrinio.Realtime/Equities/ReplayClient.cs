@@ -17,7 +17,7 @@ using System.Threading.Tasks;
 public class ReplayClient : IEquitiesWebSocketClient
 {
     #region Data Members
-    private const string LobbyName = "lobby";
+    private const string FirehoseName = "lobby";
     public Action<Trade> OnTrade { get; set; }
     public Action<Quote> OnQuote { get; set; }
     private readonly Config _config;
@@ -140,9 +140,14 @@ public class ReplayClient : IEquitiesWebSocketClient
         return Task.CompletedTask;
     }
     
+    public async Task JoinFirehose(bool? tradesOnly)
+    {
+        await Join(FirehoseName, tradesOnly);
+    }
+    
     public async Task JoinLobby(bool? tradesOnly)
     {
-        await Join(LobbyName, tradesOnly);
+        await JoinFirehose(tradesOnly);
     }
 
     public Task Join(string[] symbols, bool? tradesOnly)
@@ -174,7 +179,12 @@ public class ReplayClient : IEquitiesWebSocketClient
     
     public async Task LeaveLobby()
     {
-        await Leave(LobbyName);
+        await LeaveFirehose();
+    }
+    
+    public async Task LeaveFirehose()
+    {
+        await Leave(FirehoseName);
     }
 
     public Task Leave(string[] symbols)
@@ -448,8 +458,8 @@ public class ReplayClient : IEquitiesWebSocketClient
                             {
                                 case MessageType.Trade:
                                     Trade trade = ParseTrade(eventSpanBuffer);
-                                    if (_channels.Contains(new Channel(LobbyName, true)) 
-                                        || _channels.Contains(new Channel(LobbyName, false)) 
+                                    if (_channels.Contains(new Channel(FirehoseName, true)) 
+                                        || _channels.Contains(new Channel(FirehoseName, false)) 
                                         || _channels.Contains(new Channel(trade.Symbol, true)) 
                                         || _channels.Contains(new Channel(trade.Symbol, false)))
                                     {
@@ -461,7 +471,7 @@ public class ReplayClient : IEquitiesWebSocketClient
                                 case MessageType.Ask:
                                 case MessageType.Bid:
                                     Quote quote = ParseQuote(eventSpanBuffer);
-                                    if (_channels.Contains (new Channel(LobbyName, false)) || _channels.Contains (new Channel(quote.Symbol, false)))
+                                    if (_channels.Contains (new Channel(FirehoseName, false)) || _channels.Contains (new Channel(quote.Symbol, false)))
                                     {
                                         if (_writeToCsv)
                                             WriteQuoteToCsv(quote);
@@ -531,12 +541,13 @@ public class ReplayClient : IEquitiesWebSocketClient
     {
         switch (provider)
         {
-            case Provider.NONE: return Array.Empty<SubProvider>();
-            case Provider.MANUAL: return Array.Empty<SubProvider>();
+            case Provider.NONE:         return Array.Empty<SubProvider>();
+            case Provider.MANUAL:       return Array.Empty<SubProvider>();
             case Provider.REALTIME: return new SubProvider[]{SubProvider.IEX};
-            case Provider.DELAYED_SIP: return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
+            case Provider.IEX: return new SubProvider[]{SubProvider.IEX};
+            case Provider.DELAYED_SIP:  return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
             case Provider.NASDAQ_BASIC: return new SubProvider[]{SubProvider.NASDAQ_BASIC};
-            default: return new SubProvider[0];
+            default:                    return new SubProvider[0];
         }
     }
 
