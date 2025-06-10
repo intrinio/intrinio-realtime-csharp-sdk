@@ -229,6 +229,26 @@ type Trade
 | 9     | Corrected Consolidated Close (Per Listing Market) |
 
 
+### Equities Trade Conditions (CBOE One)
+Trade conditions for CBOE One are represented as the integer representation of a bit flag.
+```csharp
+[Flags]
+public enum ConditionFlags
+{
+None                      = 0,
+UpdateHighLowConsolidated = 1,
+UpdateLastConsolidated    = 2,
+UpdateHighLowMarketCenter = 4,
+UpdateLastMarketCenter    = 8,
+UpdateVolume              = 16,
+OpenConsolidated          = 32,
+OpenMarketCenter          = 64,
+CloseConsolidated         = 128,
+CloseMarketCenter         = 256
+}
+```
+
+
 ### Equities Quote Conditions
 
 | Value | Description                                 |
