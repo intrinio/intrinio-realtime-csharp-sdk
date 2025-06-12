@@ -527,13 +527,14 @@ public class ReplayClient : IEquitiesWebSocketClient
     {
         switch (subProvider)
         {
-            case SubProvider.IEX: return "iex";
-            case SubProvider.UTP: return "utp_delayed";
-            case SubProvider.CTA_A: return "cta_a_delayed";
-            case SubProvider.CTA_B: return "cta_b_delayed";
-            case SubProvider.OTC: return "otc_delayed";
+            case SubProvider.IEX:          return "iex";
+            case SubProvider.UTP:          return "utp_delayed";
+            case SubProvider.CTA_A:        return "cta_a_delayed";
+            case SubProvider.CTA_B:        return "cta_b_delayed";
+            case SubProvider.OTC:          return "otc_delayed";
             case SubProvider.NASDAQ_BASIC: return "nasdaq_basic";
-            default: return "iex";
+            case SubProvider.CBOE_ONE:     return "cboe_one";
+            default:                       return "iex";
         }
     }
 
@@ -543,10 +544,11 @@ public class ReplayClient : IEquitiesWebSocketClient
         {
             case Provider.NONE:         return Array.Empty<SubProvider>();
             case Provider.MANUAL:       return Array.Empty<SubProvider>();
-            case Provider.REALTIME: return new SubProvider[]{SubProvider.IEX};
-            case Provider.IEX: return new SubProvider[]{SubProvider.IEX};
+            case Provider.REALTIME:     return new SubProvider[]{SubProvider.IEX};
+            case Provider.IEX:          return new SubProvider[]{SubProvider.IEX};
             case Provider.DELAYED_SIP:  return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
             case Provider.NASDAQ_BASIC: return new SubProvider[]{SubProvider.NASDAQ_BASIC};
+            case Provider.CBOE_ONE:     return new SubProvider[]{SubProvider.CBOE_ONE};
             default:                    return new SubProvider[0];
         }
     }
