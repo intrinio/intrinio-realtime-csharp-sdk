@@ -24,20 +24,23 @@ public class Config
     public int BufferSize { get; set; }
     
     public int OverflowBufferSize { get; set; }
+    
+    public bool Delayed { get; set; }
 
     /// <summary>
     /// The configuration for The Equities Websocket Client.
     /// </summary>
     public Config()
     {
-        ApiKey = String.Empty;
-        Provider = Provider.NONE;
-        IPAddress = String.Empty;
-        Symbols = Array.Empty<string>();
-        TradesOnly = false;
-        NumThreads = 2;
-        BufferSize = 2048;
+        ApiKey             = String.Empty;
+        Provider           = Provider.NONE;
+        IPAddress          = String.Empty;
+        Symbols            = Array.Empty<string>();
+        TradesOnly         = false;
+        NumThreads         = 2;
+        BufferSize         = 2048;
         OverflowBufferSize = 2048;
+        Delayed            = false;
     }
 
     public void Validate()

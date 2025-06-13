@@ -9,6 +9,7 @@
 		//"Provider": "CBOE_ONE",
 		//"Provider": "MANUAL",
 		//"IPAddress": "1.2.3.4",
+		"Delayed": false,
 		"BufferSize": 16384,
 		"OverflowBufferSize": 16384,
 		"Symbols": [ "AAPL", "MSFT", "TSLA" ]
