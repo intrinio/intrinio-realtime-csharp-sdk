@@ -245,23 +245,24 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
 
     protected override string GetWebSocketUrl(string token)
     {
+        string delayedPart = _config.Delayed ? "&delayed=true" : String.Empty;
         switch (_config.Provider)
         {
             case Provider.IEX:
             case Provider.REALTIME:
-                return $"wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
+                return $"wss://realtime-mx.intrinio.com/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
                 break;
             case Provider.DELAYED_SIP:
-                return $"wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
+                return $"wss://realtime-delayed-sip.intrinio.com/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
                 break;
             case Provider.NASDAQ_BASIC:
-                return $"wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
+                return $"wss://realtime-nasdaq-basic.intrinio.com/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
                 break;
             case Provider.CBOE_ONE:
-                return $"wss://cboe-one.intrinio.com/socket/websocket?vsn=1.0.0&token={token}";
+                return $"wss://cboe-one.intrinio.com/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
                 break;
             case Provider.MANUAL:
-                return $"ws://{_config.IPAddress}/socket/websocket?vsn=1.0.0&token={token}";
+                return $"ws://{_config.IPAddress}/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
                 break;
             default:
                 throw new ArgumentException("Provider not specified!");
