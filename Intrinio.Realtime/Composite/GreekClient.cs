@@ -358,7 +358,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                 Decimal? results = _indexApi.GetEconomicIndexDataPointNumber("$DTB3", "level");
                 if (results.HasValue)
                 {
-                    _cache.SetSupplementaryDatum(RiskFreeInterestRateKeyName, Convert.ToDouble(results.Value), _updateFunc);
+                    _cache.SetSupplementaryDatum(RiskFreeInterestRateKeyName, Convert.ToDouble(results.Value) / 100.0D, _updateFunc);
                     success = true;
                 }
 
