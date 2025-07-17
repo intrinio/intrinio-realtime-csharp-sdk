@@ -1,5 +1,5 @@
 # intrinio-realtime-dotnet-sdk
-SDK for working with Intrinio's realtime OPRA, IEX, delayed SIP, or NASDAQ Basic prices feeds.  Get a comprehensive view with increased market volume and enjoy minimized exchange and per user fees.
+SDK for working with Intrinio's realtime OPRA, IEX, delayed SIP, CBOE One, or NASDAQ Basic prices feeds.  Get a comprehensive view with increased market volume and enjoy minimized exchange and per user fees.
 
 [Intrinio](https://intrinio.com/) provides real-time stock and option prices via a two-way WebSocket connection. To get started, [subscribe to a real-time equity feed](https://intrinio.com/real-time-multi-exchange), or [subscribe to a real-time options feed](https://intrinio.com/financial-market-data/options-data) and follow the instructions below.
 
@@ -240,11 +240,12 @@ UpdateHighLowConsolidated = 1,
 UpdateLastConsolidated    = 2,
 UpdateHighLowMarketCenter = 4,
 UpdateLastMarketCenter    = 8,
-UpdateVolume              = 16,
+UpdateVolumeConsolidated  = 16,
 OpenConsolidated          = 32,
 OpenMarketCenter          = 64,
 CloseConsolidated         = 128,
-CloseMarketCenter         = 256
+CloseMarketCenter         = 256,
+UpdateVolumeMarketCenter  = 512
 }
 ```
 
