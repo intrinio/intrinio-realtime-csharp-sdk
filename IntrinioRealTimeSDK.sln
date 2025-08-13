@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleApp", "SampleApp\Samp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Intrinio.Realtime", "Intrinio.Realtime\Intrinio.Realtime.csproj", "{B639A9AC-4A1C-4C80-8710-8CC5753918D9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Intrinio.Realtime.Tests", "Intrinio.Realtime.Tests\Intrinio.Realtime.Tests.csproj", "{29D024D3-8A0C-456B-A06C-D5732663EE3D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{B639A9AC-4A1C-4C80-8710-8CC5753918D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B639A9AC-4A1C-4C80-8710-8CC5753918D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B639A9AC-4A1C-4C80-8710-8CC5753918D9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{29D024D3-8A0C-456B-A06C-D5732663EE3D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{29D024D3-8A0C-456B-A06C-D5732663EE3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{29D024D3-8A0C-456B-A06C-D5732663EE3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{29D024D3-8A0C-456B-A06C-D5732663EE3D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
