@@ -408,13 +408,12 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         double? riskFreeInterestRate = dataCache.GetSupplementaryDatum(RiskFreeInterestRateKeyName);
         double? dividendYield = securityData.GetSupplementaryDatum(DividendYieldKeyName);
         Intrinio.Realtime.Equities.Trade? equitiesTrade = securityData.LatestEquitiesTrade;
-        Intrinio.Realtime.Options.Trade? optionsTrade = optionsContractData.LatestTrade;
         Intrinio.Realtime.Options.Quote? optionsQuote = optionsContractData.LatestQuote;
 
-        if (!riskFreeInterestRate.HasValue || !dividendYield.HasValue || !equitiesTrade.HasValue || !optionsTrade.HasValue || !optionsQuote.HasValue)
+        if (!riskFreeInterestRate.HasValue || !dividendYield.HasValue || !equitiesTrade.HasValue || !optionsQuote.HasValue)
             return;
 
-        Greek result = BlackScholesGreekCalculator.Calculate(riskFreeInterestRate.Value, dividendYield.Value, equitiesTrade.Value, optionsTrade.Value, optionsQuote.Value);
+        Greek result = BlackScholesGreekCalculator.Calculate(riskFreeInterestRate.Value, dividendYield.Value, equitiesTrade.Value.Price, optionsQuote.Value);
         
         if (result.IsValid)
         {
