@@ -37,7 +37,7 @@ public abstract class WebSocketClient
     private readonly Func<Task>               _tryReconnect;
     private readonly HttpClient               _httpClient           = new ();
     private const    string                   ClientInfoHeaderKey   = "Client-Information";
-    private const    string                   ClientInfoHeaderValue = "IntrinioDotNetSDKv14.0";
+    private const    string                   ClientInfoHeaderValue = "IntrinioDotNetSDKv15.0";
     private readonly ThreadPriority           _mainThreadPriority;
     private readonly Thread[]                 _threads;
     private          Thread?                  _receiveThread;
