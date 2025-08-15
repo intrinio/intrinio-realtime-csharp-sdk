@@ -92,4 +92,18 @@ public struct Quote
         Quote quote = new Quote(contract, priceType, unscaledAskPrice, askSize, unscaledBidPrice, bidSize, nanoSecondsSinceUnixEpoch);
         return quote;
     }
+    
+    public static Quote CreateUnitTestObject(string contract, double askPrice, UInt32 askSize, double bidPrice, UInt32 bidSize, double unixTimestamp)
+    {
+        byte  priceType        = (byte)4;
+        int   unscaledAskPrice = Convert.ToInt32(askPrice * 10000.0);
+        int   unscaledBidPrice = Convert.ToInt32(bidPrice * 10000.0);
+        double secondsDouble = Math.Floor(unixTimestamp);
+        ulong  seconds       = (ulong)secondsDouble;
+        double fractional    = unixTimestamp - secondsDouble;
+        ulong  nanos         = (ulong)(fractional * 1_000_000_000.0);
+        ulong  nanoSecondsSinceUnixEpoch = seconds * 1_000_000_000UL + nanos;
+        Quote quote = new Quote(contract, priceType, unscaledAskPrice, askSize, unscaledBidPrice, bidSize, nanoSecondsSinceUnixEpoch);
+        return quote;
+    }
 }

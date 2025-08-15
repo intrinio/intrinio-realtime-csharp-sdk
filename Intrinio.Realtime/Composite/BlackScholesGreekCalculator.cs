@@ -7,207 +7,162 @@ public static class BlackScholesGreekCalculator
 {
     private const double LOW_VOL = 0.0D;
     private const double HIGH_VOL = 5.0D;
-    private const double VOL_TOLERANCE = 0.0001D;
+    private const double VOL_TOLERANCE = 1e-12D;
     private const double MIN_Z_SCORE = -8.0D;
     private const double MAX_Z_SCORE = 8.0D;
-    private static readonly double rootPi = System.Math.Sqrt(2.0D * System.Math.PI);
+    private static readonly double root2Pi = Math.Sqrt(2.0D * Math.PI);
 
-    
-    public static Greek Calculate( double riskFreeInterestRate, 
-                                    double dividendYield, 
-                                    Intrinio.Realtime.Equities.Trade underlyingTrade,
-                                    Intrinio.Realtime.Options.Trade latestOptionTrade, 
-                                    Intrinio.Realtime.Options.Quote latestOptionQuote) 
+    public static Greek Calculate(double riskFreeInterestRate, double dividendYield, double underlyingPrice, Intrinio.Realtime.Options.Quote latestOptionQuote)
     {
-        if (latestOptionQuote.AskPrice <= 0.0D || latestOptionQuote.BidPrice <= 0.0D || riskFreeInterestRate <= 0.0D || underlyingTrade.Price <= 0.0D)
+        if (latestOptionQuote.AskPrice <= 0.0D || latestOptionQuote.BidPrice <= 0.0D || riskFreeInterestRate <= 0.0D || underlyingPrice <= 0.0D)
             return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
-        
-        double yearsToExpiration = GetYearsToExpiration(latestOptionTrade, latestOptionQuote);
-        double underlyingPrice = underlyingTrade.Price;
-        double strike = latestOptionTrade.GetStrikePrice();
-        bool isPut = latestOptionTrade.IsPut();
-        double marketPrice = (latestOptionQuote.AskPrice + latestOptionQuote.BidPrice) / 2.0D;
-        
+
+        double yearsToExpiration = GetYearsToExpiration(latestOptionQuote.Timestamp, latestOptionQuote.GetExpirationDate());
+        double strike            = latestOptionQuote.GetStrikePrice();
+        bool   isPut             = latestOptionQuote.IsPut();
+        double marketPrice       = (latestOptionQuote.AskPrice + latestOptionQuote.BidPrice) / 2.0D;
+
         if (yearsToExpiration <= 0.0D || strike <= 0.0D)
             return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
-        
-        double impliedVolatility = CalcImpliedVolatility(isPut, underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice); //sigma
+
+        double impliedVolatility = CalcImpliedVolatility(isPut, underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice);
         if (impliedVolatility == 0.0D)
             return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
-        
-        double delta = CalcDelta(isPut, underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice, impliedVolatility);
-        double gamma = CalcGamma(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice, impliedVolatility);
-        double theta = CalcTheta(isPut, underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice, impliedVolatility);
-        double vega = CalcVega(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice, impliedVolatility);
+
+        // Compute common values once for all Greeks to avoid redundant calcs
+        double t = yearsToExpiration;
+        double sqrtT = Math.Sqrt(t);
+        double d1 = D1(underlyingPrice, strike, t, riskFreeInterestRate, impliedVolatility, dividendYield);
+        double d2 = d1 - impliedVolatility * sqrtT;
+        double expQt = Math.Exp(-dividendYield * t);
+        double expRt = Math.Exp(-riskFreeInterestRate * t);
+        double nD1 = CumulativeNormalDistribution(d1);
+        double nD2 = CumulativeNormalDistribution(d2);
+        double phiD1 = NormalPdf(d1);
+
+        double delta = isPut ? expQt * (nD1 - 1.0D) : expQt * nD1;
+        double gamma = expQt * phiD1 / (underlyingPrice * impliedVolatility * sqrtT);
+        double vega = 0.01D * underlyingPrice * expQt * sqrtT * phiD1;
+
+        // Theta with correct dividend adjustments
+        double term1 = expQt * underlyingPrice * phiD1 * impliedVolatility / (2.0D * sqrtT);
+        double term2 = riskFreeInterestRate * strike * expRt * (isPut ? (1.0D - nD2) : nD2);
+        double term3 = dividendYield * underlyingPrice * expQt * (isPut ? (1.0D - nD1) : nD1);
+        double theta = isPut ? (-term1 + term2 - term3) / 365.25D : (-term1 - term2 + term3) / 365.25D;
 
         return new Greek(impliedVolatility, delta, gamma, theta, vega, true);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcImpliedVolatilityCall(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice) 
-    {
-        double low = LOW_VOL, high = HIGH_VOL;
-        while ((high - low) > VOL_TOLERANCE)
-        {
-            if (CalcPriceCall(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, (high + low) / 2.0D, dividendYield) > marketPrice)
-                high = (high + low) / 2.0D;
-            else
-                low = (high + low) / 2.0D;
-        }
-
-        return (high + low) / 2.0D;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcImpliedVolatilityPut(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice) 
-    {
-        double low = LOW_VOL, high = HIGH_VOL;
-        while ((high - low) > VOL_TOLERANCE)
-        {
-            if (CalcPricePut(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, (high + low) / 2.0D, dividendYield) > marketPrice)
-                high = (high + low) / 2.0D;
-            else
-                low = (high + low) / 2.0D;
-        }
-
-        return (high + low) / 2.0D;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double CalcImpliedVolatility(bool isPut, double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice)
     {
-        return isPut 
-            ? CalcImpliedVolatilityPut(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice) 
-            : CalcImpliedVolatilityCall(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice);
+        double tol = 1e-10D;
+        double forward = underlyingPrice * Math.Exp((riskFreeInterestRate - dividendYield) * yearsToExpiration);
+        double m = forward / strike;
+        double sigma = Math.Sqrt(2.0D * Math.Abs(Math.Log(m)) / yearsToExpiration);
+        if (double.IsNaN(sigma) || sigma <= 0.0D) sigma = 0.3D;
+
+        int maxIter = 50;
+        for (int iter = 0; iter < maxIter; iter++)
+        {
+            double price = isPut ? CalcPricePut(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield) : CalcPriceCall(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield);
+            double diff = price - marketPrice;
+            if (Math.Abs(diff) < tol) break;
+
+            double d1 = D1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield);
+            double vega = underlyingPrice * Math.Exp(-dividendYield * yearsToExpiration) * Math.Sqrt(yearsToExpiration) * NormalPdf(d1);
+            if (Math.Abs(vega) < 1e-10D) break; // avoid division by zero
+
+            sigma -= diff / vega;
+            if (sigma <= 0.0D) sigma = 0.0001D; // prevent negative or zero
+        }
+
+        return sigma;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcDeltaCall(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma)
+    private static double D1(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield)
     {
-        return NormalSDist( D1( underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield ) );
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcDeltaPut(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma)
-    {
-        return CalcDeltaCall( underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma) - 1D;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcDelta(bool isPut, double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma)
-    {
-        return isPut
-            ? CalcDeltaPut(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma)
-            : CalcDeltaCall(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcGamma(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma)
-    {
-        return Phi( D1( underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield ) ) / ( underlyingPrice * sigma * System.Math.Sqrt(yearsToExpiration) );
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcThetaCall(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma)
-    {
-        double term1 = underlyingPrice * Phi( D1( underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield ) ) * sigma / ( 2.0D * System.Math.Sqrt(yearsToExpiration) );
-        double term2 = riskFreeInterestRate * strike * System.Math.Exp(-1.0D * riskFreeInterestRate * yearsToExpiration) * NormalSDist( D2( underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield ) );
-        return ( -term1 - term2 ) / 365.25D;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcThetaPut(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma)
-    {
-        double term1 = underlyingPrice * Phi( D1( underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield ) ) * sigma / ( 2.0D * System.Math.Sqrt(yearsToExpiration) );
-        double term2 = riskFreeInterestRate * strike * System.Math.Exp(-1.0D * riskFreeInterestRate * yearsToExpiration) * NormalSDist( - D2( underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield ) );
-        return ( -term1 + term2 ) / 365.25D;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcTheta(bool isPut, double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma)
-    {
-        return isPut
-            ? CalcThetaPut(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma)
-            : CalcThetaCall(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice, sigma);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcVega(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice, double sigma)
-    {
-        return 0.01D * underlyingPrice * System.Math.Sqrt(yearsToExpiration) * Phi(D1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield));
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double D1(double underylyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield)
-    {
-        double numerator = ( System.Math.Log(underylyingPrice / strike) + (riskFreeInterestRate - dividendYield + 0.5D * System.Math.Pow(sigma, 2.0D) ) * yearsToExpiration);
-        double denominator = ( sigma * System.Math.Sqrt(yearsToExpiration));
+        double numerator = Math.Log(underlyingPrice / strike) + (riskFreeInterestRate - dividendYield + 0.5D * sigma * sigma) * yearsToExpiration;
+        double denominator = sigma * Math.Sqrt(yearsToExpiration);
         return numerator / denominator;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double D2(double underylyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield)
+    private static double D2(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield)
     {
-        return D1( underylyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield ) - ( sigma * System.Math.Sqrt(yearsToExpiration) );
+        return D1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield) - sigma * Math.Sqrt(yearsToExpiration);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double NormalSDist(double z)
+    private static double CumulativeNormalDistribution(double z)
     {
-        if (z < MIN_Z_SCORE)
-            return 0.0D;
-        if (z > MAX_Z_SCORE)
-            return 1.0D;
-        double i = 3.0D, sum = 0.0D, term = z;
-        while ((sum + term) != sum)
+        if (Math.Abs(z) < 1.5D)
+            return CumulativeNormalDistributionSeries(z);
+
+        if (z > MAX_Z_SCORE) return 1.0D;
+        if (z < MIN_Z_SCORE) return 0.0D;
+
+        bool isNegative = z < 0.0D;
+        if (isNegative) z = -z;
+
+        double t = 1.0D / (1.0D + 0.2316419D * z);
+        double poly = t * (0.319381530D + t * (-0.356563782D + t * (1.781477937D + t * (-1.821255978D + t * 1.330274429D))));
+
+        double pdf = Math.Exp(-0.5D * z * z) / root2Pi;
+        double tail = pdf * poly;
+
+        return isNegative ? tail : 1.0D - tail;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double CumulativeNormalDistributionSeries(double z)
+    {
+        double absZ = Math.Abs(z);
+        double sum = 0.0D;
+        double term = absZ;
+        double i = 3.0D;
+        while (sum + term != sum)
         {
             sum += term;
-            term = term * z * z / i;
+            term = term * absZ * absZ / i;
             i += 2.0D;
         }
-        return 0.5D + sum * Phi(z);
+        double pdf = Math.Exp(-0.5D * absZ * absZ) / root2Pi;
+        double half = pdf * sum;
+        return z >= 0.0D ? 0.5D + half : 0.5D - half;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double Phi(double x)
+    private static double NormalPdf(double x)
     {
-        double numerator = System.Math.Exp(-1.0D * x*x / 2.0D);
-        return numerator / rootPi;
+        return Math.Exp(-0.5D * x * x) / root2Pi;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcPriceCall(double underylyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield)
+    private static double CalcPriceCall(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield)
     {
-        double d1 = D1( underylyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield );
-        double discountedUnderlying = System.Math.Exp(-1.0D * dividendYield * yearsToExpiration) * underylyingPrice;
-        double probabilityWeightedValueOfBeingExercised = discountedUnderlying * NormalSDist( d1 );
-
-        double d2 = d1 - ( sigma * System.Math.Sqrt(yearsToExpiration) );
-        double discountedStrike = System.Math.Exp(-1.0D * riskFreeInterestRate * yearsToExpiration) * strike;
-        double probabilityWeightedValueOfDiscountedStrike = discountedStrike * NormalSDist( d2 );
-
-        return probabilityWeightedValueOfBeingExercised - probabilityWeightedValueOfDiscountedStrike;
+        double d1 = D1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield);
+        double d2 = d1 - sigma * Math.Sqrt(yearsToExpiration);
+        double discountedUnderlying = Math.Exp(-dividendYield * yearsToExpiration) * underlyingPrice;
+        double discountedStrike = Math.Exp(-riskFreeInterestRate * yearsToExpiration) * strike;
+        return discountedUnderlying * CumulativeNormalDistribution(d1) - discountedStrike * CumulativeNormalDistribution(d2);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double CalcPricePut(double underylyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield)
+    private static double CalcPricePut(double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double sigma, double dividendYield)
     {
-        double d2 = D2( underylyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield );
-        double discountedStrike = strike * System.Math.Exp(-1.0D * riskFreeInterestRate * yearsToExpiration);
-        double probabiltityWeightedValueOfDiscountedStrike = discountedStrike * NormalSDist( -1.0D * d2 );
-
-        double d1 = d2 + ( sigma * System.Math.Sqrt(yearsToExpiration) );
-        double discountedUnderlying = underylyingPrice * System.Math.Exp(-1.0D * dividendYield * yearsToExpiration);
-        double probabilityWeightedValueOfBeingExercised = discountedUnderlying * NormalSDist( -1.0D * d1 );
-
-        return probabiltityWeightedValueOfDiscountedStrike - probabilityWeightedValueOfBeingExercised;
+        double d1 = D1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, sigma, dividendYield);
+        double d2 = d1 - sigma * Math.Sqrt(yearsToExpiration);
+        double discountedUnderlying = Math.Exp(-dividendYield * yearsToExpiration) * underlyingPrice;
+        double discountedStrike = Math.Exp(-riskFreeInterestRate * yearsToExpiration) * strike;
+        return discountedStrike * CumulativeNormalDistribution(-d2) - discountedUnderlying * CumulativeNormalDistribution(-d1);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static double GetYearsToExpiration(Intrinio.Realtime.Options.Trade latestOptionTrade, Intrinio.Realtime.Options.Quote latestOptionQuote)
+    private static double GetYearsToExpiration(double latestActivityUnixTime, DateTime expirationDate)
     {
-        double latestActivity = System.Math.Max(latestOptionTrade.Timestamp, latestOptionQuote.Timestamp);
-        double expiration = (latestOptionTrade.GetExpirationDate() - DateTime.UnixEpoch.ToUniversalTime()).TotalSeconds;
-        return (expiration - latestActivity) / 31557600.0D; //86400 is seconds in a day. Using 365.25 days in a year. 
+        double expiration = (expirationDate - DateTime.UnixEpoch.ToUniversalTime()).TotalSeconds;
+        return (expiration - latestActivityUnixTime) / 31557600.0D;
     }
 }

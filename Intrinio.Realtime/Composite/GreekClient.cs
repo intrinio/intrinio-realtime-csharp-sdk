@@ -17,14 +17,14 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
 {
     #region Data Members
     private readonly IDataCache _cache;
-    private const string BlackScholesImpliedVolatilityKeyName = "IntrinioBlackScholesImpliedVolatility";
-    private const string BlackScholesDeltaKeyName = "IntrinioBlackScholesDelta";
-    private const string BlackScholesGammaKeyName = "IntrinioBlackScholesGamma";
-    private const string BlackScholesThetaKeyName = "IntrinioBlackScholesTheta";
-    private const string BlackScholesVegaKeyName = "IntrinioBlackScholesVega";
-    private const string DividendYieldKeyName = "DividendYield";
-    private const string RiskFreeInterestRateKeyName = "RiskFreeInterestRate";
-    private const string BlackScholesKeyName = "IntrinioBlackScholes";
+    public const string BlackScholesImpliedVolatilityKeyName = "IntrinioBlackScholesImpliedVolatility";
+    public const string BlackScholesDeltaKeyName = "IntrinioBlackScholesDelta";
+    public const string BlackScholesGammaKeyName = "IntrinioBlackScholesGamma";
+    public const string BlackScholesThetaKeyName = "IntrinioBlackScholesTheta";
+    public const string BlackScholesVegaKeyName = "IntrinioBlackScholesVega";
+    public const string DividendYieldKeyName = "DividendYield";
+    public const string RiskFreeInterestRateKeyName = "RiskFreeInterestRate";
+    public const string BlackScholesKeyName = "IntrinioBlackScholes";
     private readonly ConcurrentDictionary<string, CalculateNewGreek> _calcLookup;
     private readonly SupplementalDatumUpdate _updateFunc = (string key, double? oldValue, double? newValue) => { return newValue; };
     private Timer? _dividendFetchTimer;
@@ -408,13 +408,12 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         double? riskFreeInterestRate = dataCache.GetSupplementaryDatum(RiskFreeInterestRateKeyName);
         double? dividendYield = securityData.GetSupplementaryDatum(DividendYieldKeyName);
         Intrinio.Realtime.Equities.Trade? equitiesTrade = securityData.LatestEquitiesTrade;
-        Intrinio.Realtime.Options.Trade? optionsTrade = optionsContractData.LatestTrade;
         Intrinio.Realtime.Options.Quote? optionsQuote = optionsContractData.LatestQuote;
 
-        if (!riskFreeInterestRate.HasValue || !dividendYield.HasValue || !equitiesTrade.HasValue || !optionsTrade.HasValue || !optionsQuote.HasValue)
+        if (!riskFreeInterestRate.HasValue || !dividendYield.HasValue || !equitiesTrade.HasValue || !optionsQuote.HasValue)
             return;
 
-        Greek result = BlackScholesGreekCalculator.Calculate(riskFreeInterestRate.Value, dividendYield.Value, equitiesTrade.Value, optionsTrade.Value, optionsQuote.Value);
+        Greek result = BlackScholesGreekCalculator.Calculate(riskFreeInterestRate.Value, dividendYield.Value, equitiesTrade.Value.Price, optionsQuote.Value);
         
         if (result.IsValid)
         {

@@ -268,6 +268,9 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
             case Provider.OPRA:
                 return $"https://realtime-options.intrinio.com/auth?api_key={_config.ApiKey}";
                 break;
+            case Provider.OPTIONS_EDGE:
+                return $"https://options-edge.intrinio.com/auth?api_key={_config.ApiKey}";
+                break;
             case Provider.MANUAL:
                 return $"http://{_config.IPAddress}/auth?api_key={_config.ApiKey}";
                 break;
@@ -284,6 +287,9 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         {
             case Provider.OPRA:
                 return $"wss://realtime-options.intrinio.com/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
+                break;
+            case Provider.OPTIONS_EDGE:
+                return $"wss://options-edge.intrinio.com/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
                 break;
             case Provider.MANUAL:
                 return $"ws://{_config.IPAddress}/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
