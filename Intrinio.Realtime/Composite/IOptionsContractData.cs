@@ -36,4 +36,9 @@ public interface IOptionsContractData {
     internal bool SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update);
     internal bool SetSupplementaryDatum(string key, double? datum, OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated, ISecurityData securityData, IDataCache dataCache, SupplementalDatumUpdate update);
     IReadOnlyDictionary<string, double?> AllSupplementaryData { get; }
+    
+    Greek? GetGreekData(string key);
+    internal bool SetGreekData(string key, Greek? datum, GreekDataUpdate update);
+    internal bool SetGreekData(string key, Greek? datum, OnOptionsContractGreekDataUpdated? onOptionsContractGreekDataUpdated, ISecurityData securityData, IDataCache dataCache, GreekDataUpdate update);
+    IReadOnlyDictionary<string, Greek?> AllGreekData { get; }
 }

@@ -80,4 +80,9 @@ public interface ISecurityData {
 
     internal bool SetOptionsContractSupplementalDatum(string contract, string key, double? datum, SupplementalDatumUpdate update);
     internal bool SetOptionsContractSupplementalDatum(string contract, string key, double? datum, OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated, IDataCache dataCache, SupplementalDatumUpdate update);
+    
+    Greek? GetOptionsContractGreekData(string contract, string key);
+
+    internal bool SetOptionsContractGreekData(string contract, string key, Greek? data, GreekDataUpdate update);
+    internal bool SetOptionsContractGreekData(string contract, string key, Greek? data, OnOptionsContractGreekDataUpdated? onOptionsContractGreekDataUpdated, IDataCache dataCache, GreekDataUpdate update);
 }

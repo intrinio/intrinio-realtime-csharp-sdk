@@ -591,4 +591,45 @@ internal class SecurityData : ISecurityData{
 
         return false;
     }
+
+    public Greek? GetOptionsContractGreekData(string contract, string key)
+    {
+        if (_contracts.TryGetValue(contract, out IOptionsContractData optionsContractData))
+            return optionsContractData.GetGreekData(key);
+        return null;
+    }
+
+    public bool SetOptionsContractGreekData(string contract, string key, Greek? data, GreekDataUpdate update)
+    {
+        if (!String.IsNullOrWhiteSpace(contract))
+        {
+            IOptionsContractData currentOptionsContractData;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return currentOptionsContractData.SetGreekData(key, data, update);
+        }
+
+        return false;
+    }
+
+    public bool SetOptionsContractGreekData(string contract, string key, Greek? data, OnOptionsContractGreekDataUpdated? onOptionsContractGreekDataUpdated, IDataCache dataCache, GreekDataUpdate update)
+    {
+        if (!String.IsNullOrWhiteSpace(contract))
+        {
+            IOptionsContractData currentOptionsContractData;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return ((OptionsContractData)currentOptionsContractData).SetGreekData(key, data, onOptionsContractGreekDataUpdated, this, dataCache, update);
+        }
+
+        return false;
+    }
 }

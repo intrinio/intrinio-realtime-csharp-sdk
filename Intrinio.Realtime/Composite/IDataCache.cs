@@ -70,6 +70,30 @@ public interface IDataCache : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio
     
     #endregion //Supplementary Data
     
+    #region Greek Data
+    
+    /// <summary>
+    /// Get a supplemental data point stored in a specific option contract's cache.
+    /// </summary>
+    /// <param name="tickerSymbol"></param>
+    /// <param name="contract"></param>
+    /// <param name="key"></param>
+    /// <returns></returns>
+    Greek? GetOptionsContractGreekData(string tickerSymbol, string contract, string key);
+    
+    /// <summary>
+    /// Set a supplemental data point stored in a specific option contract's cache.
+    /// </summary>
+    /// <param name="tickerSymbol"></param>
+    /// <param name="contract"></param>
+    /// <param name="key"></param>
+    /// <param name="data"></param>
+    /// <param name="update">The function used to update the Greek value in the cache.</param>
+    /// <returns></returns>
+    bool SetOptionGreekData(string tickerSymbol, string contract, string key, Greek? data, GreekDataUpdate update);
+    
+    #endregion //Supplementary Data
+    
     #region Sub-caches
     /// <summary>
     /// Get the cache for a specific security
@@ -341,6 +365,8 @@ public interface IDataCache : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio
     /// Set the callback for when the latest option quote candlestick is updated.
     /// </summary>
     OnOptionsQuoteCandleStickUpdated? OptionsQuoteCandleStickUpdatedCallback { get; set; }
+    
+    OnOptionsContractGreekDataUpdated? OptionsContractGreekDataUpdatedCallback { get; set; }
     
     #endregion //Delegates
 }

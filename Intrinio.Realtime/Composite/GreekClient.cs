@@ -17,16 +17,12 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
 {
     #region Data Members
     private readonly IDataCache _cache;
-    public const string BlackScholesImpliedVolatilityKeyName = "IntrinioBlackScholesImpliedVolatility";
-    public const string BlackScholesDeltaKeyName = "IntrinioBlackScholesDelta";
-    public const string BlackScholesGammaKeyName = "IntrinioBlackScholesGamma";
-    public const string BlackScholesThetaKeyName = "IntrinioBlackScholesTheta";
-    public const string BlackScholesVegaKeyName = "IntrinioBlackScholesVega";
     public const string DividendYieldKeyName = "DividendYield";
     public const string RiskFreeInterestRateKeyName = "RiskFreeInterestRate";
     public const string BlackScholesKeyName = "IntrinioBlackScholes";
     private readonly ConcurrentDictionary<string, CalculateNewGreek> _calcLookup;
-    private readonly SupplementalDatumUpdate _updateFunc = (string key, double? oldValue, double? newValue) => { return newValue; };
+    private readonly GreekDataUpdate _updateFunc = (string key, Greek? oldValue, Greek? newValue) => { return newValue; };
+    private readonly SupplementalDatumUpdate _updateFuncNumber = (string key, double? oldValue, double? newValue) => { return newValue; };
     private Timer? _dividendFetchTimer;
     private Timer? _riskFreeInterestRateFetchTimer;
     private readonly Intrinio.SDK.Client.ApiClient _apiClient;
@@ -50,9 +46,9 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
     private bool _dividendYieldWorking = false;
     private readonly bool _selfCache;
 
-    public OnOptionsContractSupplementalDatumUpdated? OnGreekValueUpdated
+    public OnOptionsContractGreekDataUpdated? OnGreekValueUpdated
     {
-        set { _cache.OptionsContractSupplementalDatumUpdatedCallback += value; }
+        set { _cache.OptionsContractGreekDataUpdatedCallback += value; }
     }
     #endregion //Data Members
     
@@ -65,7 +61,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
     /// <param name="onGreekValueUpdated"></param>
     /// <param name="apiKey"></param>
     /// <param name="cache"></param>
-    public GreekClient(GreekUpdateFrequency greekUpdateFrequency, OnOptionsContractSupplementalDatumUpdated onGreekValueUpdated, string apiKey, IDataCache? cache = null)
+    public GreekClient(GreekUpdateFrequency greekUpdateFrequency, OnOptionsContractGreekDataUpdated onGreekValueUpdated, string apiKey, IDataCache? cache = null)
     {
         _apiCallSpacerMilliseconds = 1100;
         _dividendYieldUpdatePeriodHours = 4;
@@ -279,7 +275,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                     {
                         if (!String.IsNullOrWhiteSpace(companyDailyMetric.Company.Ticker) && companyDailyMetric.DividendYield.HasValue)
                         {
-                            _cache.SetSecuritySupplementalDatum(companyDailyMetric.Company.Ticker, DividendYieldKeyName, Convert.ToDouble(companyDailyMetric.DividendYield ?? 0m), _updateFunc);
+                            _cache.SetSecuritySupplementalDatum(companyDailyMetric.Company.Ticker, DividendYieldKeyName, Convert.ToDouble(companyDailyMetric.DividendYield ?? 0m), _updateFuncNumber);
                             _seenTickers[String.Intern(companyDailyMetric.Company.Ticker)] = DateTime.UtcNow;
                         }
                     }
@@ -305,13 +301,13 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
             string securityId = _securityApi.GetSecurityByIdAsync($"{ticker}:US").Result.Id;
             Thread.Sleep(_apiCallSpacerMilliseconds); //don't try to get rate limited.
             decimal? result = _securityApi.GetSecurityDataPointNumberAsync(securityId, dividendYieldTag).Result;
-            _cache.SetSecuritySupplementalDatum(ticker, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFunc);
+            _cache.SetSecuritySupplementalDatum(ticker, DividendYieldKeyName, Convert.ToDouble(result ?? 0m), _updateFuncNumber);
             _seenTickers[ticker] = DateTime.UtcNow;
             Thread.Sleep(_apiCallSpacerMilliseconds); //don't try to get rate limited.
         }
         catch (Exception e)
         {
-            _cache.SetSecuritySupplementalDatum(ticker, DividendYieldKeyName, 0.0D, _updateFunc);
+            _cache.SetSecuritySupplementalDatum(ticker, DividendYieldKeyName, 0.0D, _updateFuncNumber);
             _seenTickers[ticker] = DateTime.UtcNow;
             Thread.Sleep(_apiCallSpacerMilliseconds); //don't try to get rate limited.
         }
@@ -358,7 +354,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                 Decimal? results = _indexApi.GetEconomicIndexDataPointNumber("$DTB3", "level");
                 if (results.HasValue)
                 {
-                    _cache.SetSupplementaryDatum(RiskFreeInterestRateKeyName, Convert.ToDouble(results.Value) / 100.0D, _updateFunc);
+                    _cache.SetSupplementaryDatum(RiskFreeInterestRateKeyName, Convert.ToDouble(results.Value) / 100.0D, _updateFuncNumber);
                     success = true;
                 }
 
@@ -416,13 +412,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         Greek result = BlackScholesGreekCalculator.Calculate(riskFreeInterestRate.Value, dividendYield.Value, equitiesTrade.Value.Price, optionsQuote.Value);
         
         if (result.IsValid)
-        {
-            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesImpliedVolatilityKeyName, result.ImpliedVolatility, _updateFunc);
-            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesDeltaKeyName, result.Delta, _updateFunc);
-            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesGammaKeyName, result.Gamma, _updateFunc);
-            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesThetaKeyName, result.Theta, _updateFunc);
-            dataCache.SetOptionSupplementalDatum(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesVegaKeyName, result.Vega, _updateFunc);
-        }
+            dataCache.SetOptionGreekData(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesKeyName, result, _updateFunc);
     }
     
     #endregion //Private Methods
