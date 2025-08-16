@@ -1,6 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Intrinio.Realtime.Composite;
 
-public ref struct Greek
+public struct Greek
 {
     public readonly double ImpliedVolatility;
     public readonly double Delta;
@@ -17,5 +19,20 @@ public ref struct Greek
         Theta = theta;
         Vega = vega;
         IsValid = isValid;
+    }
+
+    public override bool Equals([NotNullWhen(true)] object? obj)
+    {
+        return obj != null && obj is Greek ? Equals((Greek)obj) : false;
+    }
+    
+    public bool Equals(Greek obj)
+    {
+        return ImpliedVolatility == obj.ImpliedVolatility
+               && Delta == obj.Delta
+               && Gamma == obj.Gamma
+               && Theta == obj.Theta
+               && Vega == obj.Vega
+               && IsValid == obj.IsValid;
     }
 };

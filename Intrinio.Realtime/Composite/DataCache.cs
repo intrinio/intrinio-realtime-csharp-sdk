@@ -19,6 +19,8 @@ internal class DataCache : IDataCache
     public OnSecuritySupplementalDatumUpdated? SecuritySupplementalDatumUpdatedCallback { get; set; }
     public OnOptionsContractSupplementalDatumUpdated? OptionsContractSupplementalDatumUpdatedCallback { get; set; }
     
+    public OnOptionsContractGreekDataUpdated? OptionsContractGreekDataUpdatedCallback { get; set; }
+    
     public OnEquitiesTradeUpdated? EquitiesTradeUpdatedCallback { get; set; }
     public OnEquitiesQuoteUpdated? EquitiesQuoteUpdatedCallback { get; set; }
     public OnEquitiesTradeCandleStickUpdated? EquitiesTradeCandleStickUpdatedCallback { get; set; }
@@ -115,10 +117,37 @@ internal class DataCache : IDataCache
         }
 
         return false;
-        
     }
     
     #endregion //Supplementary Data
+
+    #region Greeks
+
+    public Greek? GetOptionsContractGreekData(string tickerSymbol, string contract, string key)
+    {
+        return _securities.TryGetValue(tickerSymbol, out ISecurityData securityData)
+            ? securityData.GetOptionsContractGreekData(contract, key)
+            : null;
+    }
+
+    public bool SetOptionGreekData(string tickerSymbol, string contract, string key, Greek? data, GreekDataUpdate update)
+    {
+        if (!String.IsNullOrWhiteSpace(tickerSymbol))
+        {
+            ISecurityData securityData;
+            
+            if (!_securities.TryGetValue(tickerSymbol, out securityData))
+            {
+                SecurityData newDatum = new SecurityData(tickerSymbol, null, null, null, null, null, null);
+                securityData = _securities.AddOrUpdate(tickerSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return ((SecurityData)securityData).SetOptionsContractGreekData(contract, key, data, OptionsContractGreekDataUpdatedCallback, this, update);
+        }
+
+        return false;
+    }
+
+    #endregion //Greeks
     
     #region Sub-caches
     

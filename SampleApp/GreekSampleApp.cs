@@ -47,7 +47,7 @@ public class GreekSampleApp
 		Interlocked.Increment(ref _equitiesTradeEventCount);
 	}
 	
-	static void OnGreek(string key, double? datum, IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache)
+	static void OnGreek(string key, Greek? datum, IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache)
 	{
 		Interlocked.Increment(ref _greekUpdatedEventCount);
 		//Log("Greek: {0}\t\t{1}\t\t{2}", optionsContractData.Contract, key, datum?.ToString() ?? String.Empty);

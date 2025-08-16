@@ -22,6 +22,8 @@ internal class OptionsContractData : IOptionsContractData
     private Intrinio.Realtime.Options.QuoteCandleStick? _latestBidQuoteCandleStick;
     private readonly ConcurrentDictionary<string, double?> _supplementaryData;
     private readonly IReadOnlyDictionary<string, double?> _readonlySupplementaryData;
+    private readonly ConcurrentDictionary<string, Greek?> _greekData;
+    private readonly IReadOnlyDictionary<string, Greek?> _readonlyGreekData;
     
     public OptionsContractData( String contract, 
                                 Intrinio.Realtime.Options.Trade? latestTrade, 
@@ -42,6 +44,8 @@ internal class OptionsContractData : IOptionsContractData
         _latestBidQuoteCandleStick = latestBidQuoteCandleStick;
         _supplementaryData = new ConcurrentDictionary<String, double?>();
         _readonlySupplementaryData = new ReadOnlyDictionary<string, double?>(_supplementaryData);
+        _greekData = new ConcurrentDictionary<String, Greek?>();
+        _readonlyGreekData = new ReadOnlyDictionary<string, Greek?>(_greekData);
     }
 
     public String Contract { get { return this._contract; } }
@@ -84,7 +88,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsTradeUpdated(this, dataCache, securityData);
+                onOptionsTradeUpdated(this, dataCache, securityData, trade);
             }
             catch (Exception e)
             {
@@ -118,7 +122,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsQuoteUpdated(this, dataCache, securityData);
+                onOptionsQuoteUpdated(this, dataCache, securityData, quote);
             }
             catch (Exception e)
             {
@@ -147,7 +151,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsRefreshUpdated(this, dataCache, securityData);
+                onOptionsRefreshUpdated(this, dataCache, securityData, refresh);
             }
             catch (Exception e)
             {
@@ -176,7 +180,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsUnusualActivityUpdated(this, dataCache, securityData);
+                onOptionsUnusualActivityUpdated(this, dataCache, securityData, unusualActivity);
             }
             catch (Exception e)
             {
@@ -210,7 +214,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsTradeCandleStickUpdated(this, dataCache, securityData);
+                onOptionsTradeCandleStickUpdated(this, dataCache, securityData, tradeCandleStick);
             }
             catch (Exception e)
             {
@@ -263,7 +267,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsQuoteCandleStickUpdated(this, dataCache, securityData);
+                onOptionsQuoteCandleStickUpdated(this, dataCache, securityData, quoteCandleStick);
             }
             catch (Exception e)
             {
@@ -309,4 +313,43 @@ internal class OptionsContractData : IOptionsContractData
     }
 
     public IReadOnlyDictionary<string, double?> AllSupplementaryData{ get { return _readonlySupplementaryData; } }
+    
+    public Greek? GetGreekData(string key)
+    {
+        return _greekData.GetValueOrDefault(key, null);
+    }
+
+    public bool SetGreekData(string key, Greek? data, GreekDataUpdate update)
+    {
+        Greek? ret = _greekData.AddOrUpdate(key, data, (string key, Greek? oldValue) => update(key, oldValue, data));
+        return (ret.HasValue && data.HasValue && ret.Equals(data)) 
+               || (!ret.HasValue && !data.HasValue);
+    }
+
+    public bool SetGreekData(string key, Greek? data, OnOptionsContractGreekDataUpdated? onOptionsContractGreekDataUpdated, ISecurityData securityData, IDataCache dataCache, GreekDataUpdate update)
+    {
+        bool result = SetGreekData(key, data, update);
+        if (result && onOptionsContractGreekDataUpdated != null)
+        {
+            try
+            {
+                // Task.Factory.StartNew(o => 
+                //         onOptionsContractGreekDataUpdated( ((Tuple<string, Greek?, IOptionsContractData, ISecurityData, IDataCache>)o).Item1, 
+                //             ((Tuple<string, Greek?, IOptionsContractData, ISecurityData, IDataCache>)o).Item2,
+                //             ((Tuple<string, Greek?, IOptionsContractData, ISecurityData, IDataCache>)o).Item3,
+                //             ((Tuple<string, Greek?, IOptionsContractData, ISecurityData, IDataCache>)o).Item4,
+                //             ((Tuple<string, Greek?, IOptionsContractData, ISecurityData, IDataCache>)o).Item5
+                //         ), 
+                //     new Tuple<string, Greek?, IOptionsContractData, ISecurityData, IDataCache>(key, data, this, securityData, dataCache));
+                onOptionsContractGreekDataUpdated(key, data, this, securityData, dataCache);
+            }
+            catch (Exception e)
+            {
+                Logging.Log(LogLevel.ERROR, "Error in onOptionsContractGreekDataUpdated Callback: {0}", e.Message);
+            }
+        }
+        return result;
+    }
+
+    public IReadOnlyDictionary<string, Greek?> AllGreekData{ get { return _readonlyGreekData; } }
 }

@@ -110,7 +110,7 @@ internal class SecurityData : ISecurityData{
                 //                                 ((Tuple<ISecurityData, IDataCache>)o).Item2
                 //         ), 
                 //     new Tuple<ISecurityData, IDataCache>(this, dataCache));
-                onEquitiesTradeUpdated(this, dataCache);
+                onEquitiesTradeUpdated(this, dataCache, trade);
             }
             catch (Exception e)
             {
@@ -158,7 +158,7 @@ internal class SecurityData : ISecurityData{
                 //             ((Tuple<ISecurityData, IDataCache>)o).Item2
                 //         ), 
                 //     new Tuple<ISecurityData, IDataCache>(this, dataCache));
-                onEquitiesQuoteUpdated(this, dataCache);
+                onEquitiesQuoteUpdated(this, dataCache, quote);
             }
             catch (Exception e)
             {
@@ -191,7 +191,7 @@ internal class SecurityData : ISecurityData{
                 //             ((Tuple<ISecurityData, IDataCache>)o).Item2
                 //         ), 
                 //     new Tuple<ISecurityData, IDataCache>(this, dataCache));
-                onEquitiesTradeCandleStickUpdated(this, dataCache);
+                onEquitiesTradeCandleStickUpdated(this, dataCache, tradeCandleStick);
             }
             catch (Exception e)
             {
@@ -243,7 +243,7 @@ internal class SecurityData : ISecurityData{
                 //             ((Tuple<ISecurityData, IDataCache>)o).Item2
                 //         ), 
                 //     new Tuple<ISecurityData, IDataCache>(this, dataCache));
-                onEquitiesQuoteCandleStickUpdated(this, dataCache);
+                onEquitiesQuoteCandleStickUpdated(this, dataCache, quoteCandleStick);
             }
             catch (Exception e)
             {
@@ -587,6 +587,47 @@ internal class SecurityData : ISecurityData{
                 currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
             }
             return ((OptionsContractData)currentOptionsContractData).SetSupplementaryDatum(key, datum, onOptionsContractSupplementalDatumUpdated, this, dataCache, update);
+        }
+
+        return false;
+    }
+
+    public Greek? GetOptionsContractGreekData(string contract, string key)
+    {
+        if (_contracts.TryGetValue(contract, out IOptionsContractData optionsContractData))
+            return optionsContractData.GetGreekData(key);
+        return null;
+    }
+
+    public bool SetOptionsContractGreekData(string contract, string key, Greek? data, GreekDataUpdate update)
+    {
+        if (!String.IsNullOrWhiteSpace(contract))
+        {
+            IOptionsContractData currentOptionsContractData;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return currentOptionsContractData.SetGreekData(key, data, update);
+        }
+
+        return false;
+    }
+
+    public bool SetOptionsContractGreekData(string contract, string key, Greek? data, OnOptionsContractGreekDataUpdated? onOptionsContractGreekDataUpdated, IDataCache dataCache, GreekDataUpdate update)
+    {
+        if (!String.IsNullOrWhiteSpace(contract))
+        {
+            IOptionsContractData currentOptionsContractData;
+            
+            if (!_contracts.TryGetValue(contract, out currentOptionsContractData))
+            {
+                OptionsContractData newDatum = new OptionsContractData(contract, null, null, null, null, null, null, null);
+                currentOptionsContractData = _contracts.AddOrUpdate(contract, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
+            }
+            return ((OptionsContractData)currentOptionsContractData).SetGreekData(key, data, onOptionsContractGreekDataUpdated, this, dataCache, update);
         }
 
         return false;
