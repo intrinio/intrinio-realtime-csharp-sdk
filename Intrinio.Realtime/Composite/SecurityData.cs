@@ -110,7 +110,7 @@ internal class SecurityData : ISecurityData{
                 //                                 ((Tuple<ISecurityData, IDataCache>)o).Item2
                 //         ), 
                 //     new Tuple<ISecurityData, IDataCache>(this, dataCache));
-                onEquitiesTradeUpdated(this, dataCache);
+                onEquitiesTradeUpdated(this, dataCache, trade);
             }
             catch (Exception e)
             {
@@ -158,7 +158,7 @@ internal class SecurityData : ISecurityData{
                 //             ((Tuple<ISecurityData, IDataCache>)o).Item2
                 //         ), 
                 //     new Tuple<ISecurityData, IDataCache>(this, dataCache));
-                onEquitiesQuoteUpdated(this, dataCache);
+                onEquitiesQuoteUpdated(this, dataCache, quote);
             }
             catch (Exception e)
             {
@@ -191,7 +191,7 @@ internal class SecurityData : ISecurityData{
                 //             ((Tuple<ISecurityData, IDataCache>)o).Item2
                 //         ), 
                 //     new Tuple<ISecurityData, IDataCache>(this, dataCache));
-                onEquitiesTradeCandleStickUpdated(this, dataCache);
+                onEquitiesTradeCandleStickUpdated(this, dataCache, tradeCandleStick);
             }
             catch (Exception e)
             {
@@ -243,7 +243,7 @@ internal class SecurityData : ISecurityData{
                 //             ((Tuple<ISecurityData, IDataCache>)o).Item2
                 //         ), 
                 //     new Tuple<ISecurityData, IDataCache>(this, dataCache));
-                onEquitiesQuoteCandleStickUpdated(this, dataCache);
+                onEquitiesQuoteCandleStickUpdated(this, dataCache, quoteCandleStick);
             }
             catch (Exception e)
             {

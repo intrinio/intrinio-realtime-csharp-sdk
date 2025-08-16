@@ -391,13 +391,35 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         foreach (KeyValuePair<string,IOptionsContractData> keyValuePair in securityData.AllOptionsContractData)
             UpdateGreeks(keyValuePair.Value, dataCache, securityData);
     }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void UpdateGreeks(ISecurityData securityData, IDataCache dataCache, Equities.Trade trade)
+    {
+        UpdateGreeks(securityData, dataCache);
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void UpdateGreeks(ISecurityData securityData, IDataCache dataCache, Equities.Quote quote)
+    {
+        UpdateGreeks(securityData, dataCache);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void UpdateGreeks(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
     {
         foreach (CalculateNewGreek calculateNewGreek in _calcLookup.Values)
             calculateNewGreek(optionsContractData, securityData, dataCache);
-    } 
+    }
+    
+    private void UpdateGreeks(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData, Options.Trade trade)
+    {
+        UpdateGreeks(optionsContractData, dataCache, securityData);
+    }
+    
+    private void UpdateGreeks(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData, Options.Quote quote)
+    {
+        UpdateGreeks(optionsContractData, dataCache, securityData);
+    }
 
     private void BlackScholesCalc(IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache)
     {

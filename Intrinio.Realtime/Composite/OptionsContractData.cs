@@ -88,7 +88,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsTradeUpdated(this, dataCache, securityData);
+                onOptionsTradeUpdated(this, dataCache, securityData, trade);
             }
             catch (Exception e)
             {
@@ -122,7 +122,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsQuoteUpdated(this, dataCache, securityData);
+                onOptionsQuoteUpdated(this, dataCache, securityData, quote);
             }
             catch (Exception e)
             {
@@ -151,7 +151,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsRefreshUpdated(this, dataCache, securityData);
+                onOptionsRefreshUpdated(this, dataCache, securityData, refresh);
             }
             catch (Exception e)
             {
@@ -180,7 +180,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsUnusualActivityUpdated(this, dataCache, securityData);
+                onOptionsUnusualActivityUpdated(this, dataCache, securityData, unusualActivity);
             }
             catch (Exception e)
             {
@@ -214,7 +214,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsTradeCandleStickUpdated(this, dataCache, securityData);
+                onOptionsTradeCandleStickUpdated(this, dataCache, securityData, tradeCandleStick);
             }
             catch (Exception e)
             {
@@ -267,7 +267,7 @@ internal class OptionsContractData : IOptionsContractData
                 //             ((Tuple<IOptionsContractData, IDataCache, ISecurityData>)o).Item3
                 //         ), 
                 //     new Tuple<IOptionsContractData, IDataCache, ISecurityData>(this, dataCache, securityData));
-                onOptionsQuoteCandleStickUpdated(this, dataCache, securityData);
+                onOptionsQuoteCandleStickUpdated(this, dataCache, securityData, quoteCandleStick);
             }
             catch (Exception e)
             {
