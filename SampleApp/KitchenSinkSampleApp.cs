@@ -158,52 +158,52 @@ public class KitchenSinkSampleApp
 			Interlocked.Increment(ref _equitiesBidCandleStickCountIncomplete);
 	}
 	
-	static void OnOptionsQuoteCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsQuoteCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData, Intrinio.Realtime.Options.Quote? quote)
 	{
 		Interlocked.Increment(ref _optionsQuoteCacheUpdatedEventCount);
 	}
 
-	static void OnOptionsTradeCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsTradeCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData, Intrinio.Realtime.Options.Trade? trade)
 	{
 		Interlocked.Increment(ref _optionsTradeCacheUpdatedEventCount);
 	}
 	
-	static void OnOptionsRefreshCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsRefreshCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData, Intrinio.Realtime.Options.Refresh? refresh)
 	{
 		Interlocked.Increment(ref _optionsRefreshCacheUpdatedEventCount);
 	}
 	
-	static void OnOptionsUnusualActivityCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsUnusualActivityCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData, Intrinio.Realtime.Options.UnusualActivity? unusualActivity)
 	{
 		Interlocked.Increment(ref _optionsUnusualActivityCacheUpdatedEventCount);
 	}
 	
-	static void OnOptionsTradeCandleStickCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsTradeCandleStickCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData, Intrinio.Realtime.Options.TradeCandleStick? tradeCandleStick)
 	{
 		Interlocked.Increment(ref _optionsTradeCandleStickCacheUpdatedCount);
 	}
 	
-	static void OnOptionsQuoteCandleStickCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData)
+	static void OnOptionsQuoteCandleStickCacheUpdated(IOptionsContractData optionsContractData, IDataCache dataCache, ISecurityData securityData, Intrinio.Realtime.Options.QuoteCandleStick? quoteCandleStick)
 	{
 		Interlocked.Increment(ref _optionsQuoteCandleStickCacheUpdatedCount);
 	}
 	
-	static void OnEquitiesQuoteCacheUpdated(ISecurityData securityData, IDataCache dataCache)
+	static void OnEquitiesQuoteCacheUpdated(ISecurityData securityData, IDataCache dataCache, Intrinio.Realtime.Equities.Quote? quote)
 	{
 		Interlocked.Increment(ref _equitiesQuoteCacheUpdatedEventCount);
 	}
 
-	static void OnEquitiesTradeCacheUpdated(ISecurityData securityData, IDataCache dataCache)
+	static void OnEquitiesTradeCacheUpdated(ISecurityData securityData, IDataCache dataCache, Intrinio.Realtime.Equities.Trade? trade)
 	{
 		Interlocked.Increment(ref _equitiesTradeCacheUpdatedEventCount);
 	}
 	
-	static void OnEquitiesTradeCandleStickCacheUpdated(ISecurityData securityData, IDataCache dataCache)
+	static void OnEquitiesTradeCandleStickCacheUpdated(ISecurityData securityData, IDataCache dataCache, Intrinio.Realtime.Equities.TradeCandleStick? tradeCandleStick)
 	{
 		Interlocked.Increment(ref _equitiesTradeCandleStickCacheUpdatedCount);
 	}
 	
-	static void OnEquitiesQuoteCandleStickCacheUpdated(ISecurityData securityData, IDataCache dataCache)
+	static void OnEquitiesQuoteCandleStickCacheUpdated(ISecurityData securityData, IDataCache dataCache, Intrinio.Realtime.Equities.QuoteCandleStick? quoteCandleStick)
 	{
 		Interlocked.Increment(ref _equitiesQuoteCandleStickCacheUpdatedCount);
 	}
