@@ -12,15 +12,12 @@ public static class BlackScholesGreekCalculator
     private const double MAX_Z_SCORE = 8.0D;
     private static readonly double root2Pi = Math.Sqrt(2.0D * Math.PI);
 
-    public static Greek Calculate(double riskFreeInterestRate, double dividendYield, double underlyingPrice, Intrinio.Realtime.Options.Quote latestOptionQuote)
+    public static Greek Calculate(double riskFreeInterestRate, double dividendYield, double underlyingPrice, double latestEventUnixTimestamp, double marketPrice, bool isPut, double strike, DateTime expirationDate)
     {
-        if (latestOptionQuote.AskPrice <= 0.0D || latestOptionQuote.BidPrice <= 0.0D || riskFreeInterestRate <= 0.0D || underlyingPrice <= 0.0D)
+        if (marketPrice <= 0.0D || riskFreeInterestRate <= 0.0D || underlyingPrice <= 0.0D)
             return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
 
-        double yearsToExpiration = GetYearsToExpiration(latestOptionQuote.Timestamp, latestOptionQuote.GetExpirationDate());
-        double strike            = latestOptionQuote.GetStrikePrice();
-        bool   isPut             = latestOptionQuote.IsPut();
-        double marketPrice       = (latestOptionQuote.AskPrice + latestOptionQuote.BidPrice) / 2.0D;
+        double yearsToExpiration = GetYearsToExpiration(latestEventUnixTimestamp, expirationDate);
 
         if (yearsToExpiration <= 0.0D || strike <= 0.0D)
             return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
