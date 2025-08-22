@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Intrinio.Realtime.Options;
 
 namespace Intrinio.Realtime.Composite;
 
@@ -202,9 +203,27 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         return !String.IsNullOrWhiteSpace(name) && calc != null && _calcLookup.AddOrUpdate(name, calc, (key, old) => calc) == calc;
     }
 
-    public void AddBlackScholes()
+    public void AddBlackScholes(Options.Provider provider)
     {
-        TryAddOrUpdateGreekCalculation(BlackScholesKeyName, BlackScholesCalc);
+        switch (provider)
+        {
+            case Provider.OPRA:
+            {
+                TryAddOrUpdateGreekCalculation(BlackScholesKeyName, BlackScholesCalc);
+                break;
+            }
+            case Provider.OPTIONS_EDGE:
+            {
+                TryAddOrUpdateGreekCalculation(BlackScholesKeyName, BlackScholesCalcOptionsEdge);
+                break;
+            }
+            default:
+            {
+                TryAddOrUpdateGreekCalculation(BlackScholesKeyName, BlackScholesCalc);
+                break;
+            }   
+        }
+        
     }
     #endregion //Public Methods
     
@@ -439,6 +458,34 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                                                              optionsQuote.Value.IsPut(), 
                                                              optionsQuote.Value.GetStrikePrice(), 
                                                              optionsQuote.Value.GetExpirationDate());
+        
+        if (result.IsValid)
+            dataCache.SetOptionGreekData(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesKeyName, result, _updateFunc);
+    }
+    
+    private void BlackScholesCalcOptionsEdge(IOptionsContractData optionsContractData, ISecurityData securityData, IDataCache dataCache)
+    {
+        double?                           riskFreeInterestRate = dataCache.GetSupplementaryDatum(RiskFreeInterestRateKeyName);
+        double?                           dividendYield        = securityData.GetSupplementaryDatum(DividendYieldKeyName);
+        Intrinio.Realtime.Equities.Trade? equitiesTrade        = securityData.LatestEquitiesTrade;
+        Intrinio.Realtime.Options.Trade?  optionsTrade         = optionsContractData.LatestTrade;
+
+        if (!riskFreeInterestRate.HasValue 
+            || !dividendYield.HasValue 
+            || !equitiesTrade.HasValue 
+            || equitiesTrade.Value.Price <= 0.0D 
+            || !optionsTrade.HasValue 
+            || optionsTrade.Value.Price <= 0D)
+            return;
+
+        Greek result = BlackScholesGreekCalculator.Calculate(riskFreeInterestRate.Value, 
+                                                             dividendYield.Value, 
+                                                             equitiesTrade.Value.Price, 
+                                                             optionsTrade.Value.Timestamp, 
+                                                             optionsTrade.Value.Price, 
+                                                             optionsTrade.Value.IsPut(), 
+                                                             optionsTrade.Value.GetStrikePrice(), 
+                                                             optionsTrade.Value.GetExpirationDate());
         
         if (result.IsValid)
             dataCache.SetOptionGreekData(securityData.TickerSymbol, optionsContractData.Contract, BlackScholesKeyName, result, _updateFunc);
