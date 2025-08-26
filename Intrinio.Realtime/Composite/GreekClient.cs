@@ -223,6 +223,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                 break;
             }   
         }
+        
     }
     #endregion //Public Methods
     
