@@ -337,7 +337,7 @@ public abstract class WebSocketClient
                             }
                             break;
                         case WebSocketMessageType.Text:
-                            OnTextMessageReceived(buffer);
+                            OnTextMessageReceived(bufferSpan.Slice(0, result.Count));
                             break;
                         case WebSocketMessageType.Close:
                             OnClose(buffer);
@@ -546,7 +546,7 @@ public abstract class WebSocketClient
         }
     }
 
-    private void OnTextMessageReceived(ArraySegment<byte> message)
+    private void OnTextMessageReceived(ReadOnlySpan<byte> message)
     {
         Interlocked.Increment(ref _textMsgCount);
         LogMessage(LogLevel.ERROR, "Error received: {0}", Encoding.ASCII.GetString(message));
