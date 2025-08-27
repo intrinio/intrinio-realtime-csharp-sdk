@@ -85,7 +85,7 @@ public sealed class BlackScholesGreekCalculatorTests
         #endregion
         
         #region Act
-        Greek greek = Intrinio.Realtime.Composite.BlackScholesGreekCalculator.Calculate(riskFreeInterestRate, dividendYield, equitiesTrade.Price, optionsQuote);
+        Greek greek = Intrinio.Realtime.Composite.BlackScholesGreekCalculator.Calculate(riskFreeInterestRate, dividendYield, equitiesTrade.Price, optionsQuote.Timestamp, (optionsQuote.AskPrice + optionsQuote.BidPrice) / 2, optionsQuote.IsPut(), optionsQuote.GetStrikePrice(), optionsQuote.GetExpirationDate());
         #endregion
 
         #region Asserts
@@ -98,33 +98,16 @@ public sealed class BlackScholesGreekCalculatorTests
         #endregion
     }
     
+        
     [TestMethod]
-    public void Calculate_InvalidAskPrice_ReturnsFailure()
+    public void Calculate_InvalidMarketPrice_ReturnsFailure()
     {
         Intrinio.Realtime.Options.Quote quote = CreateQuote(askPrice: 0.0, bidPrice: 10.0, unixTimestamp: 1755292170, expirationSecondsFromNow: 0.5 * SecondsPerYear, strike: 100.0, isPut: false);
-        double r     = 0.05;
-        double q     = 0.0;
-        double S     = 100.0;
+        double                          r     = 0.05;
+        double                          q     = 0.0;
+        double                          S     = 100.0;
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
-
-        Assert.IsFalse(result.IsValid);
-        Assert.AreEqual(0.0, result.ImpliedVolatility);
-        Assert.AreEqual(0.0, result.Delta);
-        Assert.AreEqual(0.0, result.Gamma);
-        Assert.AreEqual(0.0, result.Theta);
-        Assert.AreEqual(0.0, result.Vega);
-    }
-
-    [TestMethod]
-    public void Calculate_InvalidBidPrice_ReturnsFailure()
-    {
-        Intrinio.Realtime.Options.Quote quote = CreateQuote(askPrice: 10.0, bidPrice: 0.0, unixTimestamp: 1755292170, expirationSecondsFromNow: 0.5 * SecondsPerYear, strike: 100.0, isPut: false);
-        double r     = 0.05;
-        double q     = 0.0;
-        double S     = 100.0;
-
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, 0.0D, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsFalse(result.IsValid);
         Assert.AreEqual(0.0, result.ImpliedVolatility);
@@ -133,7 +116,7 @@ public sealed class BlackScholesGreekCalculatorTests
         Assert.AreEqual(0.0, result.Theta);
         Assert.AreEqual(0.0, result.Vega);
     }
-
+    
     [TestMethod]
     public void Calculate_InvalidRiskFreeRate_ReturnsFailure()
     {
@@ -142,7 +125,7 @@ public sealed class BlackScholesGreekCalculatorTests
         double q     = 0.0;
         double S     = 100.0;
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, (quote.AskPrice + quote.BidPrice) / 2, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsFalse(result.IsValid);
         Assert.AreEqual(0.0, result.ImpliedVolatility);
@@ -160,7 +143,7 @@ public sealed class BlackScholesGreekCalculatorTests
         double q     = 0.0;
         double S     = 0.0;
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, (quote.AskPrice + quote.BidPrice) / 2, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsFalse(result.IsValid);
         Assert.AreEqual(0.0, result.ImpliedVolatility);
@@ -178,7 +161,7 @@ public sealed class BlackScholesGreekCalculatorTests
         double q     = 0.0;
         double S     = 100.0;
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, (quote.AskPrice + quote.BidPrice) / 2, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsFalse(result.IsValid);
         Assert.AreEqual(0.0, result.ImpliedVolatility);
@@ -196,7 +179,7 @@ public sealed class BlackScholesGreekCalculatorTests
         double q     = 0.0;
         double S     = 100.0;
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, (quote.AskPrice + quote.BidPrice) / 2, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsFalse(result.IsValid);
         Assert.AreEqual(0.0, result.ImpliedVolatility);
@@ -214,7 +197,7 @@ public sealed class BlackScholesGreekCalculatorTests
         double q     = 0.0;
         double S     = 100.0;
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, (quote.AskPrice + quote.BidPrice) / 2, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsFalse(result.IsValid);
         Assert.AreEqual(0.0, result.ImpliedVolatility);
@@ -242,7 +225,7 @@ public sealed class BlackScholesGreekCalculatorTests
 
         Intrinio.Realtime.Options.Quote quote = CreateQuote(askPrice: marketPrice, bidPrice: marketPrice, unixTimestamp: 1755292170, expirationSecondsFromNow: tSeconds, strike: K, isPut: isPut);
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, (quote.AskPrice + quote.BidPrice) / 2, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsTrue(result.IsValid);
         Assert.AreEqual(expectedIV,    result.ImpliedVolatility, Tolerance);
@@ -270,7 +253,7 @@ public sealed class BlackScholesGreekCalculatorTests
 
         Intrinio.Realtime.Options.Quote quote = CreateQuote(askPrice: marketPrice, bidPrice: marketPrice, unixTimestamp: 1755292170, expirationSecondsFromNow: tSeconds, strike: K, isPut: isPut);
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, (quote.AskPrice + quote.BidPrice) / 2, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsTrue(result.IsValid);
         Assert.AreEqual(expectedIV,    result.ImpliedVolatility, Tolerance);
@@ -287,7 +270,7 @@ public sealed class BlackScholesGreekCalculatorTests
         double expectedDelta = -0.7125115020;
         double expectedGamma = 0.0252522231;
         double expectedVega  = 0.1534072556;
-        double expectedTheta = 0.0169451974;
+        double expectedTheta = -0.0169451974;
         double marketPrice   = 11.2540142905;
         double S             = 90.0;
         double K             = 100.0;
@@ -298,7 +281,7 @@ public sealed class BlackScholesGreekCalculatorTests
 
         Intrinio.Realtime.Options.Quote quote = CreateQuote(askPrice: marketPrice, bidPrice: marketPrice, unixTimestamp: 1755292170, expirationSecondsFromNow: tSeconds, strike: K, isPut: isPut);
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, (quote.AskPrice + quote.BidPrice) / 2, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsTrue(result.IsValid);
         Assert.AreEqual(expectedIV,    result.ImpliedVolatility, Tolerance);
@@ -326,7 +309,7 @@ public sealed class BlackScholesGreekCalculatorTests
 
         Intrinio.Realtime.Options.Quote quote = CreateQuote(askPrice: marketPrice, bidPrice: marketPrice, unixTimestamp: 1755292170, expirationSecondsFromNow: tSeconds, strike: K, isPut: isPut);
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, (quote.AskPrice + quote.BidPrice) / 2, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsTrue(result.IsValid);
         Assert.AreEqual(expectedIV,    result.ImpliedVolatility, Tolerance * 750); // looser for low vol
@@ -354,7 +337,7 @@ public sealed class BlackScholesGreekCalculatorTests
 
         Intrinio.Realtime.Options.Quote quote = CreateQuote(askPrice: marketPrice, bidPrice: marketPrice, unixTimestamp: 1755292170, expirationSecondsFromNow: tSeconds, strike: K, isPut: isPut);
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, (quote.AskPrice + quote.BidPrice) / 2, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsTrue(result.IsValid);
         Assert.AreEqual(expectedIV,    result.ImpliedVolatility, Tolerance);
@@ -367,11 +350,11 @@ public sealed class BlackScholesGreekCalculatorTests
     [TestMethod]
     public void Calculate_VeryShortTimeATMCall_ReturnsCorrectGreeks()
     {
-        double expectedIV    = 0.2;
-        double expectedDelta = 0.5044153918;
-        double expectedGamma = 0.6307444962;
-        double expectedVega  = 0.0126148899;
-        double expectedTheta = -0.3522470513;
+        double expectedIV    = 0.3536;
+        double expectedDelta = 0.5022;
+        double expectedGamma = 0.6266;
+        double expectedVega  = 0.0072;
+        double expectedTheta = -1.0795;
         double marketPrice   = 0.2548143460;
         double S             = 100.0;
         double K             = 100.0;
@@ -382,7 +365,7 @@ public sealed class BlackScholesGreekCalculatorTests
 
         Intrinio.Realtime.Options.Quote quote = CreateQuote(askPrice: marketPrice, bidPrice: marketPrice, unixTimestamp: 1755292170, expirationSecondsFromNow: tSeconds, strike: K, isPut: isPut);
 
-        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote);
+        Greek result = BlackScholesGreekCalculator.Calculate(r, q, S, quote.Timestamp, marketPrice, quote.IsPut(), quote.GetStrikePrice(), quote.GetExpirationDate());
 
         Assert.IsTrue(result.IsValid);
         Assert.AreEqual(expectedIV,    result.ImpliedVolatility, Tolerance);

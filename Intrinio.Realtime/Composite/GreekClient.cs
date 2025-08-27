@@ -203,7 +203,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         return !String.IsNullOrWhiteSpace(name) && calc != null && _calcLookup.AddOrUpdate(name, calc, (key, old) => calc) == calc;
     }
 
-    public void AddBlackScholes(Options.Provider provider)
+    public void AddBlackScholes(Options.Provider provider = Provider.OPRA)
     {
         switch (provider)
         {
