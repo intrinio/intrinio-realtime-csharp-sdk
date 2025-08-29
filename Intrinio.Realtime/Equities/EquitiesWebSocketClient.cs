@@ -234,6 +234,9 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
             case Provider.CBOE_ONE:
                 return $"https://cboe-one.intrinio.com/auth?api_key={_config.ApiKey}";
                 break;
+            case Provider.EQUITIES_EDGE:
+                return $"https://equities-edge.intrinio.com/auth?api_key={_config.ApiKey}";
+                break;
             case Provider.MANUAL:
                 return $"http://{_config.IPAddress}/auth?api_key={_config.ApiKey}";
                 break;
@@ -260,6 +263,9 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
                 break;
             case Provider.CBOE_ONE:
                 return $"wss://cboe-one.intrinio.com/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
+                break;
+            case Provider.EQUITIES_EDGE:
+                return $"wss://equities-edge.intrinio.com/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
                 break;
             case Provider.MANUAL:
                 return $"ws://{_config.IPAddress}/socket/websocket?vsn=1.0.0&token={token}{delayedPart}";
