@@ -134,6 +134,8 @@ type [<Struct>] Trade =
   *    **`OTC`** - OTC in the DELAYED_SIP provider.
   *    **`NASDAQ_BASIC`** - NASDAQ Basic in the NASDAQ_BASIC provider.
   *    **`IEX`** - From the IEX exchange in the REALTIME provider.
+  *    **`CBOE_ONE`** - CBOE One in the CBOE_ONE provider.
+  *    **`EQUITIES_EDGE`** - Equities Edge in the EQUITIES_EDGE provider.
 * **MarketCenter** - Provides the market center
 * **Condition** - Provides the condition
 
@@ -169,6 +171,8 @@ type [<Struct>] Quote =
   *    **`OTC`** - OTC in the DELAYED_SIP provider.
   *    **`NASDAQ_BASIC`** - NASDAQ Basic in the NASDAQ_BASIC provider.
   *    **`IEX`** - From the IEX exchange in the REALTIME provider.
+  *    **`CBOE_ONE`** - CBOE One in the CBOE_ONE provider.
+  *    **`EQUITIES_EDGE`** - Equities Edge in the EQUITIES_EDGE provider.
 * **MarketCenter** - Provides the market center
 * **Condition** - Provides the condition
 
@@ -439,6 +443,8 @@ The application will look for the config file if you don't pass in a config obje
     "Provider": "REALTIME",
     //"Provider": "DELAYED_SIP",
     //"Provider": "NASDAQ_BASIC",
+    //"Provider": "CBOE_ONE",
+    //"Provider": "EQUITIES_EDGE",
     //"Provider": "MANUAL",
     //"IPAddress": "1.2.3.4",
     "BufferSize": 4096,
@@ -451,6 +457,7 @@ The application will look for the config file if you don't pass in a config obje
     "ApiKey": "API_KEY_HERE",
     "NumThreads": 8,
     "Provider": "OPRA",
+    //"Provider": "OPTIONS_EDGE",
     //"Provider": "MANUAL",
     //"IPAddress": "1.2.3.4",
     "BufferSize": 4096,
