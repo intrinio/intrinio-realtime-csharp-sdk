@@ -8,5 +8,6 @@ public enum Provider
     DELAYED_SIP = 3,
     NASDAQ_BASIC = 4,
     CBOE_ONE = 5,
-    IEX = 6
+    IEX = 6,
+    EQUITIES_EDGE = 7
 }

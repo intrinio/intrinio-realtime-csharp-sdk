@@ -9,5 +9,6 @@ public enum SubProvider
     OTC = 4,
     NASDAQ_BASIC = 5,
     IEX = 6,
-    CBOE_ONE = 7
+    CBOE_ONE = 7,
+    EQUITIES_EDGE = 8
 }

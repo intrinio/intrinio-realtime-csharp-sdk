@@ -7,6 +7,7 @@
 		//"Provider": "DELAYED_SIP",
 		//"Provider": "NASDAQ_BASIC",
 		//"Provider": "CBOE_ONE",
+		//"Provider": "EQUITIES_EDGE",
 		//"Provider": "MANUAL",
 		//"IPAddress": "1.2.3.4",
 		"Delayed": false,
