@@ -7,9 +7,6 @@ using Intrinio.Realtime.Options;
 
 namespace Intrinio.Realtime.Composite;
 
-/// <summary>
-/// Not for Use yet. Subject to change.
-/// </summary>
 internal class OptionsContractData : IOptionsContractData
 {
     private readonly String _contract;

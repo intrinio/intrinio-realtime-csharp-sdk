@@ -5,9 +5,6 @@ using System.Threading.Tasks;
 
 namespace Intrinio.Realtime.Composite;
 
-/// <summary>
-/// Not for Use yet. Subject to change.
-/// </summary>
 public interface ISecurityData {
     string TickerSymbol { get; }
     

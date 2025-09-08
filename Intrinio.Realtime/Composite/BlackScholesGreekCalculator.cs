@@ -27,14 +27,13 @@ public static class BlackScholesGreekCalculator
             return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
 
         // Compute common values once for all Greeks to avoid redundant calcs
-        double t = yearsToExpiration;
-        double sqrtT = Math.Sqrt(t);
-        double d1 = D1(underlyingPrice, strike, t, riskFreeInterestRate, impliedVolatility, dividendYield);
-        double d2 = d1 - impliedVolatility * sqrtT;
-        double expQt = Math.Exp(-dividendYield * t);
-        double expRt = Math.Exp(-riskFreeInterestRate * t);
-        double nD1 = CumulativeNormalDistribution(d1);
-        double nD2 = CumulativeNormalDistribution(d2);
+        double sqrtT = Math.Sqrt(yearsToExpiration);
+        double d1    = D1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, impliedVolatility, dividendYield);
+        double d2    = d1 - impliedVolatility * sqrtT;
+        double expQt = Math.Exp(-dividendYield * yearsToExpiration);
+        double expRt = Math.Exp(-riskFreeInterestRate * yearsToExpiration);
+        double nD1   = CumulativeNormalDistribution(d1);
+        double nD2   = CumulativeNormalDistribution(d2);
         double phiD1 = NormalPdf(d1);
 
         double delta = isPut ? expQt * (nD1 - 1.0D) : expQt * nD1;
