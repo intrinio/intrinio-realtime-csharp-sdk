@@ -198,6 +198,7 @@ public class ReplayClient : IEquitiesWebSocketClient
 
     public Task Start()
     {
+        LogMessage(LogLevel.VERBOSE, "ReplayClient - Starting...");
         foreach (Thread thread in _threads)
             thread.Start();
         if (_writeToCsv)
@@ -213,7 +214,7 @@ public class ReplayClient : IEquitiesWebSocketClient
             Leave(channel.ticker, channel.tradesOnly);
 
         _ctSource.Cancel();
-        LogMessage(LogLevel.INFORMATION, "Websocket - Closing...");
+        LogMessage(LogLevel.VERBOSE, "ReplayClient - Closing...");
         
         foreach (Thread thread in _threads)
             thread.Join();
@@ -244,17 +245,20 @@ public class ReplayClient : IEquitiesWebSocketClient
     {
         switch (logLevel)
         {
+            case LogLevel.VERBOSE:
+                Logging.Log(LogLevel.VERBOSE, $"{_logPrefix}: {messageTemplate}", propertyValues);
+                break;
             case LogLevel.DEBUG:
-                Serilog.Log.Debug(_logPrefix + messageTemplate, propertyValues);
+                Logging.Log(LogLevel.DEBUG, $"{_logPrefix}: {messageTemplate}", propertyValues);
                 break;
             case LogLevel.INFORMATION:
-                Serilog.Log.Information(_logPrefix + messageTemplate, propertyValues);
+                Logging.Log(LogLevel.INFORMATION, $"{_logPrefix}: {messageTemplate}", propertyValues);
                 break;
             case LogLevel.WARNING:
-                Serilog.Log.Warning(_logPrefix + messageTemplate, propertyValues);
+                Logging.Log(LogLevel.WARNING, $"{_logPrefix}: {messageTemplate}", propertyValues);
                 break;
             case LogLevel.ERROR:
-                Serilog.Log.Error(_logPrefix + messageTemplate, propertyValues);
+                Logging.Log(LogLevel.ERROR, $"{_logPrefix}: {messageTemplate}", propertyValues);
                 break;
             default:
                 throw new ArgumentException("LogLevel not specified!");
@@ -527,14 +531,15 @@ public class ReplayClient : IEquitiesWebSocketClient
     {
         switch (subProvider)
         {
-            case SubProvider.IEX:          return "iex";
-            case SubProvider.UTP:          return "utp_delayed";
-            case SubProvider.CTA_A:        return "cta_a_delayed";
-            case SubProvider.CTA_B:        return "cta_b_delayed";
-            case SubProvider.OTC:          return "otc_delayed";
-            case SubProvider.NASDAQ_BASIC: return "nasdaq_basic";
-            case SubProvider.CBOE_ONE:     return "cboe_one";
-            default:                       return "iex";
+            case SubProvider.IEX:           return "iex";
+            case SubProvider.UTP:           return "utp_delayed";
+            case SubProvider.CTA_A:         return "cta_a_delayed";
+            case SubProvider.CTA_B:         return "cta_b_delayed";
+            case SubProvider.OTC:           return "otc_delayed";
+            case SubProvider.NASDAQ_BASIC:  return "nasdaq_basic";
+            case SubProvider.CBOE_ONE:      return "cboe_one";
+            case SubProvider.EQUITIES_EDGE: return "equities_edge";
+            default:                        return "iex";
         }
     }
 
@@ -542,14 +547,15 @@ public class ReplayClient : IEquitiesWebSocketClient
     {
         switch (provider)
         {
-            case Provider.NONE:         return Array.Empty<SubProvider>();
-            case Provider.MANUAL:       return Array.Empty<SubProvider>();
-            case Provider.REALTIME:     return new SubProvider[]{SubProvider.IEX};
-            case Provider.IEX:          return new SubProvider[]{SubProvider.IEX};
-            case Provider.DELAYED_SIP:  return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
-            case Provider.NASDAQ_BASIC: return new SubProvider[]{SubProvider.NASDAQ_BASIC};
-            case Provider.CBOE_ONE:     return new SubProvider[]{SubProvider.CBOE_ONE};
-            default:                    return new SubProvider[0];
+            case Provider.NONE:          return Array.Empty<SubProvider>();
+            case Provider.MANUAL:        return Array.Empty<SubProvider>();
+            case Provider.REALTIME:      return new SubProvider[]{SubProvider.IEX};
+            case Provider.IEX:           return new SubProvider[]{SubProvider.IEX};
+            case Provider.DELAYED_SIP:   return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
+            case Provider.NASDAQ_BASIC:  return new SubProvider[]{SubProvider.NASDAQ_BASIC};
+            case Provider.CBOE_ONE:      return new SubProvider[]{SubProvider.CBOE_ONE};
+            case Provider.EQUITIES_EDGE: return new SubProvider[]{SubProvider.EQUITIES_EDGE};
+            default:                     return new SubProvider[0];
         }
     }
 

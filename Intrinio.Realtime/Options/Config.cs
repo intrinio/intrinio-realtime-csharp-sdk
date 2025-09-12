@@ -110,14 +110,14 @@ public class Config
 
     public static Config LoadConfig()
     {
-        Log.Information("Loading application configuration");
         var rawConfig = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("config.json").Build();
         Log.Logger = new LoggerConfiguration().ReadFrom.Configuration(rawConfig).CreateLogger();
+        Logging.Log(LogLevel.VERBOSE, "Loading application configuration");
         Config config = new Config();
 
         foreach (KeyValuePair<string, string> kvp in rawConfig.AsEnumerable())
         {
-            Log.Debug("Key: {0}, Value:{1}", kvp.Key, kvp.Value);
+            Logging.Log(LogLevel.DEBUG, "Key: {0}, Value:{1}", kvp.Key, kvp.Value);
         }
         
         rawConfig.Bind("OptionsConfig", config);

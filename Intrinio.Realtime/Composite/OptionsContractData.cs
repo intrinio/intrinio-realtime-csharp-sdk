@@ -89,7 +89,7 @@ internal class OptionsContractData : IOptionsContractData
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in OnOptionsTradeUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in OnOptionsTradeUpdated Callback: {0}", e.Message);
             }
         }
         return isSet;
@@ -123,7 +123,7 @@ internal class OptionsContractData : IOptionsContractData
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in onOptionsQuoteUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in onOptionsQuoteUpdated Callback: {0}", e.Message);
             }
         }
         return isSet;
@@ -152,7 +152,7 @@ internal class OptionsContractData : IOptionsContractData
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in onOptionsRefreshUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in onOptionsRefreshUpdated Callback: {0}", e.Message);
             }
         }
         return isSet;
@@ -181,7 +181,7 @@ internal class OptionsContractData : IOptionsContractData
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in onOptionsUnusualActivityUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in onOptionsUnusualActivityUpdated Callback: {0}", e.Message);
             }
         }
         return isSet;
@@ -215,7 +215,7 @@ internal class OptionsContractData : IOptionsContractData
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in OnOptionsTradeCandleStickUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in OnOptionsTradeCandleStickUpdated Callback: {0}", e.Message);
             }
         }
         return isSet;
@@ -268,7 +268,7 @@ internal class OptionsContractData : IOptionsContractData
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in onOptionsQuoteCandleStickUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in onOptionsQuoteCandleStickUpdated Callback: {0}", e.Message);
             }
         }
         return isSet;
@@ -303,7 +303,7 @@ internal class OptionsContractData : IOptionsContractData
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in onOptionsContractSupplementalDatumUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in onOptionsContractSupplementalDatumUpdated Callback: {0}", e.Message);
             }
         }
         return result;
@@ -342,7 +342,7 @@ internal class OptionsContractData : IOptionsContractData
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in onOptionsContractGreekDataUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in onOptionsContractGreekDataUpdated Callback: {0}", e.Message);
             }
         }
         return result;

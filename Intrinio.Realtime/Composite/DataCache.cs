@@ -63,7 +63,7 @@ internal class DataCache : IDataCache
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in OnSupplementalDatumUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in OnSupplementalDatumUpdated Callback: {0}", e.Message);
             }
         }
         return result;

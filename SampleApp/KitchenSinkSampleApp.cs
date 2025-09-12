@@ -281,7 +281,7 @@ public class KitchenSinkSampleApp
 	[MessageTemplateFormatMethod("messageTemplate")]
 	static void Log(string messageTemplate, params object[] propertyValues)
 	{
-		Serilog.Log.Information(messageTemplate, propertyValues);
+		Logging.Log(LogLevel.INFORMATION, messageTemplate, propertyValues);
 	}
 
 	public static async Task Run(string[] _)

@@ -79,7 +79,7 @@ internal class SecurityData : ISecurityData{
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in onSecuritySupplementalDatumUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in onSecuritySupplementalDatumUpdated Callback: {0}", e.Message);
             }
         }
         return result;
@@ -114,7 +114,7 @@ internal class SecurityData : ISecurityData{
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in onEquitiesTradeUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in onEquitiesTradeUpdated Callback: {0}", e.Message);
             }
         }
         return isSet;
@@ -162,7 +162,7 @@ internal class SecurityData : ISecurityData{
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in onEquitiesQuoteUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in onEquitiesQuoteUpdated Callback: {0}", e.Message);
             }
         }
         return isSet;
@@ -195,7 +195,7 @@ internal class SecurityData : ISecurityData{
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in onEquitiesTradeCandleStickUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in onEquitiesTradeCandleStickUpdated Callback: {0}", e.Message);
             }
         }
         return isSet;
@@ -247,7 +247,7 @@ internal class SecurityData : ISecurityData{
             }
             catch (Exception e)
             {
-                Logging.Log(LogLevel.ERROR, "Error in onEquitiesQuoteCandleStickUpdated Callback: {0}", e.Message);
+                Logging.Log(LogLevel.WARNING, "Error in onEquitiesQuoteCandleStickUpdated Callback: {0}", e.Message);
             }
         }
         return isSet;

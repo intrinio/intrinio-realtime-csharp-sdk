@@ -78,7 +78,7 @@ public class Config
 
     public static Config LoadConfig()
     {
-        Log.Information("Loading application configuration");
+        Log.Verbose("Loading application configuration");
         var rawConfig = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("config.json").Build();
         Log.Logger = new LoggerConfiguration().ReadFrom.Configuration(rawConfig).CreateLogger();
         Config config = new Config();
