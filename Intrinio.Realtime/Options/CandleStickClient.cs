@@ -67,14 +67,14 @@ public class CandleStickClient : ISocketPlugIn
     /// <summary>
     /// Creates an equities CandleStickClient that creates trade and quote candlesticks from a stream of trades and quotes.
     /// </summary>
-    /// <param name="onTradeCandleStick"></param>
-    /// <param name="onQuoteCandleStick"></param>
+    /// <param name="onTradeCandleStick">This is the callback for when a trade candlestick is prepared.</param>
+    /// <param name="onQuoteCandleStick">This is the callback for when a quote candlestick is prepared.</param>
     /// <param name="interval"></param>
     /// <param name="broadcastPartialCandles"></param>
-    /// <param name="getHistoricalTradeCandleStick"></param>
-    /// <param name="getHistoricalQuoteCandleStick"></param>
+    /// <param name="getHistoricalTradeCandleStick">When an trade happens on an expired interval, this is called to fetch the expired interval.</param>
+    /// <param name="getHistoricalQuoteCandleStick">When an quote happens on an expired interval, this is called to fetch the expired interval.</param>
     /// <param name="sourceDelaySeconds"></param>
-    /// <param name="useTradeFiltering"></param>
+    /// <param name="dataCache">Pass in a dataCache to automatically set the candlestick data.</param>
     public CandleStickClient(
         Action<TradeCandleStick> onTradeCandleStick, 
         Action<QuoteCandleStick> onQuoteCandleStick, 
@@ -158,7 +158,7 @@ public class CandleStickClient : ISocketPlugIn
         }
         catch (Exception e)
         {
-            Log.Warning("Error on handling trade in Options CandleStick Client: {0}", e.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling trade in Options CandleStick Client: {0}", e.Message);
         }
     }
 
@@ -179,20 +179,23 @@ public class CandleStickClient : ISocketPlugIn
         }
         catch (Exception e)
         {
-            Log.Warning("Error on handling quote in Options CandleStick Client: {0}", e.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling quote in Options CandleStick Client: {0}", e.Message);
         }      
     }
 
     public void OnRefresh(Refresh refresh)
     {
+        //Implemented for plugin interface, but we do nothing with the refresh data here.
     }
     
     public void OnUnusualActivity(UnusualActivity unusualActivity)
     {
+        //Implemented for plugin interface, but we do nothing with the unusual activity here.
     }
 
     public void Start()
     {
+        Logging.Log(LogLevel.VERBOSE, $"Starting {nameof(CandleStickClient)}");
         if (!_flushThread.IsAlive)
         {
             _flushThread.Start();
@@ -206,6 +209,7 @@ public class CandleStickClient : ISocketPlugIn
 
     public void Stop()
     {
+        Logging.Log(LogLevel.VERBOSE, $"Stopping {nameof(CandleStickClient)}");
         _ctSource.Cancel();
     }
     #endregion //Public Methods
@@ -229,7 +233,7 @@ public class CandleStickClient : ISocketPlugIn
             }
             catch (Exception e)
             {
-                Log.Error("Error retrieving historical TradeCandleStick: {0}; trade: {1}", e.Message, trade);
+                Logging.Log(LogLevel.WARNING, "Error retrieving historical TradeCandleStick: {0}; trade: {1}", e.Message, trade);
                 return freshCandle;
             }
         }
@@ -255,7 +259,7 @@ public class CandleStickClient : ISocketPlugIn
             }
             catch (Exception e)
             {
-                Log.Error("Error retrieving historical QuoteCandleStick: {0}; quote: {1}", e.Message, quote);
+                Logging.Log(LogLevel.WARNING, "Error retrieving historical QuoteCandleStick: {0}; quote: {1}", e.Message, quote);
                 return freshCandle;
             }
         }
@@ -281,7 +285,7 @@ public class CandleStickClient : ISocketPlugIn
             }
             catch (Exception e)
             {
-                Log.Error("Error retrieving historical QuoteCandleStick: {0}; quote: {1}", e.Message, quote);
+                Logging.Log(LogLevel.WARNING, "Error retrieving historical QuoteCandleStick: {0}; quote: {1}", e.Message, quote);
                 return freshCandle;
             }
         }
@@ -316,7 +320,7 @@ public class CandleStickClient : ISocketPlugIn
         }
         catch (Exception ex)
         {
-            Log.Warning("Error on handling late ask in CandleStick Client: {0}", ex.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling late ask in CandleStick Client: {0}", ex.Message);
         }    
     }
 
@@ -345,7 +349,7 @@ public class CandleStickClient : ISocketPlugIn
         }
         catch (Exception ex)
         {
-            Log.Warning("Error on handling late bid in CandleStick Client: {0}", ex.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling late bid in CandleStick Client: {0}", ex.Message);
         }   
     }
 
@@ -374,7 +378,7 @@ public class CandleStickClient : ISocketPlugIn
         }
         catch (Exception ex)
         {
-            Log.Warning("Error on handling late trade in CandleStick Client: {0}", ex.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling late trade in CandleStick Client: {0}", ex.Message);
         }   
     }
 
@@ -462,7 +466,7 @@ public class CandleStickClient : ISocketPlugIn
 
     private void FlushFn()
     {
-        Log.Information("Starting candlestick expiration watcher...");
+        Logging.Log(LogLevel.VERBOSE, "Starting candlestick expiration watcher...");
         CancellationToken ct = _ctSource.Token;
         System.Threading.Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
         List<string> keys = new List<string>();
@@ -522,12 +526,12 @@ public class CandleStickClient : ISocketPlugIn
             }
         }
 
-        Log.Information("Stopping candlestick expiration watcher...");
+        Logging.Log(LogLevel.VERBOSE, "Stopping candlestick expiration watcher...");
     }
 
     private async void LostAndFoundFn()
     {
-        Log.Information("Starting candlestick late event watcher...");
+        Logging.Log(LogLevel.VERBOSE, "Starting candlestick late event watcher...");
         CancellationToken ct = _ctSource.Token;
         System.Threading.Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
         List<string> keys = new List<string>();
@@ -573,7 +577,7 @@ public class CandleStickClient : ISocketPlugIn
                             }
                             catch (Exception e)
                             {
-                                Log.Error("Error retrieving historical TradeCandleStick: {0}", e.Message);
+                                Logging.Log(LogLevel.WARNING, "Error retrieving historical TradeCandleStick: {0}", e.Message);
                                 bucket.TradeCandleStick.MarkComplete();
                                 OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
                                 if (_useDataCache)
@@ -612,7 +616,7 @@ public class CandleStickClient : ISocketPlugIn
                             }
                             catch (Exception e)
                             {
-                                Log.Error("Error retrieving historical QuoteCandleStick: {0}", e.Message);
+                                Logging.Log(LogLevel.WARNING, "Error retrieving historical QuoteCandleStick: {0}", e.Message);
                                 bucket.AskCandleStick.MarkComplete();
                                 OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
                                 if (_useDataCache)
@@ -650,7 +654,7 @@ public class CandleStickClient : ISocketPlugIn
                             }
                             catch (Exception e)
                             {
-                                Log.Error("Error retrieving historical QuoteCandleStick: {0}", e.Message);
+                                Logging.Log(LogLevel.WARNING, "Error retrieving historical QuoteCandleStick: {0}", e.Message);
                                 bucket.BidCandleStick.MarkComplete();
                                 OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
                                 if (_useDataCache)
@@ -677,7 +681,7 @@ public class CandleStickClient : ISocketPlugIn
             }
         }
 
-        Log.Information("Stopping candlestick late event watcher...");
+        Logging.Log(LogLevel.VERBOSE, "Stopping candlestick late event watcher...");
     }
     
     #endregion //Private Methods

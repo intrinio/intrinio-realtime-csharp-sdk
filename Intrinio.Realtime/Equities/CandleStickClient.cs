@@ -4,7 +4,6 @@ using Intrinio.Realtime.Composite;
 namespace Intrinio.Realtime.Equities;
 
 using Intrinio;
-using Serilog;
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -75,6 +74,7 @@ public class CandleStickClient : ISocketPlugIn
     /// <param name="getHistoricalQuoteCandleStick"></param>
     /// <param name="sourceDelaySeconds"></param>
     /// <param name="useTradeFiltering"></param>
+    /// <param name="dataCache"></param>
     public CandleStickClient(
         Action<TradeCandleStick> onTradeCandleStick, 
         Action<QuoteCandleStick> onQuoteCandleStick, 
@@ -160,7 +160,7 @@ public class CandleStickClient : ISocketPlugIn
         }
         catch (Exception e)
         {
-            Log.Warning("Error on handling trade in Equities CandleStick Client: {0}", e.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling trade in Equities CandleStick Client: {0}", e.Message);
         }
     }
 
@@ -188,7 +188,7 @@ public class CandleStickClient : ISocketPlugIn
         }
         catch (Exception e)
         {
-            Log.Warning("Error on handling quote in Equities CandleStick Client: {0}", e.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling quote in Equities CandleStick Client: {0}", e.Message);
         }      
     }
 
@@ -230,7 +230,7 @@ public class CandleStickClient : ISocketPlugIn
             }
             catch (Exception e)
             {
-                Log.Error("Error retrieving historical TradeCandleStick: {0}; trade: {1}", e.Message, trade);
+                Logging.Log(LogLevel.WARNING, "Error retrieving historical TradeCandleStick: {0}; trade: {1}", e.Message, trade);
                 return freshCandle;
             }
         }
@@ -256,7 +256,7 @@ public class CandleStickClient : ISocketPlugIn
             }
             catch (Exception e)
             {
-                Log.Error("Error retrieving historical QuoteCandleStick: {0}; quote: {1}", e.Message, quote);
+                Logging.Log(LogLevel.WARNING, "Error retrieving historical QuoteCandleStick: {0}; quote: {1}", e.Message, quote);
                 return freshCandle;
             }
         }
@@ -291,7 +291,7 @@ public class CandleStickClient : ISocketPlugIn
         }
         catch (Exception ex)
         {
-            Log.Warning("Error on handling late ask in CandleStick Client: {0}", ex.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling late ask in CandleStick Client: {0}", ex.Message);
         }    
     }
 
@@ -320,7 +320,7 @@ public class CandleStickClient : ISocketPlugIn
         }
         catch (Exception ex)
         {
-            Log.Warning("Error on handling late bid in CandleStick Client: {0}", ex.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling late bid in CandleStick Client: {0}", ex.Message);
         }   
     }
 
@@ -349,7 +349,7 @@ public class CandleStickClient : ISocketPlugIn
         }
         catch (Exception ex)
         {
-            Log.Warning("Error on handling late trade in CandleStick Client: {0}", ex.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling late trade in CandleStick Client: {0}", ex.Message);
         }   
     }
 
@@ -437,7 +437,7 @@ public class CandleStickClient : ISocketPlugIn
 
     private void FlushFn()
     {
-        Log.Information("Starting candlestick expiration watcher...");
+        Logging.Log(LogLevel.VERBOSE, "Starting candlestick expiration watcher...");
         CancellationToken ct = _ctSource.Token;
         System.Threading.Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
         List<string> keys = new List<string>();
@@ -497,12 +497,12 @@ public class CandleStickClient : ISocketPlugIn
             }
         }
 
-        Log.Information("Stopping candlestick expiration watcher...");
+        Logging.Log(LogLevel.VERBOSE, "Stopping candlestick expiration watcher...");
     }
 
     private async void LostAndFoundFn()
     {
-        Log.Information("Starting candlestick late event watcher...");
+        Logging.Log(LogLevel.VERBOSE, "Starting candlestick late event watcher...");
         CancellationToken ct = _ctSource.Token;
         System.Threading.Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
         List<string> keys = new List<string>();
@@ -548,7 +548,7 @@ public class CandleStickClient : ISocketPlugIn
                             }
                             catch (Exception e)
                             {
-                                Log.Error("Error retrieving historical TradeCandleStick: {0}", e.Message);
+                                Logging.Log(LogLevel.WARNING, "Error retrieving historical TradeCandleStick: {0}", e.Message);
                                 bucket.TradeCandleStick.MarkComplete();
                                 OnTradeCandleStick.Invoke(bucket.TradeCandleStick);
                                 if (_useDataCache)
@@ -587,7 +587,7 @@ public class CandleStickClient : ISocketPlugIn
                             }
                             catch (Exception e)
                             {
-                                Log.Error("Error retrieving historical QuoteCandleStick: {0}", e.Message);
+                                Logging.Log(LogLevel.WARNING, "Error retrieving historical QuoteCandleStick: {0}", e.Message);
                                 bucket.AskCandleStick.MarkComplete();
                                 OnQuoteCandleStick.Invoke(bucket.AskCandleStick);
                                 if (_useDataCache)
@@ -625,7 +625,7 @@ public class CandleStickClient : ISocketPlugIn
                             }
                             catch (Exception e)
                             {
-                                Log.Error("Error retrieving historical QuoteCandleStick: {0}", e.Message);
+                                Logging.Log(LogLevel.WARNING, "Error retrieving historical QuoteCandleStick: {0}", e.Message);
                                 bucket.BidCandleStick.MarkComplete();
                                 OnQuoteCandleStick.Invoke(bucket.BidCandleStick);
                                 if (_useDataCache)
@@ -652,7 +652,7 @@ public class CandleStickClient : ISocketPlugIn
             }
         }
 
-        Log.Information("Stopping candlestick late event watcher...");
+        Logging.Log(LogLevel.VERBOSE, "Stopping candlestick late event watcher...");
     }
     
     #endregion //Private Methods

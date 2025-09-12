@@ -2,8 +2,9 @@ namespace Intrinio.Realtime;
 
 public enum LogLevel
 {
-    DEBUG = 0,
-    INFORMATION = 1,
-    WARNING = 2,
-    ERROR = 3
+    VERBOSE = 0,
+    DEBUG = 1,
+    INFORMATION = 2,
+    WARNING = 3,
+    ERROR = 4
 }

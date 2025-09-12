@@ -37,7 +37,7 @@ public abstract class WebSocketClient
     private readonly Func<Task>               _tryReconnect;
     private readonly HttpClient               _httpClient           = new ();
     private const    string                   ClientInfoHeaderKey   = "Client-Information";
-    private const    string                   ClientInfoHeaderValue = "IntrinioDotNetSDKv16.3";
+    private const    string                   ClientInfoHeaderValue = "IntrinioDotNetSDKv17.0";
     private readonly ThreadPriority           _mainThreadPriority;
     private readonly Thread[]                 _threads;
     private          Thread?                  _receiveThread;
@@ -129,7 +129,7 @@ public abstract class WebSocketClient
                 {
                     _wsState.IsReady = false;
                 }
-                LogMessage(LogLevel.INFORMATION, "Websocket - Closing...", Array.Empty<object>());
+                LogMessage(LogLevel.VERBOSE, "Websocket - Closing...", Array.Empty<object>());
                 try
                 {
                     await _wsState.WebSocket.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, null, CancellationToken);
@@ -172,17 +172,20 @@ public abstract class WebSocketClient
     {
         switch (logLevel)
         {
+            case LogLevel.VERBOSE:
+                Logging.Log(LogLevel.VERBOSE, $"{GetLogPrefix()}: {messageTemplate}", propertyValues);
+                break;
             case LogLevel.DEBUG:
-                Serilog.Log.Debug(GetLogPrefix() + messageTemplate, propertyValues);
+                Logging.Log(LogLevel.DEBUG, $"{GetLogPrefix()}: {messageTemplate}", propertyValues);
                 break;
             case LogLevel.INFORMATION:
-                Serilog.Log.Information(GetLogPrefix() + messageTemplate, propertyValues);
+                Logging.Log(LogLevel.INFORMATION, $"{GetLogPrefix()}: {messageTemplate}", propertyValues);
                 break;
             case LogLevel.WARNING:
-                Serilog.Log.Warning(GetLogPrefix() + messageTemplate, propertyValues);
+                Logging.Log(LogLevel.WARNING, $"{GetLogPrefix()}: {messageTemplate}", propertyValues);
                 break;
             case LogLevel.ERROR:
-                Serilog.Log.Error(GetLogPrefix() + messageTemplate, propertyValues);
+                Logging.Log(LogLevel.ERROR, $"{GetLogPrefix()}: {messageTemplate}", propertyValues);
                 break;
             default:
                 throw new ArgumentException("LogLevel not specified!");
@@ -214,14 +217,14 @@ public abstract class WebSocketClient
         if (_channels.Remove(channel))
         {
             byte[] message = MakeLeaveMessage(channel);
-            LogMessage(LogLevel.INFORMATION, "Websocket - Leaving channel: {0}", new object[]{channel});
+            LogMessage(LogLevel.VERBOSE, "Websocket - Leaving channel: {0}", new object[]{channel});
             try
             {
                 await _wsState.WebSocket.SendAsync(message, WebSocketMessageType.Binary, true, CancellationToken);
             }
             catch(Exception e)
             {
-                LogMessage(LogLevel.INFORMATION, "Websocket - Error while leaving channel: {0}; Message: {1}; Stack Trace: {2}", new object[]{channel, e.Message, e.StackTrace});
+                LogMessage(LogLevel.WARNING, "Websocket - Warning while leaving channel: {0}; Message: {1}; Stack Trace: {2}", new object[]{channel, e.Message, e.StackTrace});
             }
         }
     }
@@ -240,7 +243,7 @@ public abstract class WebSocketClient
         if (!ct.IsCancellationRequested && (_channels.Add(channel) || skipAddCheck))
         {
             byte[] message = MakeJoinMessage(channel);
-            LogMessage(LogLevel.INFORMATION, "Websocket - Joining channel: {0}", new object[]{channel});
+            LogMessage(LogLevel.VERBOSE, "Websocket - Joining channel: {0}", new object[]{channel});
             try
             {
                 await _wsState.WebSocket.SendAsync(message, WebSocketMessageType.Binary, true, ct);
@@ -248,7 +251,7 @@ public abstract class WebSocketClient
             catch(Exception e)
             {
                 _channels.Remove(channel);
-                LogMessage(LogLevel.INFORMATION, "Websocket - Error while joining channel: {0}; Message: {1}; Stack Trace: {2}", new object[]{channel, e.Message, e.StackTrace});
+                LogMessage(LogLevel.WARNING, "Websocket - Warning while joining channel: {0}; Message: {1}; Stack Trace: {2}", new object[]{channel, e.Message, e.StackTrace});
             }
         }
     }
@@ -299,7 +302,7 @@ public abstract class WebSocketClient
 
     private async Task<bool> Reconnect(CancellationToken ct)
     {
-        LogMessage(LogLevel.INFORMATION, "Websocket - Reconnecting...", Array.Empty<object>());
+        LogMessage(LogLevel.WARNING, "Websocket - Reconnecting...", Array.Empty<object>());
         if (_wsState.IsReady)
             return true;
                 
@@ -360,13 +363,13 @@ public abstract class WebSocketClient
                 switch (exceptionType)
                 {
                     case CloseType.Closed:
-                        LogMessage(LogLevel.WARNING, "Websocket - Error - Connection failed", Array.Empty<object>());
+                        LogMessage(LogLevel.WARNING, "Websocket - Warning - Connection failed", Array.Empty<object>());
                         break;
                     case CloseType.Refused:
-                        LogMessage(LogLevel.WARNING, "Websocket - Error - Connection refused", Array.Empty<object>());
+                        LogMessage(LogLevel.WARNING, "Websocket - Warning - Connection refused", Array.Empty<object>());
                         break;
                     case CloseType.Unavailable:
-                        LogMessage(LogLevel.WARNING, "Websocket - Error - Server unavailable", Array.Empty<object>());
+                        LogMessage(LogLevel.WARNING, "Websocket - Warning - Server unavailable", Array.Empty<object>());
                         break;
                     default:
                         LogMessage(LogLevel.ERROR, "Websocket - Error - {0}:{1}", new object[]{exn.GetType(), exn.Message});
@@ -420,7 +423,7 @@ public abstract class WebSocketClient
             }
             catch (Exception exn)
             {
-                LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", new object[]{exn.Message, exn.StackTrace});
+                LogMessage(LogLevel.WARNING, "Error parsing message: {0}; {1}", new object[]{exn.Message, exn.StackTrace});
             }
         };
     }
@@ -444,7 +447,7 @@ public abstract class WebSocketClient
 
     private async Task<bool> TrySetToken(CancellationToken ct)
     {
-        LogMessage(LogLevel.INFORMATION, "Authorizing...", Array.Empty<object>());
+        LogMessage(LogLevel.VERBOSE, "Authorizing...", Array.Empty<object>());
         string authUrl = GetAuthUrl();
         try
         {
@@ -468,12 +471,12 @@ public abstract class WebSocketClient
         }
         catch (System.Net.Http.HttpRequestException exn)
         {
-            LogMessage(LogLevel.ERROR, "Authoriztion Failure (bad network connection): {0}", new object[]{exn.Message});
+            LogMessage(LogLevel.WARNING, "Authoriztion Failure (bad network connection): {0}", new object[]{exn.Message});
             return false;
         }
         catch (TaskCanceledException exn)
         {
-            LogMessage(LogLevel.ERROR, "Authorization Failure (timeout): {0}", new object[]{exn.Message});
+            LogMessage(LogLevel.WARNING, "Authorization Failure (timeout): {0}", new object[]{exn.Message});
             return false;
         }
         catch (AggregateException exn)
@@ -541,7 +544,7 @@ public abstract class WebSocketClient
             }
             catch(Exception e)
             {
-                LogMessage(LogLevel.INFORMATION, "Websocket - Error on close: {0}. Stack Trace: {1}", e.Message, e.StackTrace);
+                LogMessage(LogLevel.WARNING, "Websocket - Error on close: {0}. Stack Trace: {1}", e.Message, e.StackTrace);
             }
         }
     }
@@ -549,7 +552,7 @@ public abstract class WebSocketClient
     private void OnTextMessageReceived(ReadOnlySpan<byte> message)
     {
         Interlocked.Increment(ref _textMsgCount);
-        LogMessage(LogLevel.ERROR, "Error received: {0}", Encoding.ASCII.GetString(message));
+        LogMessage(LogLevel.WARNING, "Warning received: {0}", Encoding.ASCII.GetString(message));
     }
 
     private ClientWebSocket CreateWebSocket(string token)
@@ -578,7 +581,7 @@ public abstract class WebSocketClient
         Uri wsUrl = new Uri(GetWebSocketUrl(token));
         lock (_wsLock)
         {
-            LogMessage(LogLevel.INFORMATION, "Websocket - Connecting...", Array.Empty<object>());
+            LogMessage(LogLevel.VERBOSE, "Websocket - Connecting...", Array.Empty<object>());
             ClientWebSocket ws = CreateWebSocket(token);
             _wsState = new WebSocketState(ws);
         }

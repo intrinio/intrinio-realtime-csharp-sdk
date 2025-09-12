@@ -124,7 +124,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         if (ReferenceEquals(null, _config))
             throw new ArgumentException("Config may not be null.");
         _config.Validate();
-        _logPrefix = String.Format("{0}: ", _config?.Provider.ToString());
+        _logPrefix = _config?.Provider.ToString() ?? String.Empty;
     }
 
     /// <summary>
@@ -546,7 +546,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
                 }
                 catch (Exception e)
                 {
-                    LogMessage(LogLevel.ERROR, "Error while invoking plugin supplied OnQuote: {0}; {1}", new object[]{e.Message, e.StackTrace});
+                    LogMessage(LogLevel.ERROR, "Error while invoking plugin supplied OnTrade: {0}; {1}", new object[]{e.Message, e.StackTrace});
                 }
             }
         }

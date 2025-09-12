@@ -9,6 +9,9 @@ public static class Logging
     {
         switch (logLevel)
         {
+            case LogLevel.VERBOSE:
+                Serilog.Log.Verbose(messageTemplate, propertyValues);
+                break;
             case LogLevel.DEBUG:
                 Serilog.Log.Debug(messageTemplate, propertyValues);
                 break;

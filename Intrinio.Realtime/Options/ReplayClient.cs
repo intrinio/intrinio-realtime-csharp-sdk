@@ -210,16 +210,16 @@
 //         switch (logLevel)
 //         {
 //             case LogLevel.DEBUG:
-//                 Serilog.Log.Debug(_logPrefix + messageTemplate, propertyValues);
+//                 Logging.Log(LogLevel.Debug, _logPrefix + messageTemplate, propertyValues);
 //                 break;
 //             case LogLevel.INFORMATION:
-//                 Serilog.Log.Information(_logPrefix + messageTemplate, propertyValues);
+//                 Logging.Log(LogLevel.Information, _logPrefix + messageTemplate, propertyValues);
 //                 break;
 //             case LogLevel.WARNING:
-//                 Serilog.Log.Warning(_logPrefix + messageTemplate, propertyValues);
+//                 Logging.Log(LogLevel.Warning, _logPrefix + messageTemplate, propertyValues);
 //                 break;
 //             case LogLevel.ERROR:
-//                 Serilog.Log.Error(_logPrefix + messageTemplate, propertyValues);
+//                 Logging.Log(LogLevel.Error, _logPrefix + messageTemplate, propertyValues);
 //                 break;
 //             default:
 //                 throw new ArgumentException("LogLevel not specified!");

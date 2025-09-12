@@ -109,21 +109,21 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
     {
         Task.Run(() =>
         {
-            Log.Information("Fetching company daily metrics in bulk");
+            Logging.Log(LogLevel.VERBOSE, "Fetching company daily metrics in bulk");
             for(int i = 365; i >= 0; i--)
                 FetchInitialCompanyDividends(i);
         });
         Task.Run(() =>
         {
-            Log.Information("Fetching list of tickers with options associated");
+            Logging.Log(LogLevel.VERBOSE, "Fetching list of tickers with options associated");
             CacheListOfOptionableTickers();
         });
         Task.Run(() =>
         {
-            Log.Information("Fetching list of all securities.");
+            Logging.Log(LogLevel.VERBOSE, "Fetching list of all securities.");
             CacheAllSecurities();
         });
-        Log.Information("Fetching risk free interest rate and periodically additional new dividend yields");
+        Logging.Log(LogLevel.VERBOSE, "Fetching risk free interest rate and periodically additional new dividend yields");
         _riskFreeInterestRateFetchTimer = new Timer(FetchRiskFreeInterestRate, null, 0, 11*60*60*1000);
         _dividendFetchTimer = new Timer(RefreshDividendYields, null, 60*1000, 30*1000);
     }
@@ -144,7 +144,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         }
         catch (Exception e)
         {
-            Log.Warning("Error on handling equity trade in GreekClient: {0}", e.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling equity trade in GreekClient: {0}", e.Message);
         }
     }
 
@@ -158,7 +158,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         }
         catch (Exception e)
         {
-            Log.Warning("Error on handling equity quote in GreekClient: {0}", e.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling equity quote in GreekClient: {0}", e.Message);
         }      
     }
     
@@ -172,7 +172,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         }
         catch (Exception e)
         {
-            Log.Warning("Error on handling option trade in GreekClient: {0}", e.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling option trade in GreekClient: {0}", e.Message);
         }
     }
 
@@ -186,7 +186,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         }
         catch (Exception e)
         {
-            Log.Warning("Error on handling option quote in GreekClient: {0}", e.Message);
+            Logging.Log(LogLevel.WARNING, "Error on handling option quote in GreekClient: {0}", e.Message);
         }      
     }
 
@@ -237,11 +237,11 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
             ApiResponseOptionsTickers result = _optionsApi.GetAllOptionsTickers();
             foreach (string ticker in result.Tickers)
                 _seenTickers.TryAdd(String.Intern(ticker), DateTime.MinValue);
-            Log.Information($"Found {result.Tickers.Count} optionable tickers.");
+            Logging.Log(LogLevel.INFORMATION, $"Found {result.Tickers.Count} optionable tickers.");
         }
         catch (Exception e)
         {
-            Log.Warning(e, e.Message);
+            Logging.Log(LogLevel.WARNING, $"Error in {nameof(CacheListOfOptionableTickers)} - {{0}}, {{1}}", e, e.Message);
         }
     }
     
@@ -265,14 +265,14 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                 }
                 catch (Exception e)
                 {
-                    Log.Warning(e, e.Message);
+                    Logging.Log(LogLevel.WARNING, "Error: {0}; {1}; {2}", e, e.Message, e.StackTrace);
                     Thread.Sleep(_apiCallSpacerMilliseconds); //don't try to get rate limited.
                 }
             }while (!String.IsNullOrWhiteSpace(nextPage));
         }
         catch (Exception e)
         {
-            Log.Warning(e, e.Message);
+            Logging.Log(LogLevel.WARNING, "Error: {0}; {1}; {2}", e, e.Message, e.StackTrace);
         }
     }
 
@@ -303,7 +303,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
             }
             catch (Exception e)
             {
-                Log.Warning(e, e.Message);
+                Logging.Log(LogLevel.WARNING, "Error: {0}; {1}; {2}", e, e.Message, e.StackTrace);
             }
             finally
             {
@@ -344,7 +344,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                 RefreshDividendYield("SPXW");
                 RefreshDividendYield("RUT");
                 RefreshDividendYield("VIX");
-                Log.Information($"Refreshing dividend yields for {_seenTickers.Count} tickers...");
+                Logging.Log(LogLevel.INFORMATION, $"Refreshing dividend yields for {_seenTickers.Count} tickers...");
                 foreach (KeyValuePair<string,DateTime> seenTicker in _seenTickers.Where(t => t.Value < (DateTime.UtcNow - TimeSpan.FromHours(_dividendYieldUpdatePeriodHours))))
                 {
                     RefreshDividendYield(seenTicker.Key);
@@ -352,7 +352,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
             }
             catch (Exception e)
             {
-                Log.Warning(e, e.Message);
+                Logging.Log(LogLevel.WARNING, "Error: {0}; {1}; {2}", e, e.Message, e.StackTrace);
             }
             finally
             {
@@ -382,7 +382,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
             }
             catch (Exception e)
             {
-                Log.Warning(e, e.Message);
+                Logging.Log(LogLevel.WARNING, "Error: {0}; {1}; {2}", e, e.Message, e.StackTrace);
             }
         } while (!success && tryCount < 10);
     }

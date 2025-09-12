@@ -79,7 +79,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         if (ReferenceEquals(null, _config))
             throw new ArgumentException("Config may not be null.");
         _config.Validate();
-        _logPrefix = String.Format("{0}: ", _config?.Provider.ToString());
+        _logPrefix = _config?.Provider.ToString() ?? String.Empty;
     }
 
     /// <summary>
