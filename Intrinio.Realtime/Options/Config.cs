@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Intrinio.Realtime.Options;
 
@@ -44,6 +45,24 @@ public class Config
         Delayed = false;
     }
 
+    /// <summary>
+    /// Attempts to convert a contract of the form AAPL250130P00010000 (no underscore padding of symbol) to AAPL__250130P00010000 (6 char symbol with right-pad underscore).
+    /// </summary>
+    /// <param name="nonstandardContract"></param>
+    /// <returns>A standard formatted contract.</returns>
+    public static string ConvertNonstandardContractToStandardContract(string nonstandardContract)
+    {
+        string nonTickerPart = nonstandardContract.Substring(nonstandardContract.Length - 15, 15);
+        int    tickerLength  = nonstandardContract.Length - 15; 
+        string tickerPart    = nonstandardContract.Substring(0, tickerLength);
+        StringBuilder sb = new StringBuilder(21);
+        sb.Append(tickerPart);
+        for (int i = 0; i < (6 - tickerLength); i++)
+            sb.Append('_');
+        sb.Append(nonTickerPart);
+        return sb.ToString();
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static string TranslateContract(string contract)
     {
@@ -51,11 +70,17 @@ public class Config
         {
             return contract;
         }
+
+        if (contract.Length < 21)
+        {
+            //This is the nonstandard format with no underscores at all.  
+            return TranslateContract(ConvertNonstandardContractToStandardContract(contract));
+        }
         
-        //this is of the old format and we need to translate it to what the server understands. input: AAPL__220101C00140000, TSLA__221111P00195000
-        string symbol = contract.Substring(0, 6).TrimEnd('_');
-        string date = contract.Substring(6, 6);
-        char callPut = contract[12];
+        //this is of the standard format and we need to translate it to what the server understands. input: AAPL__220101C00140000, TSLA__221111P00195000
+        string symbol     = contract.Substring(0, 6).TrimEnd('_');
+        string date       = contract.Substring(6, 6);
+        char   callPut    = contract[12];
         string wholePrice = contract.Substring(13, 5).TrimStart('0');
         if (wholePrice == String.Empty)
         {
