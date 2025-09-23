@@ -21,6 +21,7 @@
 		"ApiKey": "API_KEY_HERE",
 		"NumThreads": 8,
 		"Provider": "OPRA",
+		//"Provider": "OPTIONS_EDGE",
 		//"Provider": "MANUAL",
 		//"IPAddress": "1.2.3.4",
 		"BufferSize": 16384,
