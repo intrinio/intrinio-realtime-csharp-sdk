@@ -125,7 +125,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         });
         Logging.Log(LogLevel.VERBOSE, "Fetching risk free interest rate and periodically additional new dividend yields");
         _riskFreeInterestRateFetchTimer = new Timer(FetchRiskFreeInterestRate, null, 0, 11*60*60*1000);
-        _dividendFetchTimer = new Timer(RefreshDividendYields, null, 60*1000, 30*1000);
+        _dividendFetchTimer = new Timer(RefreshDividendYields, null, 10*1000, 300*1000);
     }
     
     public void Stop()
@@ -312,7 +312,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         }
     }
 
-    private void RefreshDividendYield(string ticker)
+    public void RefreshDividendYield(string ticker)
     {
         const string dividendYieldTag = "trailing_dividend_yield";
         try
@@ -332,7 +332,7 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
         }
     }  
     
-    private void RefreshDividendYields(object? _)
+    public void RefreshDividendYields(object? _)
     {
         if (!_dividendYieldWorking)
         {
@@ -454,7 +454,8 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                                                              dividendYield.Value, 
                                                              equitiesTrade.Value.Price, 
                                                              optionsQuote.Value.Timestamp, 
-                                                             (optionsQuote.Value.AskPrice + optionsQuote.Value.BidPrice) / 2.0D, 
+                                                             optionsQuote.Value.AskPrice, 
+                                                             optionsQuote.Value.BidPrice, 
                                                              optionsQuote.Value.IsPut(), 
                                                              optionsQuote.Value.GetStrikePrice(), 
                                                              optionsQuote.Value.GetExpirationDate());

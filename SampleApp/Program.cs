@@ -11,10 +11,11 @@ namespace SampleApp
 	{
 		static async Task Main(string[] args)
 		{
-			await EquitiesSampleApp.Run(args);
+			//await EquitiesSampleApp.Run(args);
 			//await OptionsSampleApp.Run(args);
 			//await GreekSampleApp.Run(args);
 			//await KitchenSinkSampleApp.Run(args);
+			await GreekDatabaseSampleApp.Run(args);
 		}
 	}
 }

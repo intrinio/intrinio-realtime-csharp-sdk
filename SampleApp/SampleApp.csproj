@@ -5,7 +5,6 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <PublishAot>true</PublishAot>
-        <InvariantGlobalization>true</InvariantGlobalization>
         <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
         <LangVersion>13</LangVersion>
         <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
@@ -27,6 +26,11 @@
       <None Update="config.json">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
+      <PackageReference Include="Npgsql" Version="9.0.3" />
     </ItemGroup>
 
 </Project>
