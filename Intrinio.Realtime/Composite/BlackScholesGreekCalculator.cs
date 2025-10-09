@@ -49,6 +49,49 @@ public static class BlackScholesGreekCalculator
         return new Greek(impliedVolatility, delta, gamma, theta, vega, true);
     }
 
+    public static Greek Calculate(double riskFreeInterestRate, double dividendYield, double underlyingPrice, double latestEventUnixTimestamp, double ask_price, double bid_price, bool isPut, double strike, DateTime expirationDate)
+    {
+        var marketPrice = (ask_price +bid_price) / 2.0D;
+
+        if (marketPrice <= 0.0D || riskFreeInterestRate <= 0.0D || underlyingPrice <= 0.0D)
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+
+        double yearsToExpiration = GetYearsToExpiration(latestEventUnixTimestamp, expirationDate);
+
+        if (yearsToExpiration <= 0.0D || strike <= 0.0D)
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+
+        double impliedVolatility = CalcImpliedVolatility(isPut, underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice);
+        if (impliedVolatility == 0.0D)
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+            
+        double askImpliedVolatility = CalcImpliedVolatility(isPut, underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, ask_price);
+        double bidImpliedVolatility = CalcImpliedVolatility(isPut, underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, bid_price);
+
+        // Compute common values once for all Greeks to avoid redundant calcs
+        double sqrtT = Math.Sqrt(yearsToExpiration);
+        double d1    = D1(underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, impliedVolatility, dividendYield);
+        double d2    = d1 - impliedVolatility * sqrtT;
+        double expQt = Math.Exp(-dividendYield * yearsToExpiration);
+        double expRt = Math.Exp(-riskFreeInterestRate * yearsToExpiration);
+        double nD1   = CumulativeNormalDistribution(d1);
+        double nD2   = CumulativeNormalDistribution(d2);
+        double phiD1 = NormalPdf(d1);
+
+        double delta = isPut ? expQt * (nD1 - 1.0D) : expQt * nD1;
+        double gamma = expQt * phiD1 / (underlyingPrice * impliedVolatility * sqrtT);
+        double vega = 0.01D * underlyingPrice * expQt * sqrtT * phiD1;
+
+        // Theta with correct dividend adjustments
+        double term1 = expQt * underlyingPrice * phiD1 * impliedVolatility / (2.0D * sqrtT);
+        double term2 = riskFreeInterestRate * strike * expRt * (isPut ? (1.0D - nD2) : nD2);
+        double term3 = dividendYield * underlyingPrice * expQt * (isPut ? (1.0D - nD1) : nD1);
+        double theta = isPut ? (-term1 + term2 - term3) / 365.25D : (-term1 - term2 + term3) / 365.25D;
+
+        return new Greek(impliedVolatility, delta, gamma, theta, vega, askImpliedVolatility, bidImpliedVolatility, true);
+    }
+
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double CalcImpliedVolatility(bool isPut, double underlyingPrice, double strike, double yearsToExpiration, double riskFreeInterestRate, double dividendYield, double marketPrice)
     {
