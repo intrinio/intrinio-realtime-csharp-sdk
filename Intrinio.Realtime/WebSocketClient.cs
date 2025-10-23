@@ -15,35 +15,35 @@ using Intrinio.Collections.RingBuffers;
 public abstract class WebSocketClient
 {
     #region Data Members
-    private readonly uint                     _processingThreadsQuantity;
-    private readonly uint                     _bufferSize;
-    private readonly uint                     _overflowBufferSize;
-    private          int[]                    _selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
-    private readonly object                   _tLock            = new ();
-    private readonly object                   _wsLock           = new ();
-    private          Tuple<string, DateTime>  _token            = new (null, DateTime.Now);
-    private          WebSocketState           _wsState          = null;
-    private          UInt64                   _dataMsgCount     = 0UL;
-    private          UInt64                   _dataEventCount   = 0UL;
-    private          UInt64                   _textMsgCount     = 0UL;
-    private readonly HashSet<string>          _channels         = new ();
-    protected        IEnumerable<string>      Channels { get { return _channels.ToArray(); } }
-    private readonly CancellationTokenSource  _ctSource = new ();
-    protected        CancellationToken        CancellationToken { get { return _ctSource.Token; } }
-    private readonly uint                     _maxMessageSize;
-    private readonly uint                     _bufferBlockSize;
-    private readonly SingleProducerRingBuffer _data;
-    private readonly DropOldestRingBuffer     _overflowData;
-    private          IDynamicBlockPriorityRingBufferPool  _priorityQueue;
-    private readonly Func<Task>               _tryReconnect;
-    private readonly HttpClient               _httpClient           = new ();
-    private const    string                   ClientInfoHeaderKey   = "Client-Information";
-    private const    string                   ClientInfoHeaderValue = "IntrinioDotNetSDKv17.2";
-    private readonly ThreadPriority           _mainThreadPriority;
-    private readonly Thread[]                 _threads;
-    private          Thread?                  _receiveThread;
-    private          Thread?                  _prioritizeThread;
-    private          bool                     _started;
+    private readonly   uint                                _processingThreadsQuantity;
+    protected readonly uint                                _bufferSize;
+    private readonly   uint                                _overflowBufferSize;
+    private            int[]                               _selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
+    private readonly   object                              _tLock            = new ();
+    private readonly   object                              _wsLock           = new ();
+    private            Tuple<string, DateTime>             _token            = new (null, DateTime.Now);
+    private            WebSocketState                      _wsState          = null;
+    private            UInt64                              _dataMsgCount     = 0UL;
+    private            UInt64                              _dataEventCount   = 0UL;
+    private            UInt64                              _textMsgCount     = 0UL;
+    private readonly   HashSet<string>                     _channels         = new ();
+    protected          IEnumerable<string>                 Channels { get { return _channels.ToArray(); } }
+    private readonly   CancellationTokenSource             _ctSource = new ();
+    protected          CancellationToken                   CancellationToken { get { return _ctSource.Token; } }
+    private readonly   uint                                _maxMessageSize;
+    protected readonly uint                                _bufferBlockSize;
+    private readonly   SingleProducerRingBuffer            _data;
+    private readonly   DropOldestRingBuffer                _overflowData;
+    private            IDynamicBlockPriorityRingBufferPool _priorityQueue;
+    private readonly   Func<Task>                          _tryReconnect;
+    private readonly   HttpClient                          _httpClient           = new ();
+    private const      string                              ClientInfoHeaderKey   = "Client-Information";
+    private const      string                              ClientInfoHeaderValue = "IntrinioDotNetSDKv17.2";
+    private readonly   ThreadPriority                      _mainThreadPriority;
+    private readonly   Thread[]                            _threads;
+    private            Thread?                             _receiveThread;
+    private            Thread?                             _prioritizeThread;
+    private            bool                                _started;
     #endregion //Data Members
     
     #region Constuctors
@@ -165,13 +165,16 @@ public abstract class WebSocketClient
     {
         return new ClientStats(Interlocked.Read(ref _dataMsgCount),
             Interlocked.Read(ref _textMsgCount),
-            Convert.ToInt32(_data.Count),
+            _data.Count,
             Interlocked.Read(ref _dataEventCount),
-            Convert.ToInt32(_data.BlockCapacity),
-            Convert.ToInt32(_overflowData.Count),
-            Convert.ToInt32(_overflowData.BlockCapacity),
-            Convert.ToInt32(_overflowData.DropCount),
-            System.Convert.ToInt32(_data.DropCount));
+            _data.BlockCapacity,
+            _overflowData.Count,
+            _overflowData.BlockCapacity,
+            _overflowData.DropCount,
+            _data.DropCount,
+            _priorityQueue.Count,
+            _priorityQueue.TotalBlockCapacity,
+            _priorityQueue.DropCount);
     }
     
     [Serilog.Core.MessageTemplateFormatMethod("messageTemplate")]
@@ -418,7 +421,8 @@ public abstract class WebSocketClient
                         {
                             chunkInfo = GetNextChunkInfo(datum.Slice(startIndex));
                             ReadOnlySpan<byte> chunk = datum.Slice(startIndex, chunkInfo.ChunkLength);
-                            _priorityQueue.TryEnqueue(chunkInfo.Priority, chunk);
+                            while(!_priorityQueue.TryEnqueue(chunkInfo.Priority, chunk))
+                                Thread.Sleep(0);
                         }
                         catch(Exception e) {LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", new object[]{e.Message, e.StackTrace});}
                         finally

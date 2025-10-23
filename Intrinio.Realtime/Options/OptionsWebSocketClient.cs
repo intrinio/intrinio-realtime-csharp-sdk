@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Intrinio.Collections.RingBuffers;
 using Intrinio.Realtime.Composite;
 
 namespace Intrinio.Realtime.Options;
@@ -308,20 +309,31 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
             headers.Add(new KeyValuePair<string, string>(DelayHeaderKey, DelayHeaderValue));
         return headers;
     }
+
+    protected override IDynamicBlockPriorityRingBufferPool GetPriorityRingBufferPool()
+    {
+        IDynamicBlockPriorityRingBufferPool queue = new DynamicBlockPriorityRingBufferPool(_bufferBlockSize, _bufferSize);
+
+        queue.AddUpdateRingBufferToPool(0, new DynamicBlockNoLockRingBuffer(_bufferBlockSize, _bufferSize)); //trades
+        queue.AddUpdateRingBufferToPool(1, new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize)); //refreshes and unusual activity
+        queue.AddUpdateRingBufferToPool(2, new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize)); //quotes
+        
+        return queue;
+    }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected override int GetNextChunkLength(ReadOnlySpan<byte> bytes)
+    protected override ChunkInfo GetNextChunkInfo(ReadOnlySpan<byte> bytes)
     {
         byte msgType = bytes[MessageTypeIndex]; //in the bytes, symbol length is first, then symbol, then msg type.
-
+        
         //using if-else vs switch for hotpathing
         if (msgType == 1u)
-            return QuoteMessageSize;
+            return new ChunkInfo(QuoteMessageSize, 2u);
         if (msgType == 0u)
-            return TradeMessageSize;
+            return new ChunkInfo(TradeMessageSize, 0u);
         if (msgType == 2u)
-            return RefreshMessageSize;
-        return UnusualActivityMessageSize;
+            return new ChunkInfo(RefreshMessageSize, 1u);
+        return new ChunkInfo(UnusualActivityMessageSize, 1u);
     }
 
     private string FormatContract(ReadOnlySpan<byte> alternateFormattedChars)

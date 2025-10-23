@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Intrinio.Collections.RingBuffers;
 using Intrinio.Realtime.Composite;
 
 namespace Intrinio.Realtime.Equities;
@@ -275,11 +276,25 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
                 break;
         }
     }
+    
+    protected override IDynamicBlockPriorityRingBufferPool GetPriorityRingBufferPool()
+    {
+        IDynamicBlockPriorityRingBufferPool queue = new DynamicBlockPriorityRingBufferPool(_bufferBlockSize, _bufferSize);
+
+        queue.AddUpdateRingBufferToPool(0, new DynamicBlockNoLockRingBuffer(_bufferBlockSize, _bufferSize));           //trades
+        queue.AddUpdateRingBufferToPool(1, new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize)); //quotes
+        
+        return queue;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected override int GetNextChunkLength(ReadOnlySpan<byte> bytes)
+    protected override ChunkInfo GetNextChunkInfo(ReadOnlySpan<byte> bytes)
     {
-        return Convert.ToInt32(bytes[1]);
+        int  length   = Convert.ToInt32(bytes[1]);
+        uint priority = 0u;
+
+        
+        //return new ChunkInfo(length, priority);
     }
 
     protected override List<KeyValuePair<string, string>> GetCustomSocketHeaders()

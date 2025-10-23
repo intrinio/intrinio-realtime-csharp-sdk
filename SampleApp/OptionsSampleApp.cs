@@ -76,7 +76,7 @@ public class OptionsSampleApp
 	{
 		IOptionsWebSocketClient client = (IOptionsWebSocketClient) obj;
 		ClientStats stats = client.GetStats();
-		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, Individual Events: {6}, Trades: {7}, Quotes: {8}, Refreshes: {9}, UnusualActivities: {10}",
+		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, PriorityQueue Depth: {11}%; PriorityQueue Drops: {12}, Individual Events: {6}, Trades: {7}, Quotes: {8}, Refreshes: {9}, UnusualActivities: {10}",
 			stats.SocketDataMessages,
 			stats.SocketTextMessages,
 			(stats.QueueDepth * 100) / stats.QueueCapacity,
@@ -87,7 +87,9 @@ public class OptionsSampleApp
 			client.TradeCount,
 			client.QuoteCount,
 			client.RefreshCount,
-			client.UnusualActivityCount);
+			client.UnusualActivityCount,
+			(stats.PriorityQueueDepth * 100) / stats.PriorityQueueCapacity,
+			stats.PriorityQueueDroppedCount);
 		
 		if (_useTradeCandleSticks)
 			Log("TRADE CANDLESTICK STATS - TradeCandleSticks = {0}, TradeCandleSticksIncomplete = {1}", _tradeCandleStickCount, _tradeCandleStickCountIncomplete);
