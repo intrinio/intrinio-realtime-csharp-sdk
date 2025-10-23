@@ -12,19 +12,23 @@ public static class BlackScholesGreekCalculator
     private const double MAX_Z_SCORE = 8.0D;
     private static readonly double root2Pi = Math.Sqrt(2.0D * Math.PI);
 
-    public static Greek Calculate(double riskFreeInterestRate, double dividendYield, double underlyingPrice, double latestEventUnixTimestamp, double marketPrice, bool isPut, double strike, DateTime expirationDate)
+    public static Greek Calculate(double riskFreeInterestRate, double dividendYield, double underlyingPrice, double latestEventUnixTimestamp, double marketPrice, double askPrice, double bidPrice, bool isPut, double strike, DateTime expirationDate)
     {
         if (marketPrice <= 0.0D || riskFreeInterestRate <= 0.0D || underlyingPrice <= 0.0D)
-            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
 
         double yearsToExpiration = GetYearsToExpiration(latestEventUnixTimestamp, expirationDate);
 
         if (yearsToExpiration <= 0.0D || strike <= 0.0D)
-            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
 
         double impliedVolatility = CalcImpliedVolatility(isPut, underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, marketPrice);
         if (impliedVolatility == 0.0D)
-            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+            return new Greek(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, false);
+        
+        
+        double askImpliedVolatility = (askPrice > 0.0D) ? CalcImpliedVolatility(isPut, underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, askPrice) : 0.0D;
+        double bidImpliedVolatility = (askPrice > 0.0D) ? CalcImpliedVolatility(isPut, underlyingPrice, strike, yearsToExpiration, riskFreeInterestRate, dividendYield, bidPrice) : 0.0D;
 
         // Compute common values once for all Greeks to avoid redundant calcs
         double sqrtT = Math.Sqrt(yearsToExpiration);
@@ -46,7 +50,7 @@ public static class BlackScholesGreekCalculator
         double term3 = dividendYield * underlyingPrice * expQt * (isPut ? (1.0D - nD1) : nD1);
         double theta = isPut ? (-term1 + term2 - term3) / 365.25D : (-term1 - term2 + term3) / 365.25D;
 
-        return new Greek(impliedVolatility, delta, gamma, theta, vega, true);
+        return new Greek(impliedVolatility, delta, gamma, theta, vega, askImpliedVolatility, bidImpliedVolatility, true);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -34,6 +34,7 @@ public abstract class WebSocketClient
     private readonly uint                     _bufferBlockSize;
     private readonly SingleProducerRingBuffer _data;
     private readonly DropOldestRingBuffer     _overflowData;
+    private          IDynamicBlockPriorityRingBufferPool  _priorityQueue;
     private readonly Func<Task>               _tryReconnect;
     private readonly HttpClient               _httpClient           = new ();
     private const    string                   ClientInfoHeaderKey   = "Client-Information";
@@ -41,6 +42,7 @@ public abstract class WebSocketClient
     private readonly ThreadPriority           _mainThreadPriority;
     private readonly Thread[]                 _threads;
     private          Thread?                  _receiveThread;
+    private          Thread?                  _prioritizeThread;
     private          bool                     _started;
     #endregion //Data Members
     
@@ -103,8 +105,11 @@ public abstract class WebSocketClient
         if (_started)
             return;
         _started = true;
+
+        _priorityQueue = GetPriorityRingBufferPool();
         
         _receiveThread = new Thread(ReceiveFn);
+        _prioritizeThread = new Thread(PrioritizeFn);
         for (int i = 0; i < _threads.Length; i++)
             _threads[i] = new Thread(ProcessFn);
         
@@ -141,6 +146,8 @@ public abstract class WebSocketClient
                 _ctSource.Cancel();
                 if (_receiveThread != null) 
                     _receiveThread.Join();
+                if (_prioritizeThread != null) 
+                    _prioritizeThread.Join();
                 foreach (Thread thread in _threads)
                     if (thread != null)
                         thread.Join();
@@ -266,7 +273,8 @@ public abstract class WebSocketClient
     protected abstract byte[] MakeJoinMessage(string channel);
     protected abstract byte[] MakeLeaveMessage(string channel);
     protected abstract void HandleMessage(in ReadOnlySpan<byte> bytes);
-    protected abstract int GetNextChunkLength(ReadOnlySpan<byte> bytes);
+    protected abstract ChunkInfo GetNextChunkInfo(ReadOnlySpan<byte> bytes);
+    protected abstract IDynamicBlockPriorityRingBufferPool GetPriorityRingBufferPool();
     
     #endregion //Abstract Methods
     
@@ -380,19 +388,23 @@ public abstract class WebSocketClient
             }
         }
     }
-    
-    private void ProcessFn()
+
+    private void PrioritizeFn()
     {
         CancellationToken ct = _ctSource.Token;
         Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)_mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
-        byte[] underlyingBuffer = new byte[_bufferBlockSize];
-        Span<byte> datum = new Span<byte>(underlyingBuffer);
+        byte[]     underlyingBuffer    = new byte[_bufferBlockSize];
+        Span<byte> datum               = new Span<byte>(underlyingBuffer);
+        int        iterationsSinceWork = 0; //int for the Thread.sleep arg type, and this number will never get more than 1000.
+        
         while (!ct.IsCancellationRequested)
         {
             try
             {
                 if (_data.TryDequeue(datum) || _overflowData.TryDequeue(datum))
                 {
+                    iterationsSinceWork = 0;
+                    
                     // These are grouped (many) messages.
                     // The first byte tells us how many messages there are.
                     // From there, for each message, check the message length at index 1 of each chunk to know how many bytes each chunk has.
@@ -401,22 +413,60 @@ public abstract class WebSocketClient
                     int startIndex = 1;
                     for (ulong i = 0UL; i < cnt; ++i)
                     {
-                        int msgLength = 1; //default value in case corrupt array so we don't reprocess same bytes over and over. 
+                        ChunkInfo chunkInfo = new ChunkInfo(1, 0); //default value in case corrupt array so we don't reprocess same bytes over and over.
                         try
                         {
-                            msgLength = GetNextChunkLength(datum.Slice(startIndex));
-                            ReadOnlySpan<byte> chunk = datum.Slice(startIndex, msgLength);
-                            HandleMessage(in chunk);
+                            chunkInfo = GetNextChunkInfo(datum.Slice(startIndex));
+                            ReadOnlySpan<byte> chunk = datum.Slice(startIndex, chunkInfo.ChunkLength);
+                            _priorityQueue.TryEnqueue(chunkInfo.Priority, chunk);
                         }
                         catch(Exception e) {LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", new object[]{e.Message, e.StackTrace});}
                         finally
                         {
-                            startIndex += msgLength;
+                            startIndex += chunkInfo.ChunkLength;
                         }
                     }
                 }
                 else
-                    Thread.Sleep(10);
+                {
+                    iterationsSinceWork = Math.Min(iterationsSinceWork + 1, 1000);
+                    Thread.Sleep(iterationsSinceWork / 100);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exn)
+            {
+                LogMessage(LogLevel.WARNING, "Error parsing message: {0}; {1}", new object[]{exn.Message, exn.StackTrace});
+            }
+        };
+    }
+    
+    private void ProcessFn()
+    {
+        CancellationToken ct = _ctSource.Token;
+        Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)_mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
+        byte[]             underlyingBuffer    = new byte[_bufferBlockSize];
+        Span<byte>         datum               = new Span<byte>(underlyingBuffer);
+        ReadOnlySpan<byte> chunk               = datum;
+        int                iterationsSinceWork = 0; //int for the Thread.sleep arg type, and this number will never get more than 1000.
+        
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                if (_priorityQueue.TryDequeue(underlyingBuffer, out datum))
+                {
+                    iterationsSinceWork = 0;
+                    chunk               = datum;
+                    HandleMessage(in chunk);
+                }
+                else
+                {
+                    iterationsSinceWork = Math.Min(iterationsSinceWork + 1, 1000);
+                    Thread.Sleep(iterationsSinceWork / 100);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -513,6 +563,8 @@ public abstract class WebSocketClient
                 if (!thread.IsAlive && thread.ThreadState.HasFlag(ThreadState.Unstarted))
                     thread.Start();
             }
+            if (!_prioritizeThread.IsAlive && _prioritizeThread.ThreadState.HasFlag(ThreadState.Unstarted))
+                _prioritizeThread.Start();
             if (!_receiveThread.IsAlive && _receiveThread.ThreadState.HasFlag(ThreadState.Unstarted))
                 _receiveThread.Start();
         }
@@ -590,4 +642,16 @@ public abstract class WebSocketClient
     }
     
     #endregion //Private Methods
+}
+
+public readonly struct ChunkInfo
+{
+    public readonly int  ChunkLength;
+    public readonly uint Priority;
+
+    public ChunkInfo(int chunkLength, uint priority)
+    {
+        ChunkLength = chunkLength;
+        Priority = priority;
+    }
 }
