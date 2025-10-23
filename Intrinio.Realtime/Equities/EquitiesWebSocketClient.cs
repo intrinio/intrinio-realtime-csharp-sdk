@@ -70,7 +70,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// <param name="config"></param>
     /// <param name="plugIns"></param>
     public EquitiesWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Config config, IEnumerable<ISocketPlugIn>? plugIns = null) 
-        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
+        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), MaxMessageSize)
     {
         OnTrade = onTrade;
         OnQuote = onQuote;

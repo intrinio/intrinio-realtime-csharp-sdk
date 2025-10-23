@@ -113,7 +113,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// <param name="config"></param>
     /// <param name="plugIns"></param>
     public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity, Config config, IEnumerable<ISocketPlugIn>? plugIns = null) 
-        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), Convert.ToUInt32(config.OverflowBufferSize), MaxMessageSize)
+        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), MaxMessageSize)
     {
         _plugIns = ReferenceEquals(plugIns, null) ? new ConcurrentBag<ISocketPlugIn>() : new ConcurrentBag<ISocketPlugIn>(plugIns);
         OnTrade = onTrade;

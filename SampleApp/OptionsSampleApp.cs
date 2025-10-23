@@ -76,13 +76,11 @@ public class OptionsSampleApp
 	{
 		IOptionsWebSocketClient client = (IOptionsWebSocketClient) obj;
 		ClientStats stats = client.GetStats();
-		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, PriorityQueue Depth: {11}%; PriorityQueue Drops: {12}, Individual Events: {6}, Trades: {7}, Quotes: {8}, Refreshes: {9}, UnusualActivities: {10}",
+		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Drops: {3}, PriorityQueue Depth: {9}%; PriorityQueue Drops: {10}, Individual Events: {4}, Trades: {5}, Quotes: {6}, Refreshes: {7}, UnusualActivities: {8}",
 			stats.SocketDataMessages,
 			stats.SocketTextMessages,
 			(stats.QueueDepth * 100) / stats.QueueCapacity,
-			(stats.OverflowQueueDepth * 100) / stats.OverflowQueueCapacity,
 			stats.DroppedCount,
-			stats.OverflowCount,
 			stats.EventCount,
 			client.TradeCount,
 			client.QuoteCount,

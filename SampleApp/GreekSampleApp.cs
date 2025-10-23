@@ -58,12 +58,10 @@ public class GreekSampleApp
 	{
 		IOptionsWebSocketClient optionsClient = _optionsClient;
 		ClientStats optionsClientStats = optionsClient.GetStats();
-		Log("Options Socket Stats - Grouped Messages: {0}, Queue Depth: {1}%, Overflow Queue Depth: {2}%, Drops: {3}, Overflow Count: {4}, PriorityQueue Depth: {8}%; PriorityQueue Drops: {9}, , Individual Events: {5}, Trades: {6}, Quotes: {7}",
+		Log("Options Socket Stats - Grouped Messages: {0}, Queue Depth: {1}%, Drops: {2}, PriorityQueue Depth: {6}%; PriorityQueue Drops: {7}, , Individual Events: {3}, Trades: {4}, Quotes: {5}",
 			optionsClientStats.SocketDataMessages,
 			(optionsClientStats.QueueDepth * 100) / optionsClientStats.QueueCapacity,
-			(optionsClientStats.OverflowQueueDepth * 100) / optionsClientStats.OverflowQueueCapacity,
 			optionsClientStats.DroppedCount,
-			optionsClientStats.OverflowCount,
 			optionsClientStats.EventCount,
 			optionsClient.TradeCount,
 			optionsClient.QuoteCount,
@@ -72,12 +70,10 @@ public class GreekSampleApp
 		
 		IEquitiesWebSocketClient equitiesClient = _equitiesClient;
 		ClientStats equitiesClientStats = equitiesClient.GetStats();
-		Log("Equities Socket Stats - Grouped Messages: {0}, Queue Depth: {1}%, Overflow Queue Depth: {2}%, PriorityQueue Depth: {8}%; PriorityQueue Drops: {9}, Drops: {3}, Overflow Count: {4}, Individual Events: {5}, Trades: {6}, Quotes: {7}",
+		Log("Equities Socket Stats - Grouped Messages: {0}, Queue Depth: {1}%, PriorityQueue Depth: {6}%; PriorityQueue Drops: {7}, Drops: {2}, Individual Events: {3}, Trades: {4}, Quotes: {5}",
 			equitiesClientStats.SocketDataMessages,
 			(equitiesClientStats.QueueDepth * 100) / equitiesClientStats.QueueCapacity,
-			(equitiesClientStats.OverflowQueueDepth * 100) / equitiesClientStats.OverflowQueueCapacity,
 			equitiesClientStats.DroppedCount,
-			equitiesClientStats.OverflowCount,
 			equitiesClientStats.EventCount,
 			equitiesClient.TradeCount,
 			equitiesClient.QuoteCount,
@@ -125,7 +121,6 @@ public class GreekSampleApp
 		// _optionsConfig.NumThreads = System.Environment.ProcessorCount;
 		// _optionsConfig.TradesOnly = false;
 		// _optionsConfig.BufferSize = 8192;
-		// _optionsConfig.OverflowBufferSize = 65536;
 		// _optionsConfig.Delayed = false;
 		_optionsConfig = Intrinio.Realtime.Options.Config.LoadConfig();
 		_greekClient = new GreekClient(updateFrequency, OnGreek, _optionsConfig.ApiKey, _dataCache);
@@ -148,7 +143,6 @@ public class GreekSampleApp
 		// _equitiesConfig.NumThreads = System.Environment.ProcessorCount;
 		// _equitiesConfig.TradesOnly = false;
 		// _equitiesConfig.BufferSize = 8192;
-		// _equitiesConfig.OverflowBufferSize = 65536;
 		_equitiesConfig = Intrinio.Realtime.Equities.Config.LoadConfig();
 		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, _equitiesConfig, new Intrinio.Realtime.Equities.ISocketPlugIn[]{_dataCache, _greekClient});
 		await _equitiesClient.Start();
