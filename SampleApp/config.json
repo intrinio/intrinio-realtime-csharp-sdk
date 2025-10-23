@@ -12,7 +12,6 @@
 		//"IPAddress": "1.2.3.4",
 		"Delayed": false,
 		"BufferSize": 16384,
-		"OverflowBufferSize": 16384,
 		"Symbols": [ "AAPL", "MSFT", "TSLA" ]
 		//"Symbols": [ "lobby" ],
 		//"Symbols": [  ]
@@ -25,7 +24,6 @@
 		//"Provider": "MANUAL",
 		//"IPAddress": "1.2.3.4",
 		"BufferSize": 16384,
-		"OverflowBufferSize": 16384,
 		"Delayed": false,
 		"Symbols": [ "GOOG__220408C02870000", "MSFT__220408C00315000", "AAPL__220414C00180000", "SPY", "TSLA" ]
 		//"Symbols": [ "lobby" ],
