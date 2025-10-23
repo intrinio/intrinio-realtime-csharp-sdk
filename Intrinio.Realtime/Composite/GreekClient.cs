@@ -455,6 +455,8 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                                                              equitiesTrade.Value.Price, 
                                                              optionsQuote.Value.Timestamp, 
                                                              (optionsQuote.Value.AskPrice + optionsQuote.Value.BidPrice) / 2.0D, 
+                                                             optionsQuote.Value.AskPrice,
+                                                             optionsQuote.Value.BidPrice, 
                                                              optionsQuote.Value.IsPut(), 
                                                              optionsQuote.Value.GetStrikePrice(), 
                                                              optionsQuote.Value.GetExpirationDate());
@@ -483,6 +485,8 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
                                                              equitiesTrade.Value.Price, 
                                                              optionsTrade.Value.Timestamp, 
                                                              optionsTrade.Value.Price, 
+                                                             optionsTrade.Value.Price,
+                                                             optionsTrade.Value.Price,
                                                              optionsTrade.Value.IsPut(), 
                                                              optionsTrade.Value.GetStrikePrice(), 
                                                              optionsTrade.Value.GetExpirationDate());

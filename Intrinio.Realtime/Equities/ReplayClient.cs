@@ -230,12 +230,15 @@ public class ReplayClient : IEquitiesWebSocketClient
         return new ClientStats(
             Interlocked.Read(ref _dataMsgCount), 
             Interlocked.Read(ref _textMsgCount), 
-            _data.Count, 
+            Convert.ToUInt64(_data.Count), 
             Interlocked.Read(ref _dataEventCount), 
             Int32.MaxValue, 
             0, 
             Int32.MaxValue, 
             0, 
+            0,
+            0,
+            Int32.MaxValue,
             0
         );
     }

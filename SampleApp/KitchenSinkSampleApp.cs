@@ -212,7 +212,7 @@ public class KitchenSinkSampleApp
 	{
 		IOptionsWebSocketClient optionsClient = _optionsClient;
 		ClientStats optionsClientStats = optionsClient.GetStats();
-		Log("Options Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, Individual Events: {6}, Trades: {7}, Quotes: {8}, Refreshes: {9}, UnusualActivities: {10}",
+		Log("Options Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, PriorityQueue Depth: {11}%; PriorityQueue Drops: {12}, Individual Events: {6}, Trades: {7}, Quotes: {8}, Refreshes: {9}, UnusualActivities: {10}",
 			optionsClientStats.SocketDataMessages,
 			optionsClientStats.SocketTextMessages,
 			(optionsClientStats.QueueDepth * 100) / optionsClientStats.QueueCapacity,
@@ -223,7 +223,9 @@ public class KitchenSinkSampleApp
 			optionsClient.TradeCount,
 			optionsClient.QuoteCount,
 			optionsClient.RefreshCount,
-			optionsClient.UnusualActivityCount);
+			optionsClient.UnusualActivityCount,
+			(optionsClientStats.PriorityQueueDepth * 100) / optionsClientStats.PriorityQueueCapacity,
+			optionsClientStats.PriorityQueueDroppedCount);
 		
 		if (_optionsUseTradeCandleSticks)
 			Log("OPTION TRADE CANDLESTICK STATS - TradeCandleSticks = {0}, TradeCandleSticksIncomplete = {1}", _optionsTradeCandleStickCount, _optionsTradeCandleStickCountIncomplete);
@@ -232,7 +234,7 @@ public class KitchenSinkSampleApp
 		
 		IEquitiesWebSocketClient equitiesClient = _equitiesClient;
 		ClientStats equitiesClientStats = equitiesClient.GetStats();
-		Log("Equities Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, Individual Events: {6}, Trades: {7}, Quotes: {8}",
+		Log("Equities Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, PriorityQueue Depth: {9}%; PriorityQueue Drops: {10}, Individual Events: {6}, Trades: {7}, Quotes: {8}",
 			equitiesClientStats.SocketDataMessages,
 			equitiesClientStats.SocketTextMessages,
 			(equitiesClientStats.QueueDepth * 100) / equitiesClientStats.QueueCapacity,
@@ -241,7 +243,9 @@ public class KitchenSinkSampleApp
 			equitiesClientStats.OverflowCount,
 			equitiesClientStats.EventCount,
 			equitiesClient.TradeCount,
-			equitiesClient.QuoteCount);
+			equitiesClient.QuoteCount,
+			(equitiesClientStats.PriorityQueueDepth * 100) / equitiesClientStats.PriorityQueueCapacity,
+			equitiesClientStats.PriorityQueueDroppedCount);
 		
 		if (_equitiesUseTradeCandleSticks)
 			Log("EQUITIES TRADE CANDLESTICK STATS - TradeCandleSticks = {0}, TradeCandleSticksIncomplete = {1}", _equitiesTradeCandleStickCount, _equitiesTradeCandleStickCountIncomplete);

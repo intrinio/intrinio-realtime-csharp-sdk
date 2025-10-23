@@ -58,7 +58,7 @@ public class GreekSampleApp
 	{
 		IOptionsWebSocketClient optionsClient = _optionsClient;
 		ClientStats optionsClientStats = optionsClient.GetStats();
-		Log("Options Socket Stats - Grouped Messages: {0}, Queue Depth: {1}%, Overflow Queue Depth: {2}%, Drops: {3}, Overflow Count: {4}, Individual Events: {5}, Trades: {6}, Quotes: {7}",
+		Log("Options Socket Stats - Grouped Messages: {0}, Queue Depth: {1}%, Overflow Queue Depth: {2}%, Drops: {3}, Overflow Count: {4}, PriorityQueue Depth: {8}%; PriorityQueue Drops: {9}, , Individual Events: {5}, Trades: {6}, Quotes: {7}",
 			optionsClientStats.SocketDataMessages,
 			(optionsClientStats.QueueDepth * 100) / optionsClientStats.QueueCapacity,
 			(optionsClientStats.OverflowQueueDepth * 100) / optionsClientStats.OverflowQueueCapacity,
@@ -66,11 +66,13 @@ public class GreekSampleApp
 			optionsClientStats.OverflowCount,
 			optionsClientStats.EventCount,
 			optionsClient.TradeCount,
-			optionsClient.QuoteCount);
+			optionsClient.QuoteCount,
+			(optionsClientStats.PriorityQueueDepth * 100) / optionsClientStats.PriorityQueueCapacity,
+			optionsClientStats.PriorityQueueDroppedCount);
 		
 		IEquitiesWebSocketClient equitiesClient = _equitiesClient;
 		ClientStats equitiesClientStats = equitiesClient.GetStats();
-		Log("Equities Socket Stats - Grouped Messages: {0}, Queue Depth: {1}%, Overflow Queue Depth: {2}%, Drops: {3}, Overflow Count: {4}, Individual Events: {5}, Trades: {6}, Quotes: {7}",
+		Log("Equities Socket Stats - Grouped Messages: {0}, Queue Depth: {1}%, Overflow Queue Depth: {2}%, PriorityQueue Depth: {8}%; PriorityQueue Drops: {9}, Drops: {3}, Overflow Count: {4}, Individual Events: {5}, Trades: {6}, Quotes: {7}",
 			equitiesClientStats.SocketDataMessages,
 			(equitiesClientStats.QueueDepth * 100) / equitiesClientStats.QueueCapacity,
 			(equitiesClientStats.OverflowQueueDepth * 100) / equitiesClientStats.OverflowQueueCapacity,
@@ -78,7 +80,9 @@ public class GreekSampleApp
 			equitiesClientStats.OverflowCount,
 			equitiesClientStats.EventCount,
 			equitiesClient.TradeCount,
-			equitiesClient.QuoteCount);
+			equitiesClient.QuoteCount,
+			(equitiesClientStats.PriorityQueueDepth * 100) / equitiesClientStats.PriorityQueueCapacity,
+			equitiesClientStats.PriorityQueueDroppedCount);
 		
 		Log("Greek updates: {0}", _greekUpdatedEventCount);
 		Log("Data Cache Security Count: {0}", _dataCache.AllSecurityData.Count);

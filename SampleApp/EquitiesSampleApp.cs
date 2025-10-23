@@ -88,7 +88,7 @@ public class EquitiesSampleApp
 	{
 		IEquitiesWebSocketClient client = (IEquitiesWebSocketClient) obj;
 		ClientStats stats = client.GetStats();
-		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, Individual Events: {6}, Trades: {7}, Quotes: {8}",
+		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, PriorityQueue Depth: {9}%; PriorityQueue Drops: {10}, Individual Events: {6}, Trades: {7}, Quotes: {8}",
 			stats.SocketDataMessages,
 			stats.SocketTextMessages,
 			(stats.QueueDepth * 100) / stats.QueueCapacity,
@@ -97,7 +97,9 @@ public class EquitiesSampleApp
 			stats.OverflowCount,
 			stats.EventCount,
 			client.TradeCount,
-			client.QuoteCount);
+			client.QuoteCount,
+			(stats.PriorityQueueDepth * 100) / stats.PriorityQueueCapacity,
+			stats.PriorityQueueDroppedCount);
 		if (maxTradeCount > 0)
 		{
 			Log("Most active trade: {0} ({1} updates)", maxCountTrade, maxTradeCount);
