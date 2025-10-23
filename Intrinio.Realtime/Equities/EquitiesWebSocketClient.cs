@@ -291,10 +291,21 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     protected override ChunkInfo GetNextChunkInfo(ReadOnlySpan<byte> bytes)
     {
         int  length   = Convert.ToInt32(bytes[1]);
-        uint priority = 0u;
-
-        
-        //return new ChunkInfo(length, priority);
+        MessageType msgType = (MessageType)Convert.ToInt32(bytes[0]);
+        switch (msgType)
+        {
+            case MessageType.Trade:
+            {
+                return new ChunkInfo(length, 0);
+            }
+            case MessageType.Ask:
+            case MessageType.Bid:
+            {
+                return new ChunkInfo(length, 1);
+            }
+            default:
+                return new ChunkInfo(length, 1);
+        }
     }
 
     protected override List<KeyValuePair<string, string>> GetCustomSocketHeaders()
