@@ -16,4 +16,15 @@
       <ProjectReference Include="..\Intrinio.Realtime\Intrinio.Realtime.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Fleck" Version="1.2.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="config.json" />
+      <Content Include="config.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
 </Project>

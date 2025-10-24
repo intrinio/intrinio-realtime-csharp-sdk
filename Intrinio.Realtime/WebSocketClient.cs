@@ -34,7 +34,7 @@ public abstract class WebSocketClient
     private readonly   SingleProducerDropOldestRingBuffer  _data;
     private            IDynamicBlockPriorityRingBufferPool _priorityQueue;
     private readonly   Func<Task>                          _tryReconnect;
-    private readonly   HttpClient                          _httpClient           = new ();
+    private readonly   IHttpClient                         _httpClient;
     private const      string                              ClientInfoHeaderKey   = "Client-Information";
     private const      string                              ClientInfoHeaderValue = "IntrinioDotNetSDKv18.0";
     private readonly   ThreadPriority                      _mainThreadPriority;
@@ -42,6 +42,7 @@ public abstract class WebSocketClient
     private            Thread?                             _receiveThread;
     private            Thread[]                            _prioritizeThreads;
     private            bool                                _started;
+    private readonly   Func<IClientWebSocket>?             _socketFactory;
     #endregion //Data Members
     
     #region Constuctors
@@ -50,19 +51,21 @@ public abstract class WebSocketClient
     /// </summary>
     /// <param name="processingThreadsQuantity"></param>
     /// <param name="bufferSize"></param>
-    /// <param name="overflowBufferSize"></param>
     /// <param name="maxMessageSize"></param>
-    /// <param name="dataCache"></param>
-    public WebSocketClient(uint processingThreadsQuantity, uint bufferSize, uint maxMessageSize)
+    /// <param name="socketFactory">Use this if you want to override the ClientWebSocket creation, usually for testing purposes. Null by default. </param>
+    /// <param name="httpClient">Use this if you want to override the HttpClient creation, usually for testing purposes. Null by default. </param>
+    public WebSocketClient(uint processingThreadsQuantity, uint bufferSize, uint maxMessageSize, Func<IClientWebSocket>? socketFactory = null, IHttpClient? httpClient = null)
     {
-        _started = false;
-        _mainThreadPriority = Thread.CurrentThread.Priority; //this is set outside of our scope - let's not interfere.
-        _maxMessageSize = maxMessageSize;
-        _bufferBlockSize = 256 * _maxMessageSize; //256 possible messages in a group, and let's buffer 64bytes per message
+        _started                   = false;
+        _mainThreadPriority        = Thread.CurrentThread.Priority; //this is set outside of our scope - let's not interfere.
+        _maxMessageSize            = maxMessageSize;
+        _bufferBlockSize           = 256 * _maxMessageSize; //256 possible messages in a group, and let's buffer 64bytes per message
         _processingThreadsQuantity = processingThreadsQuantity > 0 ? processingThreadsQuantity : 2;
-        _bufferSize = bufferSize >= 2048 ? bufferSize : 2048;
-        _workerThreads = GC.AllocateUninitializedArray<Thread>(Convert.ToInt32(_processingThreadsQuantity));
-        _prioritizeThreads = GC.AllocateUninitializedArray<Thread>(Convert.ToInt32(_processingThreadsQuantity));
+        _bufferSize                = bufferSize                >= 2048 ? bufferSize : 2048;
+        _workerThreads             = GC.AllocateUninitializedArray<Thread>(Convert.ToInt32(_processingThreadsQuantity));
+        _prioritizeThreads         = GC.AllocateUninitializedArray<Thread>(Convert.ToInt32(_processingThreadsQuantity));
+        _socketFactory             = socketFactory;
+        _httpClient                = httpClient ?? new HttpClientWrapper(new HttpClient());
         
         _data = new SingleProducerDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
         
@@ -609,9 +612,9 @@ public abstract class WebSocketClient
         LogMessage(LogLevel.WARNING, "Warning received: {0}", Encoding.ASCII.GetString(message));
     }
 
-    private ClientWebSocket CreateWebSocket(string token)
+    private IClientWebSocket CreateWebSocket(string token)
     {
-        ClientWebSocket ws = new ClientWebSocket();
+        IClientWebSocket ws = _socketFactory == null ? new ClientWebSocketWrapper(new ClientWebSocket()) : _socketFactory();
         ws.Options.SetBuffer(Convert.ToInt32(_bufferBlockSize * _bufferSize), Convert.ToInt32(_bufferBlockSize * _bufferSize));
         GetCustomSocketHeaders().ForEach(h => ws.Options.SetRequestHeader(h.Key, h.Value));
         return ws;
@@ -636,7 +639,7 @@ public abstract class WebSocketClient
         lock (_wsLock)
         {
             LogMessage(LogLevel.VERBOSE, "Websocket - Connecting...", Array.Empty<object>());
-            ClientWebSocket ws = CreateWebSocket(token);
+            IClientWebSocket ws = CreateWebSocket(token);
             _wsState = new WebSocketState(ws);
         }
         await _wsState.WebSocket.ConnectAsync(wsUrl, _ctSource.Token);

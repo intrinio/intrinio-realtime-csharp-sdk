@@ -6,7 +6,7 @@ using System.Net.WebSockets;
 
 internal class WebSocketState
 {
-    public ClientWebSocket WebSocket { get; set; }
+    public IClientWebSocket WebSocket { get; set; }
     public bool IsReady { get; set; }
     public bool IsReconnecting { get; set; }
     
@@ -24,7 +24,7 @@ internal class WebSocketState
         }
     }
     
-    public WebSocketState(ClientWebSocket ws)
+    public WebSocketState(IClientWebSocket ws)
     {
         WebSocket = ws;
         IsReady = false;
