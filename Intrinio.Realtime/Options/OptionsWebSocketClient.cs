@@ -106,14 +106,16 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     /// <summary>
     /// Create a new Options websocket client.
     /// </summary>
-    /// <param name="onTrade"></param>
-    /// <param name="onQuote"></param>
-    /// <param name="onRefresh"></param>
-    /// <param name="onUnusualActivity"></param>
+    /// <param name="onTrade">This is called when a trade occurs.</param>
+    /// <param name="onQuote">This is called when a quote occurs.</param>
+    /// <param name="onRefresh">This is called when a refresh event occurs.</param>
+    /// <param name="onUnusualActivity">This is called when an unusual activity event occurs.</param>
     /// <param name="config"></param>
-    /// <param name="plugIns"></param>
-    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity, Config config, IEnumerable<ISocketPlugIn>? plugIns = null) 
-        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), MaxMessageSize)
+    /// <param name="plugIns">Any plugins passed in will automatically have their On-events called - no need to include them in the earlier on-parameters' contents.</param>
+    /// <param name="socketFactory">Use this if you want to override the ClientWebSocket creation, usually for testing purposes. Null by default. </param>
+    /// <param name="httpClient">Use this if you want to override the HttpClient creation, usually for testing purposes. Null by default. </param>
+    public OptionsWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Action<Refresh>? onRefresh, Action<UnusualActivity>? onUnusualActivity, Config config, IEnumerable<ISocketPlugIn>? plugIns = null, Func<IClientWebSocket>? socketFactory = null, IHttpClient? httpClient = null) 
+        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), MaxMessageSize, socketFactory, httpClient)
     {
         _plugIns = ReferenceEquals(plugIns, null) ? new ConcurrentBag<ISocketPlugIn>() : new ConcurrentBag<ISocketPlugIn>(plugIns);
         OnTrade = onTrade;

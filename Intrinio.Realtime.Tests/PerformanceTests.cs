@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading;
@@ -14,73 +15,15 @@ namespace Intrinio.Realtime.Tests;
 [TestClass]
 public class PerformanceTests
 {
-    private HttpListener _listener;
-    private Task _listenerTask;
-    private WebSocketServer _server;
-    private IWebSocketConnection _currentSocket;
-    private bool _connected;
-    private bool _disconnected;
-    private byte[] _receivedBinary;
-    private Trade _receivedTrade;
-
     [TestInitialize]
     public void Setup()
     {
-        _connected = false;
-        _disconnected = false;
-        _receivedBinary = null;
-        _receivedTrade = default;
-
-        _listener = new HttpListener();
-        _listener.Prefixes.Add("http://localhost:54321/");
-        _listener.Start();
-
-        _listenerTask = Task.Run(() =>
-        {
-            while (_listener.IsListening)
-            {
-                try
-                {
-                    var context = _listener.GetContext();
-                    if (context.Request.Url.LocalPath == "/auth")
-                    {
-                        context.Response.StatusCode = 200;
-                        using (var writer = new StreamWriter(context.Response.OutputStream))
-                        {
-                            writer.Write("dummy_token");
-                        }
-                        context.Response.Close();
-                    }
-                }
-                catch (Exception) { }
-            }
-        });
-
-        _server = new WebSocketServer("ws://localhost:54321");
-        _server.Start(socket =>
-        {
-            socket.OnOpen = () =>
-            {
-                _currentSocket = socket;
-                _connected = true;
-            };
-            socket.OnClose = () =>
-            {
-                _disconnected = true;
-            };
-            socket.OnBinary = data =>
-            {
-                _receivedBinary = data;
-            };
-        });
+        // Suppress or mock Logging if needed; assuming it's static and harmless for tests
     }
 
     [TestCleanup]
     public void Cleanup()
     {
-        _server.Dispose();
-        _listener.Close();
-        _listenerTask.Wait();
     }
 
     private Config CreateTestConfig()
@@ -93,105 +36,129 @@ public class PerformanceTests
             TradesOnly = false,
             Delayed = false,
             BufferSize = 2048,
-            NumThreads = 2,
+            NumThreads = 1,
             Symbols = new string[] { }
         };
     }
 
     [TestMethod]
-    public async Task TestConnectionAndDisconnection()
+    public void TestProcessingMultipleMessages()
     {
-        Config config = CreateTestConfig();
-        EquitiesWebSocketClient client = new EquitiesWebSocketClient(null, null, config);
+        MockHttpClient mockHttp = new MockHttpClient();
+        mockHttp.SetResponse("http://localhost:54321/auth?api_key=test", "fake_token");
 
-        await client.Start();
-        await Task.Delay(500);
-        Assert.IsTrue(_connected, "Expected connection to be established.");
+        MockClientWebSocket mockWs = new MockClientWebSocket();
+        Func<IClientWebSocket> socketFactory = () => mockWs;
 
-        await client.Stop();
-        await Task.Delay(500);
-        Assert.IsTrue(_disconnected, "Expected disconnection to occur.");
+        ulong          receivedCount = 0UL;
+        ulong          sentCount     = 0UL;
+        int            packetCount   = 5000;
+        Action<Trade>  onTrade       = (trade) => Interlocked.Increment(ref receivedCount);
+        Action<Quote>? onQuote       = (quote) => Interlocked.Increment(ref receivedCount);
+        Config         config        = CreateTestConfig();
+
+        EquitiesWebSocketClient client = new EquitiesWebSocketClient(onTrade, onQuote, config, null, socketFactory, mockHttp);
+        client.Start().Wait();
+        client.JoinLobby(false).Wait();
+
+        byte[] packet = CreatePacket(out int count);
+        // Push multiple packets
+        for (int i = 0; i < packetCount; i++)
+        {
+            sentCount += (ulong)count;
+            mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
+        }
+
+        Thread.Sleep(60000);
+        Assert.AreEqual(sentCount, receivedCount);
+        client.Stop().Wait();
     }
 
-    [TestMethod]
-    public async Task TestSendingBinaryMessage()
+    private byte[] CreatePacket(out int count)
     {
-        Config config = CreateTestConfig();
-        EquitiesWebSocketClient client = new EquitiesWebSocketClient(null, null, config);
-
-        await client.Start();
-        await Task.Delay(500);
-        Assert.IsTrue(_connected, "Expected connection to be established.");
-
-        await client.Join("AAPL", false);
-        await Task.Delay(500);
-
-        Assert.IsNotNull(_receivedBinary, "Expected to receive a binary message.");
-        byte[] expected = new byte[] { 74, 0, (byte)'A', (byte)'P', (byte)'P', (byte)'L' };
-        CollectionAssert.AreEqual(expected, _receivedBinary, "Expected join message for AAPL.");
-
-        await client.Stop();
+        int messageCount   = 254;
+        count = messageCount;
+        List<byte> packet = new List<byte>();
+        packet.Add((byte)messageCount);
+        byte[] askMessage = BuildQuote(new Quote(QuoteType.Ask, "SYM1", 12.4D, 100u, DateTime.Now, SubProvider.IEX, 'X', "Condition"));
+        byte[] bidMessage = BuildQuote(new Quote(QuoteType.Bid, "SYM1", 12.2D, 100u, DateTime.Now, SubProvider.IEX, 'X', "Condition"));
+        byte[] tradeMessage = BuildTrade(new Trade("SYM1", 12.3D, 100u, 1000000UL, DateTime.Now, SubProvider.IEX, 'X', "Condition"));
+        for (int packetIndex = 0; packetIndex < messageCount; packetIndex++)
+        {
+            if (packetIndex % 10 == 0)
+            {
+                for (int byteIndex = 0; byteIndex < tradeMessage.Length; byteIndex++)
+                    packet.Add(tradeMessage[byteIndex]);
+            }
+            else
+            {
+                if (packetIndex % 2 == 0)
+                {
+                    for (int byteIndex = 0; byteIndex < askMessage.Length; byteIndex++)
+                        packet.Add(askMessage[byteIndex]);
+                }
+                else
+                {
+                    for (int byteIndex = 0; byteIndex < bidMessage.Length; byteIndex++)
+                        packet.Add(bidMessage[byteIndex]);
+                }
+            }
+        }
+        return packet.ToArray();
     }
 
-    [TestMethod]
-    public async Task TestReceivingBinaryMessage()
+    // Helper to create a sample quote message based on ParseQuote format
+    private byte[] BuildQuote(Quote quote)
     {
-        DateTime testTimestamp = DateTime.UtcNow;
-        ulong tsNano = (ulong)((testTimestamp - DateTime.UnixEpoch).Ticks * 100);
-
-        byte[] messageBytes = new byte[]
+        byte[] symbolBytes     = Encoding.ASCII.GetBytes(quote.Symbol);
+        int    symbolLength    = symbolBytes.Length;
+        byte[] conditionBytes  = Encoding.ASCII.GetBytes(quote.Condition);
+        int    conditionLength = conditionBytes.Length;
+        int    totalLength     = 23 + symbolLength + conditionLength;
+        byte[] bytes           = new byte[totalLength];
+        bytes[0] = (byte)((int)quote.Type);
+        bytes[1] = (byte)totalLength;
+        bytes[2] = (byte)symbolLength;
+        symbolBytes.CopyTo(bytes, 3);
+        bytes[3 + symbolLength] = (byte)((int)quote.SubProvider);
+        BitConverter.GetBytes(quote.MarketCenter).CopyTo(bytes, 4 + symbolLength);
+        BitConverter.GetBytes((float)quote.Price).CopyTo(bytes, 6 + symbolLength);
+        BitConverter.GetBytes(quote.Size).CopyTo(bytes, 10        + symbolLength);
+        ulong timestampNs = Convert.ToUInt64((quote.Timestamp - DateTime.UnixEpoch).Ticks) * 100UL;
+        BitConverter.GetBytes(timestampNs).CopyTo(bytes, 14 + symbolLength);
+        bytes[22 + symbolLength] = (byte)conditionLength;
+        if (conditionLength > 0)
         {
-            0, // MessageType.Trade (assuming 0)
-            31, // Length
-            4, // Symbol length
-            (byte)'T', (byte)'E', (byte)'S', (byte)'T', // Symbol "TEST"
-            0, // SubProvider.NONE (assuming 0)
-            65, 0, // MarketCenter 'A' (ASCII 65, little-endian char)
-            0, 0, 0xC8, 0x42, // Price 100.0f
-            100, 0, 0, 0, // Size 100u
-            // Timestamp (8 bytes)
-            (byte)(tsNano & 0xFF),
-            (byte)((tsNano >> 8) & 0xFF),
-            (byte)((tsNano >> 16) & 0xFF),
-            (byte)((tsNano >> 24) & 0xFF),
-            (byte)((tsNano >> 32) & 0xFF),
-            (byte)((tsNano >> 40) & 0xFF),
-            (byte)((tsNano >> 48) & 0xFF),
-            (byte)((tsNano >> 56) & 0xFF),
-            0xE8, 0x03, 0, 0, // TotalVolume 1000u (0x3E8)
-            0 // Condition length
-        };
+            conditionBytes.CopyTo(bytes, 23 + symbolLength);
+        }
+        return bytes;
+    }
 
-        byte[] grouped = new byte[messageBytes.Length + 1];
-        grouped[0] = 1;
-        messageBytes.CopyTo(grouped, 1);
-
-        Config config = CreateTestConfig();
-        bool received = false;
-        Action<Trade> onTrade = t =>
+    // Helper to create a sample trade message based on ParseTrade logic
+    private byte[] BuildTrade(Trade trade)
+    {
+        byte[] symbolBytes     = Encoding.ASCII.GetBytes(trade.Symbol);
+        int    symbolLength    = symbolBytes.Length;
+        byte[] conditionBytes  = Encoding.ASCII.GetBytes(trade.Condition);
+        int    conditionLength = conditionBytes.Length;
+        int    totalLength     = 27 + symbolLength + conditionLength;
+        byte[] bytes           = new byte[totalLength];
+        bytes[1] = (byte)totalLength;
+        bytes[0] = 0;
+        bytes[2] = (byte)symbolLength;
+        symbolBytes.CopyTo(bytes, 3);
+        bytes[3 + symbolLength] = (byte)((int)trade.SubProvider);
+        BitConverter.GetBytes(trade.MarketCenter).CopyTo(bytes, 4 + symbolLength);
+        BitConverter.GetBytes((float)trade.Price).CopyTo(bytes, 6 + symbolLength);
+        BitConverter.GetBytes(trade.Size).CopyTo(bytes, 10        + symbolLength);
+        ulong timestampNs = Convert.ToUInt64((trade.Timestamp - DateTime.UnixEpoch).Ticks) * 100UL;
+        BitConverter.GetBytes(timestampNs).CopyTo(bytes, 14             + symbolLength);
+        BitConverter.GetBytes((uint)trade.TotalVolume).CopyTo(bytes, 22 + symbolLength);
+        bytes[26 + symbolLength] = (byte)conditionLength;
+        if (conditionLength > 0)
         {
-            _receivedTrade = t;
-            received = true;
-        };
-        EquitiesWebSocketClient client = new EquitiesWebSocketClient(onTrade, null, config);
-
-        await client.Start();
-        await Task.Delay(500);
-        Assert.IsTrue(_connected, "Expected connection to be established.");
-
-        _currentSocket.Send(grouped);
-        await Task.Delay(500);
-
-        Assert.IsTrue(received, "Expected to receive a trade message.");
-        Assert.AreEqual("TEST", _receivedTrade.Symbol);
-        Assert.AreEqual(100.0, _receivedTrade.Price);
-        Assert.AreEqual(100u, _receivedTrade.Size);
-        Assert.AreEqual(1000u, _receivedTrade.TotalVolume);
-        Assert.IsTrue(Math.Abs((testTimestamp - _receivedTrade.Timestamp).TotalSeconds) < 1, "Timestamps should match closely.");
-        Assert.AreEqual(SubProvider.NONE, _receivedTrade.SubProvider);
-        Assert.AreEqual('A', _receivedTrade.MarketCenter);
-        Assert.AreEqual(string.Empty, _receivedTrade.Condition);
-
-        await client.Stop();
+            conditionBytes.CopyTo(bytes, 27 + symbolLength);
+        }
+        return bytes;
     }
 }

@@ -65,12 +65,14 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     /// <summary>
     /// Create a new Equities websocket client.
     /// </summary>
-    /// <param name="onTrade"></param>
-    /// <param name="onQuote"></param>
+    /// <param name="onTrade">This is called when a trade occurs.</param>
+    /// <param name="onQuote">This is called when a quote occurs.</param>
     /// <param name="config"></param>
-    /// <param name="plugIns"></param>
-    public EquitiesWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Config config, IEnumerable<ISocketPlugIn>? plugIns = null) 
-        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), MaxMessageSize)
+    /// <param name="plugIns">Any plugins passed in will automatically have their On-events called - no need to include them in the earlier on-parameters' contents.</param>
+    /// <param name="socketFactory">Use this if you want to override the ClientWebSocket creation, usually for testing purposes. Null by default. </param>
+    /// <param name="httpClient">Use this if you want to override the HttpClient creation, usually for testing purposes. Null by default. </param>
+    public EquitiesWebSocketClient(Action<Trade>? onTrade, Action<Quote>? onQuote, Config config, IEnumerable<ISocketPlugIn>? plugIns = null, Func<IClientWebSocket>? socketFactory = null, IHttpClient? httpClient = null) 
+        : base(Convert.ToUInt32(config.NumThreads), Convert.ToUInt32(config.BufferSize), MaxMessageSize, socketFactory, httpClient)
     {
         OnTrade = onTrade;
         OnQuote = onQuote;
