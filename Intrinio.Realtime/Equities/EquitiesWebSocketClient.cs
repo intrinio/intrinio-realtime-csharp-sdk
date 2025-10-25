@@ -281,7 +281,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     
     protected override IDynamicBlockPriorityRingBufferPool GetPriorityRingBufferPool()
     {
-        IDynamicBlockPriorityRingBufferPool queue = new DynamicBlockPriorityRingBufferPool(_bufferBlockSize, _bufferSize);
+        IDynamicBlockPriorityRingBufferPool queue = new DynamicBlockPriorityRingBufferPool(_bufferBlockSize);
 
         queue.AddUpdateRingBufferToPool(0, new DynamicBlockNoLockRingBuffer(_bufferBlockSize, _bufferSize));           //trades
         queue.AddUpdateRingBufferToPool(1, new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize)); //quotes
