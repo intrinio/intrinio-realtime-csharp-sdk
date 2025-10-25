@@ -105,7 +105,7 @@ public abstract class WebSocketClient
         for (int i = 0; i < _prioritizeThreads.Length; i++)
             _prioritizeThreads[i] = new Thread(PrioritizeFn){IsBackground = true};
         for (int i = 0; i < _workerThreads.Length; i++)
-            _workerThreads[i] = new Thread(ProcessFn){IsBackground = true};
+            _workerThreads[i] = new Thread(ProcessFn);
         
         _httpClient.DefaultRequestHeaders.Add(ClientInfoHeaderKey, ClientInfoHeaderValue);
         foreach (KeyValuePair<string,string> customSocketHeader in GetCustomSocketHeaders())
