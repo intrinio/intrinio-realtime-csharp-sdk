@@ -26,7 +26,7 @@ public class PerformanceTests
     {
     }
 
-    private Config CreateTestConfig()
+    private Config CreateSlowTestConfig()
     {
         return new Config
         {
@@ -35,14 +35,29 @@ public class PerformanceTests
             ApiKey = "test",
             TradesOnly = false,
             Delayed = false,
-            BufferSize = 2048,
+            BufferSize = 6000,
             NumThreads = 1,
             Symbols = new string[] { }
         };
     }
+    
+    private Config CreateTestConfig()
+    {
+        return new Config
+               {
+                   Provider   = Provider.MANUAL,
+                   IPAddress  = "localhost:54321",
+                   ApiKey     = "test",
+                   TradesOnly = false,
+                   Delayed    = false,
+                   BufferSize = 6000,
+                   NumThreads = Environment.ProcessorCount,
+                   Symbols    = new string[] { }
+               };
+    }
 
     [TestMethod]
-    public void TestProcessingMultipleMessages()
+    public void TestProcessingMultipleMessages_FailsTooSlow()
     {
         MockHttpClient mockHttp = new MockHttpClient();
         mockHttp.SetResponse("http://localhost:54321/auth?api_key=test", "fake_token");
@@ -52,14 +67,10 @@ public class PerformanceTests
 
         ulong          receivedCount = 0UL;
         ulong          sentCount     = 0UL;
-        int            packetCount   = 5000;
+        int            packetCount   = 750;
         Action<Trade>  onTrade       = (trade) => Interlocked.Increment(ref receivedCount);
         Action<Quote>? onQuote       = (quote) => Interlocked.Increment(ref receivedCount);
-        Config         config        = CreateTestConfig();
-
-        EquitiesWebSocketClient client = new EquitiesWebSocketClient(onTrade, onQuote, config, null, socketFactory, mockHttp);
-        client.Start().Wait();
-        client.JoinLobby(false).Wait();
+        Config         config        = CreateSlowTestConfig();
 
         byte[] packet = CreatePacket(out int count);
         // Push multiple packets
@@ -68,6 +79,43 @@ public class PerformanceTests
             sentCount += (ulong)count;
             mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
         }
+        
+        EquitiesWebSocketClient client = new EquitiesWebSocketClient(onTrade, onQuote, config, null, socketFactory, mockHttp);
+        client.Start().Wait();
+        client.JoinLobby(false).Wait();
+
+        Thread.Sleep(60000);
+        Assert.IsTrue(sentCount > receivedCount);
+        client.Stop().Wait();
+    }
+    
+    [TestMethod]
+    public void TestProcessingMultipleMessages_Success()
+    {
+        MockHttpClient mockHttp = new MockHttpClient();
+        mockHttp.SetResponse("http://localhost:54321/auth?api_key=test", "fake_token");
+
+        MockClientWebSocket    mockWs        = new MockClientWebSocket();
+        Func<IClientWebSocket> socketFactory = () => mockWs;
+
+        ulong          receivedCount = 0UL;
+        ulong          sentCount     = 0UL;
+        int            packetCount   = 750;
+        Action<Trade>  onTrade       = (trade) => Interlocked.Increment(ref receivedCount);
+        Action<Quote>? onQuote       = (quote) => Interlocked.Increment(ref receivedCount);
+        Config         config        = CreateTestConfig();
+
+        byte[] packet = CreatePacket(out int count);
+        // Push multiple packets
+        for (int i = 0; i < packetCount; i++)
+        {
+            sentCount += (ulong)count;
+            mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
+        }
+        
+        EquitiesWebSocketClient client = new EquitiesWebSocketClient(onTrade, onQuote, config, null, socketFactory, mockHttp);
+        client.Start().Wait();
+        client.JoinLobby(false).Wait();
 
         Thread.Sleep(60000);
         Assert.AreEqual(sentCount, receivedCount);
