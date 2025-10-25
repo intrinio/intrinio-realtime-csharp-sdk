@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,10 +20,8 @@ namespace Intrinio.Realtime.Tests;
 
 public class MockClientWebSocket : IClientWebSocket
 {
-    private readonly ClientWebSocketOptions _options = new ClientWebSocket().Options;
-    private readonly SemaphoreSlim _receiveSemaphore = new SemaphoreSlim(0);
-    private readonly Queue<(byte[], WebSocketMessageType, bool)> _incoming = new Queue<(byte[], WebSocketMessageType, bool)>();
-    private readonly object _lock = new object();
+    private readonly ClientWebSocketOptions                                _options          = new ClientWebSocket().Options;
+    private readonly ConcurrentQueue<(byte[], WebSocketMessageType, bool)> _incoming         = new ConcurrentQueue<(byte[], WebSocketMessageType, bool)>();
 
     public List<(byte[], WebSocketMessageType)> SentMessages = new List<(byte[], WebSocketMessageType)>();
 
@@ -67,12 +66,9 @@ public class MockClientWebSocket : IClientWebSocket
     {
         return Task.Run(async () =>
         {
-            await _receiveSemaphore.WaitAsync(cancellationToken);
             (byte[] msg, WebSocketMessageType type, bool end) item;
-            lock (_lock)
-            {
-                item = _incoming.Dequeue();
-            }
+            while (!_incoming.TryDequeue(out item))
+                   await Task.Delay(0, cancellationToken);
             int len = Math.Min(item.msg.Length, buffer.Count);
             Array.Copy(item.msg, 0, buffer.Array ?? new byte[0], buffer.Offset, len);
             return new WebSocketReceiveResult(len, item.type, item.end);
@@ -106,10 +102,6 @@ public class MockClientWebSocket : IClientWebSocket
 
     public void PushMessage(byte[] data, WebSocketMessageType type = WebSocketMessageType.Binary, bool endOfMessage = true)
     {
-        lock (_lock)
-        {
-            _incoming.Enqueue((data, type, endOfMessage));
-        }
-        _receiveSemaphore.Release();
+        _incoming.Enqueue((data, type, endOfMessage));
     }
 }
