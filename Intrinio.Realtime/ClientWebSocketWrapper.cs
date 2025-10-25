@@ -65,12 +65,12 @@ internal class ClientWebSocketWrapper : IClientWebSocket
         _wrapped.SendAsync(buffer, messageType, endOfMessage, cancellationToken);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Task SendAsync(ReadOnlyMemory<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken) =>
-        _wrapped.SendAsync(buffer, messageType, endOfMessage, cancellationToken).AsTask();
+    public ValueTask SendAsync(ReadOnlyMemory<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken) =>
+        _wrapped.SendAsync(buffer, messageType, endOfMessage, cancellationToken);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Task SendAsync(ReadOnlyMemory<byte> buffer, WebSocketMessageType messageType, WebSocketMessageFlags messageFlags, CancellationToken cancellationToken) =>
-        _wrapped.SendAsync(buffer, messageType, messageFlags, cancellationToken).AsTask();
+    public ValueTask SendAsync(ReadOnlyMemory<byte> buffer, WebSocketMessageType messageType, WebSocketMessageFlags messageFlags, CancellationToken cancellationToken) =>
+        _wrapped.SendAsync(buffer, messageType, messageFlags, cancellationToken);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Dispose() => _wrapped.Dispose();
