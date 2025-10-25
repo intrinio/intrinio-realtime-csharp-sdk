@@ -445,7 +445,6 @@ public abstract class WebSocketClient
         Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)_mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
         byte[]             underlyingBuffer    = new byte[_bufferBlockSize];
         Span<byte>         datum               = new Span<byte>(underlyingBuffer);
-        ReadOnlySpan<byte> chunk               = datum;
         int                iterationsSinceWork = 0; //int for the Thread.sleep arg type, and this number will never get more than 1000.
         
         while (!ct.IsCancellationRequested)
@@ -455,8 +454,7 @@ public abstract class WebSocketClient
                 if (_priorityQueue.TryDequeue(underlyingBuffer, out datum))
                 {
                     iterationsSinceWork = 0;
-                    chunk               = datum;
-                    HandleMessage(in chunk);
+                    HandleMessage(datum);
                 }
                 else
                 {
