@@ -25,6 +25,7 @@ public class OptionsSampleApp
 	private static UInt64 _BidCandleStickCountIncomplete = 0UL;
 	private static bool _useTradeCandleSticks = false;
 	private static bool _useQuoteCandleSticks = false;
+	private static bool _stopped = false;
 
 	static void OnQuote(Quote quote)
 	{
@@ -76,13 +77,11 @@ public class OptionsSampleApp
 	{
 		IOptionsWebSocketClient client = (IOptionsWebSocketClient) obj;
 		ClientStats stats = client.GetStats();
-		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, PriorityQueue Depth: {11}%; PriorityQueue Drops: {12}, Individual Events: {6}, Trades: {7}, Quotes: {8}, Refreshes: {9}, UnusualActivities: {10}",
+		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Drops: {3}, PriorityQueue Depth: {9}%; PriorityQueue Drops: {10}, Individual Events: {4}, Trades: {5}, Quotes: {6}, Refreshes: {7}, UnusualActivities: {8}",
 			stats.SocketDataMessages,
 			stats.SocketTextMessages,
 			(stats.QueueDepth * 100) / stats.QueueCapacity,
-			(stats.OverflowQueueDepth * 100) / stats.OverflowQueueCapacity,
 			stats.DroppedCount,
-			stats.OverflowCount,
 			stats.EventCount,
 			client.TradeCount,
 			client.QuoteCount,
@@ -100,13 +99,20 @@ public class OptionsSampleApp
 	static void Cancel(object sender, ConsoleCancelEventArgs args)
 	{
 		Log("Stopping sample app");
-		timer.Dispose();
+		try
+		{
+			timer.Dispose();
+		}
+		catch (Exception e)
+		{
+			
+		}
 		client.Stop();
 		if (_useTradeCandleSticks || _useQuoteCandleSticks)
 		{
 			_candleStickClient.Stop();
 		}
-		Environment.Exit(0);
+		_stopped = true;
 	}
 
 	[MessageTemplateFormatMethod("messageTemplate")]
@@ -152,5 +158,10 @@ public class OptionsSampleApp
 		// await client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
 		Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
+		
+		while (!_stopped)
+			await Task.Delay(1000);
+		
+		Environment.Exit(0);
 	}
 }

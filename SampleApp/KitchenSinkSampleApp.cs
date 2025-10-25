@@ -56,6 +56,7 @@ public class KitchenSinkSampleApp
 	private static UInt64 _equitiesQuoteCacheUpdatedEventCount = 0UL;
 	private static UInt64 _equitiesTradeCandleStickCacheUpdatedCount = 0UL;
 	private static UInt64 _equitiesQuoteCandleStickCacheUpdatedCount = 0UL;
+	private static bool _stopped = false;
 
 	static void OnOptionsQuote(Intrinio.Realtime.Options.Quote quote)
 	{
@@ -212,13 +213,11 @@ public class KitchenSinkSampleApp
 	{
 		IOptionsWebSocketClient optionsClient = _optionsClient;
 		ClientStats optionsClientStats = optionsClient.GetStats();
-		Log("Options Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, PriorityQueue Depth: {11}%; PriorityQueue Drops: {12}, Individual Events: {6}, Trades: {7}, Quotes: {8}, Refreshes: {9}, UnusualActivities: {10}",
+		Log("Options Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Drops: {3}, PriorityQueue Depth: {9}%; PriorityQueue Drops: {10}, Individual Events: {4}, Trades: {5}, Quotes: {6}, Refreshes: {7}, UnusualActivities: {8}",
 			optionsClientStats.SocketDataMessages,
 			optionsClientStats.SocketTextMessages,
 			(optionsClientStats.QueueDepth * 100) / optionsClientStats.QueueCapacity,
-			(optionsClientStats.OverflowQueueDepth * 100) / optionsClientStats.OverflowQueueCapacity,
 			optionsClientStats.DroppedCount,
-			optionsClientStats.OverflowCount,
 			optionsClientStats.EventCount,
 			optionsClient.TradeCount,
 			optionsClient.QuoteCount,
@@ -234,13 +233,11 @@ public class KitchenSinkSampleApp
 		
 		IEquitiesWebSocketClient equitiesClient = _equitiesClient;
 		ClientStats equitiesClientStats = equitiesClient.GetStats();
-		Log("Equities Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, PriorityQueue Depth: {9}%; PriorityQueue Drops: {10}, Individual Events: {6}, Trades: {7}, Quotes: {8}",
+		Log("Equities Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Drops: {3}, PriorityQueue Depth: {7}%; PriorityQueue Drops: {8}, Individual Events: {4}, Trades: {5}, Quotes: {6}",
 			equitiesClientStats.SocketDataMessages,
 			equitiesClientStats.SocketTextMessages,
 			(equitiesClientStats.QueueDepth * 100) / equitiesClientStats.QueueCapacity,
-			(equitiesClientStats.OverflowQueueDepth * 100) / equitiesClientStats.OverflowQueueCapacity,
 			equitiesClientStats.DroppedCount,
-			equitiesClientStats.OverflowCount,
 			equitiesClientStats.EventCount,
 			equitiesClient.TradeCount,
 			equitiesClient.QuoteCount,
@@ -268,7 +265,14 @@ public class KitchenSinkSampleApp
 	static void Cancel(object sender, ConsoleCancelEventArgs args)
 	{
 		Log("Stopping sample app");
-		timer.Dispose();
+		try
+		{
+			timer.Dispose();
+		}
+		catch (Exception e)
+		{
+			
+		}
 		_optionsClient.Stop();
 		_equitiesClient.Stop();
 		if (_optionsUseTradeCandleSticks || _optionsUseQuoteCandleSticks)
@@ -279,7 +283,7 @@ public class KitchenSinkSampleApp
 		{
 			_equitiesCandleStickClient1Minute.Stop();
 		}
-		Environment.Exit(0);
+		_stopped = true;
 	}
 
 	[MessageTemplateFormatMethod("messageTemplate")]
@@ -337,7 +341,6 @@ public class KitchenSinkSampleApp
 		optionsConfig.NumThreads = 4; //Adjust this higher as you subscribe to more channels, or you will fall behind and will drop messages out of your local buffer.
 		optionsConfig.TradesOnly = false; //If true, don't send separate quote events.
 		optionsConfig.BufferSize = 2048; //Primary buffer block quantity.  Adjust higher as you subscribe to more channels.
-		optionsConfig.OverflowBufferSize = 8192; //Overflow buffer block quantity.  Adjust higher as you subscribe to more channels.
 		optionsConfig.Delayed = false; //Used to force to 15minute delayed mode if you have access to realtime but want delayed. 
 		 
 		//Provide the plugins to feed events to, as well as callbacks for each event type. 
@@ -364,7 +367,6 @@ public class KitchenSinkSampleApp
 		equitiesConfig.NumThreads = 2; //Adjust this higher as you subscribe to more channels, or you will fall behind and will drop messages out of your local buffer.
 		equitiesConfig.TradesOnly = false; //If true, don't send separate quote events.
 		equitiesConfig.BufferSize = 2048; //Primary buffer block quantity.  Adjust higher as you subscribe to more channels.
-		equitiesConfig.OverflowBufferSize = 4096; //Overflow buffer block quantity.  Adjust higher as you subscribe to more channels.
 		
 		//Provide the plugins to feed events to, as well as callbacks for each event type.
 		_equitiesClient = new EquitiesWebSocketClient(OnEquitiesTrade, OnEquitiesQuote, equitiesConfig, equitiesPlugins);
@@ -378,5 +380,10 @@ public class KitchenSinkSampleApp
 		timer = new Timer(TimerCallback, null, 60000, 60000);
 		
 		Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
+		
+		while (!_stopped)
+			await Task.Delay(1000);
+		
+		Environment.Exit(0);
 	}
 }

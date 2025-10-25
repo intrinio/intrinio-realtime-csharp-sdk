@@ -3,30 +3,30 @@
 		"ApiKey": "API_KEY_HERE",
 		"NumThreads": 4,
 		//"Provider": "REALTIME", //IEX
-		"Provider": "IEX", //IEX
+		//"Provider": "IEX", //IEX
 		//"Provider": "DELAYED_SIP",
 		//"Provider": "NASDAQ_BASIC",
 		//"Provider": "CBOE_ONE",
 		//"Provider": "EQUITIES_EDGE",
-		//"Provider": "MANUAL",
-		//"IPAddress": "1.2.3.4",
+		"Provider": "MANUAL",
+		"IPAddress": "localhost:54321",
 		"Delayed": false,
 		"BufferSize": 16384,
 		"Symbols": [ "AAPL", "MSFT", "TSLA" ]
-		//"Symbols": [ "lobby" ]
+		//"Symbols": [ "lobby" ],
 		//"Symbols": [  ]
 	},
 	"OptionsConfig": {
 		"ApiKey": "API_KEY_HERE",
 		"NumThreads": 8,
-		"Provider": "OPRA",
+		//"Provider": "OPRA",
 		//"Provider": "OPTIONS_EDGE",
-		//"Provider": "MANUAL",
-		//"IPAddress": "1.2.3.4",
+		"Provider": "MANUAL",
+		"IPAddress": "localhost:54321",
 		"BufferSize": 16384,
 		"Delayed": false,
 		"Symbols": [ "GOOG__220408C02870000", "MSFT__220408C00315000", "AAPL__220414C00180000", "SPY", "TSLA" ]
-		//"Symbols": [ "lobby" ]
+		//"Symbols": [ "lobby" ],
 		//"Symbols": [  ]
 	},
 	"Serilog": {

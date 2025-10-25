@@ -27,6 +27,7 @@ public class EquitiesSampleApp
 	private static UInt64 _BidCandleStickCountIncomplete = 0UL;
 	private static bool _useTradeCandleSticks = false;
 	private static bool _useQuoteCandleSticks = false;
+	private static bool _stopped = false;
 
 	static void OnQuote(Quote quote)
 	{
@@ -88,13 +89,11 @@ public class EquitiesSampleApp
 	{
 		IEquitiesWebSocketClient client = (IEquitiesWebSocketClient) obj;
 		ClientStats stats = client.GetStats();
-		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Overflow Queue Depth: {3}%, Drops: {4}, Overflow Count: {5}, PriorityQueue Depth: {9}%; PriorityQueue Drops: {10}, Individual Events: {6}, Trades: {7}, Quotes: {8}",
+		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Drops: {3}, PriorityQueue Depth: {7}%; PriorityQueue Drops: {8}, Individual Events: {4}, Trades: {5}, Quotes: {6}",
 			stats.SocketDataMessages,
 			stats.SocketTextMessages,
 			(stats.QueueDepth * 100) / stats.QueueCapacity,
-			(stats.OverflowQueueDepth * 100) / stats.OverflowQueueCapacity,
 			stats.DroppedCount,
-			stats.OverflowCount,
 			stats.EventCount,
 			client.TradeCount,
 			client.QuoteCount,
@@ -117,13 +116,21 @@ public class EquitiesSampleApp
 	static void Cancel(object sender, ConsoleCancelEventArgs args)
 	{
 		Log("Stopping sample app");
-		timer.Dispose();
-		client.Stop();
+		try
+		{
+			timer.Dispose();
+		}
+		catch (Exception e)
+		{
+			
+		}
+		client.Stop().Wait();
 		if (_useTradeCandleSticks || _useQuoteCandleSticks)
 		{
 			_candleStickClient.Stop();
 		}
-		Environment.Exit(0);
+
+		_stopped = true;
 	}
 
 	[MessageTemplateFormatMethod("messageTemplate")]
@@ -174,5 +181,10 @@ public class EquitiesSampleApp
 		// // await client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
 		Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
+
+		while (!_stopped)
+			await Task.Delay(1000);
+		
+		Environment.Exit(0);
 	}
 }

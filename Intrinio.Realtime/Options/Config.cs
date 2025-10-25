@@ -25,8 +25,6 @@ public class Config
     
     public int BufferSize { get; set; }
     
-    public int OverflowBufferSize { get; set; }
-    
     public bool Delayed { get; set; }
 
     /// <summary>
@@ -41,7 +39,6 @@ public class Config
         TradesOnly = false;
         NumThreads = 2;
         BufferSize = 2048;
-        OverflowBufferSize = 2048;
         Delayed = false;
     }
 
@@ -120,11 +117,6 @@ public class Config
         if (BufferSize < 2048)
         {
             throw new ArgumentException("'BufferSize' must be greater than or equal to 2048.");
-        }
-        
-        if (OverflowBufferSize < 2048)
-        {
-            throw new ArgumentException("'OverflowBufferSize' must be greater than or equal to 2048.");
         }
 
         for (int i = 0; i < Symbols.Length; i++)
