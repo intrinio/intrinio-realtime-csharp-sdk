@@ -26,6 +26,7 @@ public class GreekSampleApp
 	private static Intrinio.Realtime.Equities.Config _equitiesConfig;
 	private static UInt64 _equitiesTradeEventCount = 0UL;
 	private static UInt64 _equitiesQuoteEventCount = 0UL;
+	private static bool _stopped = false;
 
 	static void OnOptionsQuote(Intrinio.Realtime.Options.Quote quote)
 	{
@@ -89,11 +90,18 @@ public class GreekSampleApp
 	static void Cancel(object sender, ConsoleCancelEventArgs args)
 	{
 		Log("Stopping sample app");
-		timer.Dispose();
+		try
+		{
+			timer.Dispose();
+		}
+		catch (Exception e)
+		{
+			
+		}
 		_optionsClient.Stop();
 		_equitiesClient.Stop();
 		_greekClient.Stop();
-		Environment.Exit(0);
+		_stopped = true;
 	}
 
 	[MessageTemplateFormatMethod("messageTemplate")]
@@ -153,5 +161,10 @@ public class GreekSampleApp
 		timer = new Timer(TimerCallback, null, 60000, 60000);
 		
 		Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
+		
+		while (!_stopped)
+			await Task.Delay(1000);
+		
+		Environment.Exit(0);
 	}
 }

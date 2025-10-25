@@ -56,6 +56,7 @@ public class KitchenSinkSampleApp
 	private static UInt64 _equitiesQuoteCacheUpdatedEventCount = 0UL;
 	private static UInt64 _equitiesTradeCandleStickCacheUpdatedCount = 0UL;
 	private static UInt64 _equitiesQuoteCandleStickCacheUpdatedCount = 0UL;
+	private static bool _stopped = false;
 
 	static void OnOptionsQuote(Intrinio.Realtime.Options.Quote quote)
 	{
@@ -264,7 +265,14 @@ public class KitchenSinkSampleApp
 	static void Cancel(object sender, ConsoleCancelEventArgs args)
 	{
 		Log("Stopping sample app");
-		timer.Dispose();
+		try
+		{
+			timer.Dispose();
+		}
+		catch (Exception e)
+		{
+			
+		}
 		_optionsClient.Stop();
 		_equitiesClient.Stop();
 		if (_optionsUseTradeCandleSticks || _optionsUseQuoteCandleSticks)
@@ -275,7 +283,7 @@ public class KitchenSinkSampleApp
 		{
 			_equitiesCandleStickClient1Minute.Stop();
 		}
-		Environment.Exit(0);
+		_stopped = true;
 	}
 
 	[MessageTemplateFormatMethod("messageTemplate")]
@@ -372,5 +380,10 @@ public class KitchenSinkSampleApp
 		timer = new Timer(TimerCallback, null, 60000, 60000);
 		
 		Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
+		
+		while (!_stopped)
+			await Task.Delay(1000);
+		
+		Environment.Exit(0);
 	}
 }

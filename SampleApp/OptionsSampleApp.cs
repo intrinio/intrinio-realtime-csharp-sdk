@@ -25,6 +25,7 @@ public class OptionsSampleApp
 	private static UInt64 _BidCandleStickCountIncomplete = 0UL;
 	private static bool _useTradeCandleSticks = false;
 	private static bool _useQuoteCandleSticks = false;
+	private static bool _stopped = false;
 
 	static void OnQuote(Quote quote)
 	{
@@ -98,13 +99,20 @@ public class OptionsSampleApp
 	static void Cancel(object sender, ConsoleCancelEventArgs args)
 	{
 		Log("Stopping sample app");
-		timer.Dispose();
+		try
+		{
+			timer.Dispose();
+		}
+		catch (Exception e)
+		{
+			
+		}
 		client.Stop();
 		if (_useTradeCandleSticks || _useQuoteCandleSticks)
 		{
 			_candleStickClient.Stop();
 		}
-		Environment.Exit(0);
+		_stopped = true;
 	}
 
 	[MessageTemplateFormatMethod("messageTemplate")]
@@ -150,5 +158,10 @@ public class OptionsSampleApp
 		// await client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
 		
 		Console.CancelKeyPress += new ConsoleCancelEventHandler(Cancel);
+		
+		while (!_stopped)
+			await Task.Delay(1000);
+		
+		Environment.Exit(0);
 	}
 }

@@ -128,7 +128,7 @@ public abstract class WebSocketClient
         }
         catch (Exception e)
         {
-            LogMessage(LogLevel.ERROR, "CloseAsync bollocksed: {0}", e.Message);
+            LogMessage(LogLevel.ERROR, "CloseAsync errored: {0}", e.Message);
         }
 
         // Timed joins to ensure exit
