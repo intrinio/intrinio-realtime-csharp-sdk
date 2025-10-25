@@ -36,7 +36,7 @@ public abstract class WebSocketClient
     private readonly   Func<Task>                          _tryReconnect;
     private readonly   IHttpClient                         _httpClient;
     private const      string                              ClientInfoHeaderKey   = "Client-Information";
-    private const      string                              ClientInfoHeaderValue = "IntrinioDotNetSDKv18.1";
+    private const      string                              ClientInfoHeaderValue = "IntrinioDotNetSDKv18.2";
     private readonly   ThreadPriority                      _mainThreadPriority;
     private readonly   Thread[]                            _workerThreads;
     private            Thread?                             _receiveThread;
@@ -161,6 +161,19 @@ public abstract class WebSocketClient
 
     public ClientStats GetStats()
     {
+        if (!_started)
+        {
+            return new ClientStats(Interlocked.Read(ref _dataMsgCount),
+                                   Interlocked.Read(ref _textMsgCount),
+                                   _data.Count,
+                                   Interlocked.Read(ref _dataEventCount),
+                                   _data.BlockCapacity,
+                                   _data.DropCount,
+                                   0UL,
+                                   1UL, //Since the data is invalid anyway, and this field is usually the divisor for calculating full percentage, prevent divide by zero by using 1.
+                                   0UL);
+        }
+        
         return new ClientStats(Interlocked.Read(ref _dataMsgCount),
             Interlocked.Read(ref _textMsgCount),
             _data.Count,
