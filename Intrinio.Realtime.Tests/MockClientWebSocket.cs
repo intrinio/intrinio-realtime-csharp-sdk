@@ -23,8 +23,6 @@ public class MockClientWebSocket : IClientWebSocket
     private readonly ClientWebSocketOptions                                _options          = new ClientWebSocket().Options;
     private readonly ConcurrentQueue<(byte[], WebSocketMessageType, bool)> _incoming         = new ConcurrentQueue<(byte[], WebSocketMessageType, bool)>();
 
-    public List<(byte[], WebSocketMessageType)> SentMessages = new List<(byte[], WebSocketMessageType)>();
-
     public WebSocketCloseStatus? CloseStatus { get; private set; }
     public string? CloseStatusDescription { get; private set; }
     public IReadOnlyDictionary<string, IEnumerable<string>>? HttpResponseHeaders { get; } = null;
@@ -84,18 +82,17 @@ public class MockClientWebSocket : IClientWebSocket
     {
         byte[] copy = new byte[buffer.Count];
         Array.Copy(buffer.Array ?? new byte[0], buffer.Offset, copy, 0, buffer.Count);
-        SentMessages.Add((copy, messageType));
         return Task.CompletedTask;
     }
 
-    public Task SendAsync(ReadOnlyMemory<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
+    public ValueTask SendAsync(ReadOnlyMemory<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
     {
-        return SendAsync(new ArraySegment<byte>(buffer.ToArray()), messageType, endOfMessage, cancellationToken);
+        return default;
     }
 
-    public Task SendAsync(ReadOnlyMemory<byte> buffer, WebSocketMessageType messageType, WebSocketMessageFlags messageFlags, CancellationToken cancellationToken)
+    public ValueTask SendAsync(ReadOnlyMemory<byte> buffer, WebSocketMessageType messageType, WebSocketMessageFlags messageFlags, CancellationToken cancellationToken)
     {
-        return SendAsync(buffer, messageType, (messageFlags & WebSocketMessageFlags.EndOfMessage) != 0, cancellationToken);
+        return default;
     }
 
     public void Dispose() { }

@@ -122,7 +122,7 @@ public class PerformanceTests
 
         await fastClient.Stop();
 
-        Assert.IsTrue(multipleThreadReceiveCount > singleThreadReceiveCount, "Multiple threads should have received more messages than a single thread.");
+        Assert.IsTrue(multipleThreadReceiveCount * 10UL > (singleThreadReceiveCount * 15UL), "Multiple threads should have received more messages than a single thread, by at least 50%.");
     }
     
     private byte[] CreatePacket(out int count)

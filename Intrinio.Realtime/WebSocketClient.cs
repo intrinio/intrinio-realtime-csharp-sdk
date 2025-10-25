@@ -68,6 +68,8 @@ public abstract class WebSocketClient
         _httpClient                = httpClient ?? new HttpClientWrapper(new HttpClient());
         
         _data = new SingleProducerDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
+                
+        //_httpClient.Timeout = TimeSpan.FromMinutes(10.0);
         
         _tryReconnect = async () => await DoBackoff(Reconnect);
     }
