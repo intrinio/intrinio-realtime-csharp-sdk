@@ -440,8 +440,9 @@ public abstract class WebSocketClient
                 }
                 else
                 {
-                    iterationsSinceWork = Math.Min(iterationsSinceWork + 1, 1000);
-                    Thread.Sleep(iterationsSinceWork / 100);
+                    // iterationsSinceWork = Math.Min(iterationsSinceWork + 1, 1000);
+                    // Thread.Sleep(iterationsSinceWork / 100);
+                    Thread.Sleep(10);
                 }
             }
             catch (OperationCanceledException)
@@ -473,8 +474,9 @@ public abstract class WebSocketClient
                 }
                 else
                 {
-                    iterationsSinceWork = Math.Min(iterationsSinceWork + 1, 1000);
-                    Thread.Sleep(iterationsSinceWork / 100);
+                    // iterationsSinceWork = Math.Min(iterationsSinceWork + 1, 1000);
+                    // Thread.Sleep(iterationsSinceWork / 100);
+                    Thread.Sleep(10);
                 }
             }
             catch (OperationCanceledException)
