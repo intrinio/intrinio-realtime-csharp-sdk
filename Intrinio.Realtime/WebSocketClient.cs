@@ -31,7 +31,7 @@ public abstract class WebSocketClient
     protected          CancellationToken                      CancellationToken { get { return _ctSource.Token; } }
     private readonly   uint                                   _maxMessageSize;
     protected readonly uint                                   _bufferBlockSize;
-    private readonly   DynamicBlockDropOldestRingBuffer       _data;
+    private readonly   DynamicBlockNoLockDropOldestRingBuffer _data;
     private            IDynamicBlockPriorityRingBufferPool    _priorityQueue;
     private readonly   Func<Task>                             _tryReconnect;
     private readonly   IHttpClient                            _httpClient;
@@ -65,7 +65,7 @@ public abstract class WebSocketClient
         _socketFactory             = socketFactory;
         _httpClient                = httpClient ?? new HttpClientWrapper(new HttpClient());
         
-        _data = new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
+        _data = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
                 
         //_httpClient.Timeout = TimeSpan.FromMinutes(10.0);
         
@@ -342,7 +342,7 @@ public abstract class WebSocketClient
                             if (result.Count > 0)
                             {
                                 Interlocked.Increment(ref _dataMsgCount);
-                                _data.TryEnqueue(bufferSpan.Slice(0, result.Count));
+                                _data.TryEnqueue(bufferSpan.Slice(0, result.Count)); //don't spin on retrying on failure. This will always return true because it overwrites (drop oldest) if full.
                             }
                             break;
                         case WebSocketMessageType.Text:
@@ -391,23 +391,31 @@ public abstract class WebSocketClient
     {
         CancellationToken ct = _ctSource.Token;
         Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)_mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
-        byte[]     underlyingBuffer    = new byte[_bufferBlockSize];
-        Span<byte> datum               = new Span<byte>(underlyingBuffer);
+        byte[]     networkUnderlyingBuffer  = new byte[_bufferBlockSize];
+        Span<byte> networkDatum             = new Span<byte>(networkUnderlyingBuffer);
+        byte[]     priorityUnderlyingBuffer = new byte[_bufferBlockSize];
+        Span<byte> priorityDatum            = new Span<byte>(networkUnderlyingBuffer);
+        bool didWork = false;
         
         while (!ct.IsCancellationRequested)
         {
+            didWork = false;
             try
             {
-                //Dequeue from general queue to put on priority queue, then pull off priority queue to process.
-
+                //First process a message on the priority queue in case it's full. Pass in the buffers for reuse so they don't get recreated.
+                didWork = didWork || ProcessMessage(priorityUnderlyingBuffer, out priorityDatum);
+                
+                //Now, Dequeue from network queue to put on priority queue, then pull off priority queue to process.
                 try
                 {
-                    if (_data.TryDequeue(underlyingBuffer, out datum))
+                    if (_data.TryDequeue(networkUnderlyingBuffer, out networkDatum))
                     {
+                        didWork = true; //there's going to be at least one message in the priority queue, so anticipate that.
+                        
                         // These are grouped (many) messages.
                         // The first byte tells us how many messages there are.
                         // From there, for each message, check the message length at index 1 of each chunk to know how many bytes each chunk has.
-                        UInt64 cnt = Convert.ToUInt64(datum[0]);
+                        UInt64 cnt = Convert.ToUInt64(networkDatum[0]);
                         Interlocked.Add(ref _dataEventCount, cnt);
                         int startIndex = 1;
                         for (ulong i = 0UL; i < cnt; ++i)
@@ -415,9 +423,13 @@ public abstract class WebSocketClient
                             ChunkInfo chunkInfo = new ChunkInfo(1, 0); //default value in case corrupt array so we don't reprocess same bytes over and over.
                             try
                             {
-                                chunkInfo = GetNextChunkInfo(datum.Slice(startIndex));
-                                ReadOnlySpan<byte> chunk = datum.Slice(startIndex, chunkInfo.ChunkLength);
-                                _priorityQueue.TryEnqueue(chunkInfo.Priority, chunk);
+                                chunkInfo = GetNextChunkInfo(networkDatum.Slice(startIndex));
+                                ReadOnlySpan<byte> chunk = networkDatum.Slice(startIndex, chunkInfo.ChunkLength);
+                                
+                                //if we can't enqueue, that means the queue inside the priority queue at that priority index doesn't allow overwrite, and is full, so try to process a message from the priority queue to make room.
+                                while (!_priorityQueue.TryEnqueue(chunkInfo.Priority, chunk))
+                                    didWork = didWork || ProcessMessage(priorityUnderlyingBuffer, out priorityDatum);
+                                didWork = true;
                             }
                             catch(Exception e) {LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);}
                             finally
@@ -432,21 +444,10 @@ public abstract class WebSocketClient
                     LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);
                 }
 
-                try
-                {
-                    if (_priorityQueue.TryDequeue(underlyingBuffer, out datum))
-                    {
-                        HandleMessage(datum);
-                    }
-                    else
-                    {
-                        Thread.Sleep(10);
-                    }
-                }
-                catch (Exception e)
-                {
-                    LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);
-                }
+                didWork = didWork || ProcessMessage(priorityUnderlyingBuffer, out priorityDatum);
+                
+                if (!didWork)
+                    Thread.Sleep(10);
             }
             catch (OperationCanceledException)
             {
@@ -457,7 +458,26 @@ public abstract class WebSocketClient
             }
         };
     }
-    
+
+    private bool ProcessMessage(byte[] underlyingBuffer, out Span<byte> datum)
+    {
+        try
+        {
+            if (_priorityQueue.TryDequeue(underlyingBuffer, out datum))
+            {
+                HandleMessage(datum);
+                return true;
+            }
+        }
+        catch (Exception e)
+        {
+            LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);
+        }
+
+        datum = default;
+        return false;
+    }
+
     private async Task DoBackoff(Func<CancellationToken, Task<bool>> fn)
     {
         int[] backoffsCopy = _selfHealBackoffs.ToArray(); //this could be swapped mid-method here, so get a local copy to work with. 
