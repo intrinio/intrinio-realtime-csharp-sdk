@@ -31,12 +31,12 @@ public abstract class WebSocketClient
     protected          CancellationToken                      CancellationToken { get { return _ctSource.Token; } }
     private readonly   uint                                   _maxMessageSize;
     protected readonly uint                                   _bufferBlockSize;
-    private readonly   DynamicBlockNoLockDropOldestRingBuffer _data;
+    private readonly   DynamicBlockDropOldestRingBuffer       _data;
     private            IDynamicBlockPriorityRingBufferPool    _priorityQueue;
     private readonly   Func<Task>                             _tryReconnect;
     private readonly   IHttpClient                            _httpClient;
     private const      string                                 ClientInfoHeaderKey   = "Client-Information";
-    private const      string                                 ClientInfoHeaderValue = "IntrinioDotNetSDKv18.4";
+    private const      string                                 ClientInfoHeaderValue = "IntrinioDotNetSDKv18.5";
     private readonly   ThreadPriority                         _mainThreadPriority;
     private readonly   Thread[]                               _workerThreads;
     private            Thread?                                _receiveThread;
@@ -65,7 +65,7 @@ public abstract class WebSocketClient
         _socketFactory             = socketFactory;
         _httpClient                = httpClient ?? new HttpClientWrapper(new HttpClient());
         
-        _data = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
+        _data = new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
                 
         //_httpClient.Timeout = TimeSpan.FromMinutes(10.0);
         
@@ -399,40 +399,53 @@ public abstract class WebSocketClient
             try
             {
                 //Dequeue from general queue to put on priority queue, then pull off priority queue to process.
-                
-                if (_data.TryDequeue(underlyingBuffer, out datum))
+
+                try
                 {
-                    // These are grouped (many) messages.
-                    // The first byte tells us how many messages there are.
-                    // From there, for each message, check the message length at index 1 of each chunk to know how many bytes each chunk has.
-                    UInt64 cnt = Convert.ToUInt64(datum[0]);
-                    Interlocked.Add(ref _dataEventCount, cnt);
-                    int startIndex = 1;
-                    for (ulong i = 0UL; i < cnt; ++i)
+                    if (_data.TryDequeue(underlyingBuffer, out datum))
                     {
-                        ChunkInfo chunkInfo = new ChunkInfo(1, 0); //default value in case corrupt array so we don't reprocess same bytes over and over.
-                        try
+                        // These are grouped (many) messages.
+                        // The first byte tells us how many messages there are.
+                        // From there, for each message, check the message length at index 1 of each chunk to know how many bytes each chunk has.
+                        UInt64 cnt = Convert.ToUInt64(datum[0]);
+                        Interlocked.Add(ref _dataEventCount, cnt);
+                        int startIndex = 1;
+                        for (ulong i = 0UL; i < cnt; ++i)
                         {
-                            chunkInfo = GetNextChunkInfo(datum.Slice(startIndex));
-                            ReadOnlySpan<byte> chunk = datum.Slice(startIndex, chunkInfo.ChunkLength);
-                            while(!_priorityQueue.TryEnqueue(chunkInfo.Priority, chunk))
-                                Thread.Sleep(0);
-                        }
-                        catch(Exception e) {LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);}
-                        finally
-                        {
-                            startIndex += chunkInfo.ChunkLength;
+                            ChunkInfo chunkInfo = new ChunkInfo(1, 0); //default value in case corrupt array so we don't reprocess same bytes over and over.
+                            try
+                            {
+                                chunkInfo = GetNextChunkInfo(datum.Slice(startIndex));
+                                ReadOnlySpan<byte> chunk = datum.Slice(startIndex, chunkInfo.ChunkLength);
+                                _priorityQueue.TryEnqueue(chunkInfo.Priority, chunk);
+                            }
+                            catch(Exception e) {LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);}
+                            finally
+                            {
+                                startIndex += Math.Max(chunkInfo.ChunkLength, 1);
+                            }
                         }
                     }
                 }
-                
-                if (_priorityQueue.TryDequeue(underlyingBuffer, out datum))
+                catch (Exception e)
                 {
-                    HandleMessage(datum);
+                    LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);
                 }
-                else
+
+                try
                 {
-                    Thread.Sleep(10);
+                    if (_priorityQueue.TryDequeue(underlyingBuffer, out datum))
+                    {
+                        HandleMessage(datum);
+                    }
+                    else
+                    {
+                        Thread.Sleep(10);
+                    }
+                }
+                catch (Exception e)
+                {
+                    LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);
                 }
             }
             catch (OperationCanceledException)
