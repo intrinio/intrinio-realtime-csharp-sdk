@@ -15,34 +15,33 @@ using Intrinio.Collections.RingBuffers;
 public abstract class WebSocketClient
 {
     #region Data Members
-    private readonly   uint                                _processingThreadsQuantity;
-    protected readonly uint                                _bufferSize;
-    private            int[]                               _selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
-    private readonly   object                              _tLock            = new ();
-    private readonly   object                              _wsLock           = new ();
-    private            Tuple<string, DateTime>             _token            = new (null, DateTime.Now);
-    private            WebSocketState                      _wsState          = null;
-    private            UInt64                              _dataMsgCount     = 0UL;
-    private            UInt64                              _dataEventCount   = 0UL;
-    private            UInt64                              _textMsgCount     = 0UL;
-    private readonly   HashSet<string>                     _channels         = new ();
-    protected          IEnumerable<string>                 Channels { get { return _channels.ToArray(); } }
-    private readonly   CancellationTokenSource             _ctSource = new ();
-    protected          CancellationToken                   CancellationToken { get { return _ctSource.Token; } }
-    private readonly   uint                                _maxMessageSize;
-    protected readonly uint                                _bufferBlockSize;
-    private readonly   SingleProducerDropOldestRingBuffer  _data;
-    private            IDynamicBlockPriorityRingBufferPool _priorityQueue;
-    private readonly   Func<Task>                          _tryReconnect;
-    private readonly   IHttpClient                         _httpClient;
-    private const      string                              ClientInfoHeaderKey   = "Client-Information";
-    private const      string                              ClientInfoHeaderValue = "IntrinioDotNetSDKv18.3";
-    private readonly   ThreadPriority                      _mainThreadPriority;
-    private readonly   Thread[]                            _workerThreads;
-    private            Thread?                             _receiveThread;
-    private            Thread[]                            _prioritizeThreads;
-    private            bool                                _started;
-    private readonly   Func<IClientWebSocket>?             _socketFactory;
+    private readonly   uint                                   _processingThreadsQuantity;
+    protected readonly uint                                   _bufferSize;
+    private            int[]                                  _selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
+    private readonly   object                                 _tLock            = new ();
+    private readonly   object                                 _wsLock           = new ();
+    private            Tuple<string, DateTime>                _token            = new (null, DateTime.Now);
+    private            WebSocketState                         _wsState          = null;
+    private            UInt64                                 _dataMsgCount     = 0UL;
+    private            UInt64                                 _dataEventCount   = 0UL;
+    private            UInt64                                 _textMsgCount     = 0UL;
+    private readonly   HashSet<string>                        _channels         = new ();
+    protected          IEnumerable<string>                    Channels { get { return _channels.ToArray(); } }
+    private readonly   CancellationTokenSource                _ctSource = new ();
+    protected          CancellationToken                      CancellationToken { get { return _ctSource.Token; } }
+    private readonly   uint                                   _maxMessageSize;
+    protected readonly uint                                   _bufferBlockSize;
+    private readonly   DynamicBlockNoLockDropOldestRingBuffer _data;
+    private            IDynamicBlockPriorityRingBufferPool    _priorityQueue;
+    private readonly   Func<Task>                             _tryReconnect;
+    private readonly   IHttpClient                            _httpClient;
+    private const      string                                 ClientInfoHeaderKey   = "Client-Information";
+    private const      string                                 ClientInfoHeaderValue = "IntrinioDotNetSDKv18.3";
+    private readonly   ThreadPriority                         _mainThreadPriority;
+    private readonly   Thread[]                               _workerThreads;
+    private            Thread?                                _receiveThread;
+    private            bool                                   _started;
+    private readonly   Func<IClientWebSocket>?                _socketFactory;
     #endregion //Data Members
     
     #region Constuctors
@@ -63,11 +62,10 @@ public abstract class WebSocketClient
         _processingThreadsQuantity = processingThreadsQuantity > 0 ? processingThreadsQuantity : 2;
         _bufferSize                = bufferSize                >= 2048 ? bufferSize : 2048;
         _workerThreads             = GC.AllocateUninitializedArray<Thread>(Convert.ToInt32(_processingThreadsQuantity));
-        _prioritizeThreads         = GC.AllocateUninitializedArray<Thread>(Convert.ToInt32(_processingThreadsQuantity));
         _socketFactory             = socketFactory;
         _httpClient                = httpClient ?? new HttpClientWrapper(new HttpClient());
         
-        _data = new SingleProducerDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
+        _data = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
                 
         //_httpClient.Timeout = TimeSpan.FromMinutes(10.0);
         
@@ -102,8 +100,6 @@ public abstract class WebSocketClient
         _priorityQueue = GetPriorityRingBufferPool();
         
         _receiveThread = new Thread(ReceiveFn){IsBackground = true};
-        for (int i = 0; i < _prioritizeThreads.Length; i++)
-            _prioritizeThreads[i] = new Thread(PrioritizeFn){IsBackground = true};
         for (int i = 0; i < _workerThreads.Length; i++)
             _workerThreads[i] = new Thread(ProcessFn);
         
@@ -143,14 +139,6 @@ public abstract class WebSocketClient
             {
                 if (!thread.Join(10000))
                     LogMessage(LogLevel.WARNING, "Worker thread timed out on join");
-            }
-        }
-        foreach (var thread in _prioritizeThreads)
-        {
-            if (thread?.IsAlive ?? false)
-            {
-                if (!thread.Join(10000))
-                    LogMessage(LogLevel.WARNING, "Prioritize thread timed out on join");
             }
         }
 
@@ -399,22 +387,21 @@ public abstract class WebSocketClient
         }
     }
 
-    private void PrioritizeFn()
+    private void ProcessFn()
     {
         CancellationToken ct = _ctSource.Token;
         Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)_mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
         byte[]     underlyingBuffer    = new byte[_bufferBlockSize];
         Span<byte> datum               = new Span<byte>(underlyingBuffer);
-        int        iterationsSinceWork = 0; //int for the Thread.sleep arg type, and this number will never get more than 1000.
         
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                if (_data.TryDequeue(datum))
+                //Dequeue from general queue to put on priority queue, then pull off priority queue to process.
+                
+                if (_data.TryDequeue(underlyingBuffer, out datum))
                 {
-                    iterationsSinceWork = 0;
-                    
                     // These are grouped (many) messages.
                     // The first byte tells us how many messages there are.
                     // From there, for each message, check the message length at index 1 of each chunk to know how many bytes each chunk has.
@@ -438,44 +425,13 @@ public abstract class WebSocketClient
                         }
                     }
                 }
-                else
-                {
-                    // iterationsSinceWork = Math.Min(iterationsSinceWork + 1, 1000);
-                    // Thread.Sleep(iterationsSinceWork / 100);
-                    Thread.Sleep(10);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (Exception exn)
-            {
-                LogMessage(LogLevel.WARNING, "Error parsing message: {0}; {1}", exn.Message, exn.StackTrace);
-            }
-        };
-    }
-    
-    private void ProcessFn()
-    {
-        CancellationToken ct = _ctSource.Token;
-        Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)_mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
-        byte[]             underlyingBuffer    = new byte[_bufferBlockSize];
-        Span<byte>         datum               = new Span<byte>(underlyingBuffer);
-        int                iterationsSinceWork = 0; //int for the Thread.sleep arg type, and this number will never get more than 1000.
-        
-        while (!ct.IsCancellationRequested)
-        {
-            try
-            {
+                
                 if (_priorityQueue.TryDequeue(underlyingBuffer, out datum))
                 {
-                    iterationsSinceWork = 0;
                     HandleMessage(datum);
                 }
                 else
                 {
-                    // iterationsSinceWork = Math.Min(iterationsSinceWork + 1, 1000);
-                    // Thread.Sleep(iterationsSinceWork / 100);
                     Thread.Sleep(10);
                 }
             }
@@ -569,11 +525,6 @@ public abstract class WebSocketClient
             _wsState.IsReady = true;
             _wsState.IsReconnecting = false;
             foreach (Thread thread in _workerThreads)
-            {
-                if (!thread.IsAlive && thread.ThreadState.HasFlag(ThreadState.Unstarted))
-                    thread.Start();
-            }
-            foreach (Thread thread in _prioritizeThreads)
             {
                 if (!thread.IsAlive && thread.ThreadState.HasFlag(ThreadState.Unstarted))
                     thread.Start();
