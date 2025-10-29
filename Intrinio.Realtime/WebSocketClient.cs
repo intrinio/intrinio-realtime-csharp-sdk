@@ -43,8 +43,8 @@ public abstract class WebSocketClient
     private            bool                                   _started;
     private readonly   Func<IClientWebSocket>?                _socketFactory;
     private            ulong                                  _processedCount;
-    private            ulong                                  _prevProcessedCount;
-    private            double                                 _prevProcessedTime = 0.0D;
+    private            ulong                                  _prevProcessedCount = 0UL;
+    private            double                                 _prevProcessedTime  = DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
 #if NET9_0_OR_GREATER
     private readonly   Lock                                   _getStatsLocker;
 #else

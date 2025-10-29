@@ -238,7 +238,8 @@ public class ReplayClient : IEquitiesWebSocketClient
             Int32.MaxValue,
             0UL,
             0UL,
-            0UL
+            0UL,
+            0D
         );
     }
     
