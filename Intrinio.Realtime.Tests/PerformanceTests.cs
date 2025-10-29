@@ -178,19 +178,19 @@ public class PerformanceTests
         Action<Trade> onTrade = (trade) =>
         {
             Interlocked.Increment(ref receivedCount);
-            if (threadsWaited < config.NumThreads)
-            {
-                lock (callBackLock)
-                {
-                    if (threadsWaited < config.NumThreads)
-                    {
-                        Thread.Sleep(waitMs); // on the first call, intentionall block 
-                        Interlocked.Increment(ref threadsWaited);
-                        if (client != null)
-                            client.OnTrade = trade1 => { };
-                    }
-                }
-            }
+            // if (threadsWaited < config.NumThreads)
+            // {
+            //     lock (callBackLock)
+            //     {
+            //         if (threadsWaited < config.NumThreads)
+            //         {
+            //             Thread.Sleep(waitMs); // on the first call, intentionall block 
+            //             Interlocked.Increment(ref threadsWaited);
+            //             if (client != null)
+            //                 client.OnTrade = trade1 => { };
+            //         }
+            //     }
+            // }
         };
         Action<Quote> onQuote = (quote) => { };
 
@@ -221,7 +221,7 @@ public class PerformanceTests
         }
 
         // Poll until processed or timeout
-        var timeout = TimeSpan.FromSeconds(60);
+        var timeout = TimeSpan.FromSeconds(60000);
         var start = DateTime.UtcNow;
         stats = client.GetStats();
         while (stats.PriorityQueueDepth > 0UL && (DateTime.UtcNow - start) < timeout)

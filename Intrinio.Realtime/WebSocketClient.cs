@@ -459,8 +459,7 @@ public abstract class WebSocketClient
                                 
                                 //if we can't enqueue, that means the queue inside the priority queue at that priority index doesn't allow overwrite, and is full, so try to process a message from the priority queue to make room.
                                 while (!_priorityQueue.TryEnqueue(chunkInfo.Priority, chunk))
-                                    didWork = didWork || ProcessMessage(priorityUnderlyingBuffer, out priorityDatum);
-                                didWork = true;
+                                    ProcessMessage(priorityUnderlyingBuffer, out priorityDatum);
                             }
                             catch(Exception e) {LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);}
                             finally
