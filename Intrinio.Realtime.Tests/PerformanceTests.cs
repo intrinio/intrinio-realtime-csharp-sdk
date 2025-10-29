@@ -167,13 +167,14 @@ public class PerformanceTests
         object callBackLock = new object();
 #endif
         
-        ulong  receivedCount      = 0UL;
-        ulong  sentCount          = 0UL;
-        int    packetMessageCount = 0;
-        int    threadsWaited      = 0;
-        Config config             = Create1ThreadTestConfig();
-        int    waitMs             = 10_000;
-        byte[] packet;
+        ulong                   receivedCount      = 0UL;
+        ulong                   sentCount          = 0UL;
+        int                     packetMessageCount = 0;
+        int                     threadsWaited      = 0;
+        Config                  config             = Create1ThreadTestConfig();
+        int                     waitMs             = 10_000;
+        byte[]                  packet;
+        EquitiesWebSocketClient client = null;
         Action<Trade> onTrade = (trade) =>
         {
             Interlocked.Increment(ref receivedCount);
@@ -185,6 +186,8 @@ public class PerformanceTests
                     {
                         Thread.Sleep(waitMs); // on the first call, intentionall block 
                         Interlocked.Increment(ref threadsWaited);
+                        if (client != null)
+                            client.OnTrade = trade1 => { };
                     }
                 }
             }
@@ -204,7 +207,7 @@ public class PerformanceTests
 
         //As soon as we start the client, it's going to start fetching the messages from the mocked socket, so we have a wait in the first call to the callback to allow the network thread to overfill the priority queue.
         //The network thread will keep processing, unhindered, and overwrite its buffer with the next message.
-        EquitiesWebSocketClient client = new EquitiesWebSocketClient(onTrade, onQuote, config, null, socketFactory, mockHttp);
+        client = new EquitiesWebSocketClient(onTrade, onQuote, config, null, socketFactory, mockHttp);
         await client.Start();
         await client.JoinLobby(false);
         
