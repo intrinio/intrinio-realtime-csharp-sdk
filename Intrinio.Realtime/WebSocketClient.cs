@@ -42,6 +42,14 @@ public abstract class WebSocketClient
     private            Thread?                                _receiveThread;
     private            bool                                   _started;
     private readonly   Func<IClientWebSocket>?                _socketFactory;
+    private            ulong                                  _processedCount;
+    private            ulong                                  _prevProcessedCount;
+    private            double                                 _prevProcessedTime = 0.0D;
+#if NET9_0_OR_GREATER
+    private readonly   Lock                                   _getStatsLocker;
+#else
+    private readonly   object                                 _getStatsLocker;
+#endif
     #endregion //Data Members
     
     #region Constuctors
@@ -56,6 +64,7 @@ public abstract class WebSocketClient
     public WebSocketClient(uint processingThreadsQuantity, uint bufferSize, uint maxMessageSize, Func<IClientWebSocket>? socketFactory = null, IHttpClient? httpClient = null)
     {
         _started                   = false;
+        _getStatsLocker            = new ();
         _mainThreadPriority        = Thread.CurrentThread.Priority; //this is set outside of our scope - let's not interfere.
         _maxMessageSize            = maxMessageSize;
         _bufferBlockSize           = 256 * _maxMessageSize; //256 possible messages in a group
@@ -149,28 +158,47 @@ public abstract class WebSocketClient
 
     public ClientStats GetStats()
     {
-        if (!_started)
+        lock (_getStatsLocker)
         {
+            if (!_started)
+            {
+                return new ClientStats(Interlocked.Read(ref _dataMsgCount),
+                                       Interlocked.Read(ref _textMsgCount),
+                                       _data.Count,
+                                       Interlocked.Read(ref _dataEventCount),
+                                       _data.BlockCapacity,
+                                       _data.DropCount,
+                                       0UL,
+                                       1UL, //Since the data is invalid anyway, and this field is usually the divisor for calculating full percentage, prevent divide by zero by using 1.
+                                       0UL,
+                                       0UL,
+                                       0UL,
+                                       0.0D);
+            }
+        
+        
+            double now               = DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
+            double prevProcessedTime = _prevProcessedTime;
+            _prevProcessedTime = now;
+            ulong prevProcessedCount = _prevProcessedCount;
+            _prevProcessedCount = Interlocked.Read(ref _processedCount);
+            ulong  countDiff         = _processedCount - prevProcessedCount;
+            double timeDiff          = now             - prevProcessedTime;
+            double messagesPerSecond = timeDiff > 0.0D ? Convert.ToDouble(countDiff) / timeDiff : Convert.ToDouble(countDiff) / 1D;
+        
             return new ClientStats(Interlocked.Read(ref _dataMsgCount),
                                    Interlocked.Read(ref _textMsgCount),
                                    _data.Count,
                                    Interlocked.Read(ref _dataEventCount),
                                    _data.BlockCapacity,
                                    _data.DropCount,
-                                   0UL,
-                                   1UL, //Since the data is invalid anyway, and this field is usually the divisor for calculating full percentage, prevent divide by zero by using 1.
-                                   0UL);
+                                   _priorityQueue.Count,
+                                   _priorityQueue.TotalBlockCapacity,
+                                   GetCustomPriorityQueueDropCount(),
+                                   GetPriorityQueueTradesFullCheckCount(),
+                                   GetPriorityQueueTradesDepth(),
+                                   messagesPerSecond);
         }
-        
-        return new ClientStats(Interlocked.Read(ref _dataMsgCount),
-            Interlocked.Read(ref _textMsgCount),
-            _data.Count,
-            Interlocked.Read(ref _dataEventCount),
-            _data.BlockCapacity,
-            _data.DropCount,
-            _priorityQueue.Count,
-            _priorityQueue.TotalBlockCapacity,
-            _priorityQueue.DropCount);
     }
     
     [Serilog.Core.MessageTemplateFormatMethod("messageTemplate")]
@@ -274,6 +302,9 @@ public abstract class WebSocketClient
     protected abstract void HandleMessage(in ReadOnlySpan<byte> bytes);
     protected abstract ChunkInfo GetNextChunkInfo(ReadOnlySpan<byte> bytes);
     protected abstract IDynamicBlockPriorityRingBufferPool GetPriorityRingBufferPool();
+    protected abstract ulong GetCustomPriorityQueueDropCount();
+    protected abstract ulong GetPriorityQueueTradesFullCheckCount();
+    protected abstract ulong GetPriorityQueueTradesDepth();
     
     #endregion //Abstract Methods
     
@@ -466,6 +497,7 @@ public abstract class WebSocketClient
             if (_priorityQueue.TryDequeue(underlyingBuffer, out datum))
             {
                 HandleMessage(datum);
+                Interlocked.Increment(ref _processedCount);
                 return true;
             }
         }

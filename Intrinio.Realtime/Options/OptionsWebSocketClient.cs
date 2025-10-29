@@ -100,6 +100,10 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     private const string DelayHeaderKey = "delay";
     private const string DelayHeaderValue = "true";
     private const string ChannelFormat = "{0}|TradesOnly|{1}";
+    private IDynamicBlockRingBuffer _tradePriorityQueue = null;
+    private IDynamicBlockRingBuffer _unusualActivityPriorityQueue = null;
+    private IDynamicBlockRingBuffer _refreshPriorityQueue = null;
+    private IDynamicBlockRingBuffer _quotePriorityQueue = null;
     #endregion //Data Members
     
     #region Constuctors
@@ -316,11 +320,34 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     {
         IDynamicBlockPriorityRingBufferPool queue = new DynamicBlockPriorityRingBufferPool(_bufferBlockSize);
 
-        queue.AddUpdateRingBufferToPool(0, new DynamicBlockNoLockRingBuffer(_bufferBlockSize, _bufferSize)); //trades
-        queue.AddUpdateRingBufferToPool(1, new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize)); //refreshes and unusual activity
-        queue.AddUpdateRingBufferToPool(2, new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize)); //quotes
+        _tradePriorityQueue           = new DynamicBlockNoLockRingBuffer(_bufferBlockSize, _bufferSize);
+        _unusualActivityPriorityQueue = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
+        _refreshPriorityQueue         = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
+        _quotePriorityQueue           = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
+        queue.AddUpdateRingBufferToPool(0, _tradePriorityQueue);
+        queue.AddUpdateRingBufferToPool(1, _unusualActivityPriorityQueue);
+        queue.AddUpdateRingBufferToPool(2, _refreshPriorityQueue);
+        queue.AddUpdateRingBufferToPool(3, _quotePriorityQueue);
         
         return queue;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected override ulong GetCustomPriorityQueueDropCount()
+    {
+        return _quotePriorityQueue.DropCount;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected override ulong GetPriorityQueueTradesFullCheckCount()
+    {
+        return _tradePriorityQueue.DropCount;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected override ulong GetPriorityQueueTradesDepth()
+    {
+        return _tradePriorityQueue.Count;
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

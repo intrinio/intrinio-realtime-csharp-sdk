@@ -41,6 +41,36 @@ public class PerformanceTests
         };
     }
     
+    private Config Create1ThreadTestConfig()
+    {
+        return new Config
+               {
+                   Provider   = Provider.MANUAL,
+                   IPAddress  = "localhost:54321",
+                   ApiKey     = "test",
+                   TradesOnly = false,
+                   Delayed    = false,
+                   BufferSize = 2048,
+                   NumThreads = 1,
+                   Symbols    = new string[] { }
+               };
+    }
+    
+    private Config Create2ThreadsTestConfig()
+    {
+        return new Config
+               {
+                   Provider   = Provider.MANUAL,
+                   IPAddress  = "localhost:54321",
+                   ApiKey     = "test",
+                   TradesOnly = false,
+                   Delayed    = false,
+                   BufferSize = 2048,
+                   NumThreads = 2,
+                   Symbols    = new string[] { }
+               };
+    }
+    
     private Config CreateTestConfig()
     {
         return new Config
@@ -72,7 +102,7 @@ public class PerformanceTests
         MockClientWebSocket mockWsSlow = new MockClientWebSocket();
         Func<IClientWebSocket> socketFactorySlow = () => mockWsSlow;
 
-        byte[] packet = CreatePacket(out int count);
+        byte[] packet = CreateAccurateRatioPacket(out int count);
         for (int i = 0; i < packetCount; i++)
         {
             sentCount += (ulong)count;
@@ -125,7 +155,175 @@ public class PerformanceTests
         Assert.IsTrue(multipleThreadReceiveCount * 10UL > (singleThreadReceiveCount * 15UL), "Multiple threads should have received more messages than a single thread, by at least 50%.");
     }
     
-    private byte[] CreatePacket(out int count)
+    [TestMethod]
+    public async Task TestProcessing_FullTradePriorityQueue1Worker()
+    {
+        MockHttpClient mockHttp = new MockHttpClient();
+        mockHttp.SetResponse("http://localhost:54321/auth?api_key=test", "fake_token");
+
+#if NET9_0_OR_GREATER
+        Lock callBackLock = new Lock();
+#else
+        object callBackLock = new object();
+#endif
+        
+        ulong  receivedCount      = 0UL;
+        ulong  sentCount          = 0UL;
+        int    packetMessageCount = 0;
+        int    threadsWaited      = 0;
+        Config config             = Create1ThreadTestConfig();
+        int    waitMs             = 10_000;
+        byte[] packet;
+        Action<Trade> onTrade = (trade) =>
+        {
+            Interlocked.Increment(ref receivedCount);
+            if (threadsWaited < config.NumThreads)
+            {
+                lock (callBackLock)
+                {
+                    if (threadsWaited < config.NumThreads)
+                    {
+                        Thread.Sleep(waitMs); // on the first call, intentionall block 
+                        Interlocked.Increment(ref threadsWaited);
+                    }
+                }
+            }
+        };
+        Action<Quote> onQuote = (quote) => { };
+
+        MockClientWebSocket mockWs = new MockClientWebSocket();
+        Func<IClientWebSocket> socketFactory = () => mockWs;
+        
+        //Preload the queue with the trades
+        packet = CreateTradeOnlyPacket(out packetMessageCount);
+        while(sentCount < Convert.ToUInt64(config.BufferSize))
+        {
+            sentCount += (ulong)packetMessageCount;
+            mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
+        }
+
+        //As soon as we start the client, it's going to start fetching the messages from the mocked socket, so we have a wait in the first call to the callback to allow the network thread to overfill the priority queue.
+        //The network thread will keep processing, unhindered, and overwrite its buffer with the next message.
+        EquitiesWebSocketClient client = new EquitiesWebSocketClient(onTrade, onQuote, config, null, socketFactory, mockHttp);
+        await client.Start();
+        await client.JoinLobby(false);
+        
+        //Fill the trade part of the priority queue
+        var stats = client.GetStats();
+        while(stats.PriorityQueueTradesFullCheckCount == 0UL) 
+        {
+            sentCount += (ulong)packetMessageCount;
+            mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
+            stats = client.GetStats();
+        }
+
+        // Poll until processed or timeout
+        var timeout = TimeSpan.FromSeconds(60);
+        var start = DateTime.UtcNow;
+        stats = client.GetStats();
+        while (stats.PriorityQueueDepth > 0UL && (DateTime.UtcNow - start) < timeout)
+        {
+            await Task.Delay(100);
+            stats = client.GetStats();
+        }
+        
+        await client.Stop();
+        
+        Assert.IsTrue(stats.PriorityQueuePriorityQueueTradeDepth < Convert.ToUInt64(config.BufferSize), "Queue depth should recover after trade part of priority queue is full.");
+    }
+    
+    [TestMethod]
+    public async Task TestProcessing_FullTradePriorityQueue2Workers()
+    {
+        MockHttpClient mockHttp = new MockHttpClient();
+        mockHttp.SetResponse("http://localhost:54321/auth?api_key=test", "fake_token");
+
+#if NET9_0_OR_GREATER
+        Lock callBackLock = new Lock();
+#else
+        object callBackLock = new object();
+#endif
+        
+        ulong  receivedCount      = 0UL;
+        ulong  sentCount          = 0UL;
+        int    packetMessageCount = 0;
+        int    threadsWaited      = 0;
+        Config config             = Create2ThreadsTestConfig();
+        int    waitMs             = 10_000;
+        byte[] packet;
+        Action<Trade> onTrade = (trade) =>
+        {
+            Interlocked.Increment(ref receivedCount);
+            if (threadsWaited < config.NumThreads)
+            {
+                lock (callBackLock)
+                {
+                    if (threadsWaited < config.NumThreads)
+                    {
+                        Thread.Sleep(waitMs); // on the first call, intentionall block 
+                        Interlocked.Increment(ref threadsWaited);
+                    }
+                }
+            }
+        };
+        Action<Quote> onQuote = (quote) => 
+        {
+            Interlocked.Increment(ref receivedCount);
+            if (threadsWaited < config.NumThreads)
+            {
+                lock (callBackLock)
+                {
+                    if (threadsWaited < config.NumThreads)
+                    {
+                        Thread.Sleep(waitMs); // on the first call, intentionall block 
+                        Interlocked.Increment(ref threadsWaited);
+                    }
+                }
+            }
+        };
+
+        MockClientWebSocket mockWs = new MockClientWebSocket();
+        Func<IClientWebSocket> socketFactory = () => mockWs;
+        
+        //Preload the queue with the trades
+        packet = CreateTradeOnlyPacket(out packetMessageCount);
+        while(sentCount < Convert.ToUInt64(config.BufferSize) * 2UL)
+        {
+            sentCount += (ulong)packetMessageCount;
+            mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
+        }
+
+        //As soon as we start the client, it's going to start fetching the messages from the mocked socket, so we have a wait in the first call to the callback to allow the network thread to overfill the priority queue.
+        //The network thread will keep processing, unhindered, and overwrite its buffer with the next message.
+        EquitiesWebSocketClient client = new EquitiesWebSocketClient(onTrade, onQuote, config, null, socketFactory, mockHttp);
+        await client.Start();
+        await client.JoinLobby(false);
+        
+        //Fill the trade part of the priority queue
+        var stats = client.GetStats();
+        while(stats.PriorityQueueDepth < stats.PriorityQueueCapacity / 2) 
+        {
+            sentCount += (ulong)packetMessageCount;
+            mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
+            stats = client.GetStats();
+        }
+
+        // Poll until processed or timeout
+        var timeout = TimeSpan.FromSeconds(60);
+        var start = DateTime.UtcNow;
+        stats = client.GetStats();
+        while (stats.PriorityQueueDepth > 0UL && (DateTime.UtcNow - start) < timeout)
+        {
+            await Task.Delay(100);
+            stats = client.GetStats();
+        }
+        
+        await client.Stop();
+
+        Assert.IsTrue(stats.PriorityQueueDepth < Convert.ToUInt64(config.BufferSize), "Queue depth should recover after trade part of priority queue is full.");
+    }
+    
+    private byte[] CreateAccurateRatioPacket(out int count)
     {
         int messageCount   = 254;
         count = messageCount;
@@ -153,6 +351,75 @@ public class PerformanceTests
                     for (int byteIndex = 0; byteIndex < bidMessage.Length; byteIndex++)
                         packet.Add(bidMessage[byteIndex]);
                 }
+            }
+        }
+        return packet.ToArray();
+    }
+    
+    private byte[] CreateTradeOnlyPacket(out int count)
+    {
+        int messageCount   = 254;
+        count = messageCount;
+        List<byte> packet = new List<byte>();
+        packet.Add((byte)messageCount);
+        byte[] tradeMessage = BuildTrade(new Trade("SYM1", 12.3D, 100u, 1000000UL, DateTime.Now, SubProvider.IEX, 'X', "Condition"));
+        for (int packetIndex = 0; packetIndex < messageCount; packetIndex++)
+        {
+            for (int byteIndex = 0; byteIndex < tradeMessage.Length; byteIndex++)
+                packet.Add(tradeMessage[byteIndex]);
+        }
+        return packet.ToArray();
+    }
+    
+    private byte[] CreateAskOnlyPacket(out int count)
+    {
+        int messageCount   = 254;
+        count = messageCount;
+        List<byte> packet = new List<byte>();
+        packet.Add((byte)messageCount);
+        byte[] askMessage   = BuildQuote(new Quote(QuoteType.Ask, "SYM1", 12.4D, 100u, DateTime.Now, SubProvider.IEX, 'X', "Condition"));
+        for (int packetIndex = 0; packetIndex < messageCount; packetIndex++)
+        {
+            for (int byteIndex = 0; byteIndex < askMessage.Length; byteIndex++)
+                packet.Add(askMessage[byteIndex]);
+        }
+        return packet.ToArray();
+    }
+    
+    private byte[] CreateBidOnlyPacket(out int count)
+    {
+        int messageCount   = 254;
+        count = messageCount;
+        List<byte> packet = new List<byte>();
+        packet.Add((byte)messageCount);
+        byte[] bidMessage   = BuildQuote(new Quote(QuoteType.Bid, "SYM1", 12.2D, 100u, DateTime.Now, SubProvider.IEX, 'X', "Condition"));
+        for (int packetIndex = 0; packetIndex < messageCount; packetIndex++)
+        {
+            for (int byteIndex = 0; byteIndex < bidMessage.Length; byteIndex++)
+                packet.Add(bidMessage[byteIndex]);
+        }
+        return packet.ToArray();
+    }
+    
+    private byte[] CreateQuoteOnlyPacket(out int count)
+    {
+        int messageCount   = 254;
+        count = messageCount;
+        List<byte> packet = new List<byte>();
+        packet.Add((byte)messageCount);
+        byte[] askMessage   = BuildQuote(new Quote(QuoteType.Ask, "SYM1", 12.4D, 100u, DateTime.Now, SubProvider.IEX, 'X', "Condition"));
+        byte[] bidMessage   = BuildQuote(new Quote(QuoteType.Bid, "SYM1", 12.2D, 100u, DateTime.Now, SubProvider.IEX, 'X', "Condition"));
+        for (int packetIndex = 0; packetIndex < messageCount; packetIndex++)
+        {
+            if (packetIndex % 2 == 0)
+            {
+                for (int byteIndex = 0; byteIndex < askMessage.Length; byteIndex++)
+                    packet.Add(askMessage[byteIndex]);
+            }
+            else
+            {
+                for (int byteIndex = 0; byteIndex < bidMessage.Length; byteIndex++)
+                    packet.Add(bidMessage[byteIndex]);
             }
         }
         return packet.ToArray();
