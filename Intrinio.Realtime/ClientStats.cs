@@ -109,7 +109,7 @@ public class ClientStats
     /// <summary>
     /// The current depth of the priority queue for trade events. 
     /// </summary>
-    public UInt64 PriorityQueuePriorityQueueTradeDepth
+    public UInt64 PriorityQueueTradeDepth
     {
         get { return _priorityQueueTradeDepth; }   
     }
