@@ -399,7 +399,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
             case MessageType.Trade:
             {
                 Trade trade = ParseTrade(bytes);
-                _dataTradeCount[threadId]++;
+                ++_dataTradeCount[threadId];
                 if (_useOnTrade)
                 {
                     try
@@ -428,7 +428,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
             case MessageType.Bid:
             {
                 Quote quote = ParseQuote(bytes);
-                _dataQuoteCount[threadId]++;
+                ++_dataQuoteCount[threadId];
                 if (_useOnQuote)
                 {
                     try

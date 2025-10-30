@@ -27,22 +27,7 @@ public class PerformanceTests
     {
     }
 
-    private Config CreateSlowTestConfig()
-    {
-        return new Config
-        {
-            Provider   = Provider.MANUAL,
-            IPAddress  = "localhost:54321",
-            ApiKey     = "test",
-            TradesOnly = false,
-            Delayed    = false,
-            BufferSize = 6000,
-            NumThreads = 1,
-            Symbols    = new string[] { }
-        };
-    }
-    
-    private Config Create1ThreadTestConfig()
+    private Config CreateConfig()
     {
         return new Config
                {
@@ -51,55 +36,38 @@ public class PerformanceTests
                    ApiKey     = "test",
                    TradesOnly = false,
                    Delayed    = false,
-                   BufferSize = 6000,
+                   BufferSize = 16_384,
                    NumThreads = 1,
                    Symbols    = new string[] { }
                };
     }
     
+    private Config Create1ThreadTestConfig()
+    {
+        Config config = CreateConfig();
+        config.NumThreads = 1;
+        return config;
+    }
+    
     private Config Create2ThreadsTestConfig()
     {
-        return new Config
-               {
-                   Provider   = Provider.MANUAL,
-                   IPAddress  = "localhost:54321",
-                   ApiKey     = "test",
-                   TradesOnly = false,
-                   Delayed    = false,
-                   BufferSize = 6000,
-                   NumThreads = 2,
-                   Symbols    = new string[] { }
-               };
+        Config config = CreateConfig();
+        config.NumThreads = 2;
+        return config;
     }
     
     private Config Create4ThreadsTestConfig()
     {
-        return new Config
-               {
-                   Provider   = Provider.MANUAL,
-                   IPAddress  = "localhost:54321",
-                   ApiKey     = "test",
-                   TradesOnly = false,
-                   Delayed    = false,
-                   BufferSize = 6000,
-                   NumThreads = 4,
-                   Symbols    = new string[] { }
-               };
+        Config config = CreateConfig();
+        config.NumThreads = 4;
+        return config;
     }
     
     private Config Create8ThreadsTestConfig()
     {
-        return new Config
-               {
-                   Provider   = Provider.MANUAL,
-                   IPAddress  = "localhost:54321",
-                   ApiKey     = "test",
-                   TradesOnly = false,
-                   Delayed    = false,
-                   BufferSize = 6000,
-                   NumThreads = 8,
-                   Symbols    = new string[] { }
-               };
+        Config config = CreateConfig();
+        config.NumThreads = 8;
+        return config;
     }
     
     private Config CreateTestConfig()
@@ -123,19 +91,12 @@ public class PerformanceTests
         MockHttpClient mockHttp = new MockHttpClient();
         mockHttp.SetResponse("http://localhost:54321/auth?api_key=test", "fake_token");
 
-        ConcurrentBag<long> receivedCount = new ConcurrentBag<long>();
-        ulong sentCount = 0UL;
-        int packetCount = 750;
-        ulong fakeWork = 0UL;
-        Action<Trade> onTrade = (trade) =>
-        {
-            receivedCount.Add(1L);
-        };
-        Action<Quote> onQuote       = (quote) => 
-        {
-            receivedCount.Add(1L);
-        };
-        Config        slowConfig    = CreateSlowTestConfig();
+        ulong         sentCount   = 0UL;
+        ulong         fakeWork    = 0UL;
+        Action<Trade> onTrade     = (trade) => { };
+        Action<Quote> onQuote     = (quote) => { };
+        Config        slowConfig  = Create1ThreadTestConfig();
+        int           packetCount = slowConfig.BufferSize * 5;
 
         MockClientWebSocket mockWsSlow = new MockClientWebSocket();
         Func<IClientWebSocket> socketFactorySlow = () => mockWsSlow;
@@ -154,18 +115,17 @@ public class PerformanceTests
         // Poll until processed or timeout
         var timeout = TimeSpan.FromSeconds(60);
         var start = DateTime.UtcNow;
-        while (Convert.ToUInt64(receivedCount.Sum(i => i)) < sentCount && (DateTime.UtcNow - start) < timeout)
+        while (slowClient.TradeCount + slowClient.QuoteCount < sentCount && (DateTime.UtcNow - start) < timeout)
         {
             await Task.Delay(100);
         }
-        ulong singleThreadReceiveCount = Convert.ToUInt64(receivedCount.Sum(i => i));
+        ulong singleThreadReceiveCount = slowClient.TradeCount + slowClient.QuoteCount;
 
         await slowClient.Stop();
 
         ///////////////////////////////////////////////
 
-        receivedCount.Clear();
-        sentCount     = 0UL;
+        sentCount = 0UL;
         Config fastConfig = Create8ThreadsTestConfig();
 
         MockClientWebSocket mockWsFast = new MockClientWebSocket();
@@ -182,11 +142,11 @@ public class PerformanceTests
         await fastClient.JoinLobby(false);
 
         start = DateTime.UtcNow;
-        while (Convert.ToUInt64(receivedCount.Sum(i => i)) < sentCount && (DateTime.UtcNow - start) < timeout)
+        while (fastClient.TradeCount + fastClient.QuoteCount < sentCount && (DateTime.UtcNow - start) < timeout)
         {
             await Task.Delay(100);
         }
-        ulong multipleThreadReceiveCount = Convert.ToUInt64(receivedCount.Sum(i => i));
+        ulong multipleThreadReceiveCount = fastClient.TradeCount + fastClient.QuoteCount;
 
         await fastClient.Stop();
 
@@ -205,7 +165,6 @@ public class PerformanceTests
         object callBackLock = new object();
 #endif
         
-        ulong                   receivedCount      = 0UL;
         ulong                   sentCount          = 0UL;
         int                     packetMessageCount = 0;
         int                     threadsWaited      = 0;
@@ -213,7 +172,7 @@ public class PerformanceTests
         int                     waitMs             = 10_000;
         byte[]                  packet;
         EquitiesWebSocketClient client  = null;
-        Action<Trade>           onTrade = (trade) => { Interlocked.Increment(ref receivedCount); };
+        Action<Trade>           onTrade = (trade) => { };
         Action<Quote>           onQuote = (quote) => { };
 
         MockClientWebSocket mockWs = new MockClientWebSocket();
@@ -245,7 +204,7 @@ public class PerformanceTests
         // Poll until processed or timeout
         var timeout = TimeSpan.FromSeconds(60);
         var start = DateTime.UtcNow;
-        ulong startProcessedCount = receivedCount;
+        ulong startProcessedCount = client.TradeCount;
         stats = client.GetStats();
         while (stats.PriorityQueueDepth > 0UL && (DateTime.UtcNow - start) < timeout)
         {
@@ -255,7 +214,7 @@ public class PerformanceTests
         
         await client.Stop();
         
-        Assert.IsTrue(receivedCount > startProcessedCount, "Queue depth should recover after trade part of priority queue is full.");
+        Assert.IsTrue(client.TradeCount > startProcessedCount, "Queue depth should recover after trade part of priority queue is full.");
     }
     
     [TestMethod]
@@ -270,7 +229,6 @@ public class PerformanceTests
         object callBackLock = new object();
 #endif
         
-        ulong                   receivedCount      = 0UL;
         ulong                   sentCount          = 0UL;
         int                     packetMessageCount = 0;
         int                     threadsWaited      = 0;
@@ -278,7 +236,7 @@ public class PerformanceTests
         int                     waitMs             = 10_000;
         byte[]                  packet;
         EquitiesWebSocketClient client  = null;
-        Action<Trade>           onTrade = (trade) => { Interlocked.Increment(ref receivedCount); };
+        Action<Trade>           onTrade = (trade) => { };
         Action<Quote>           onQuote = (quote) => { };
 
         MockClientWebSocket mockWs = new MockClientWebSocket();
@@ -310,7 +268,7 @@ public class PerformanceTests
         // Poll until processed or timeout
         var timeout = TimeSpan.FromSeconds(60);
         var start = DateTime.UtcNow;
-        ulong startProcessedCount = receivedCount;
+        ulong startProcessedCount = client.TradeCount;
         stats = client.GetStats();
         while (stats.PriorityQueueDepth > 0UL && (DateTime.UtcNow - start) < timeout)
         {
@@ -320,7 +278,7 @@ public class PerformanceTests
         
         await client.Stop();
         
-        Assert.IsTrue(receivedCount > startProcessedCount, "Queue depth should recover after trade part of priority queue is full.");
+        Assert.IsTrue(client.TradeCount > startProcessedCount, "Queue depth should recover after trade part of priority queue is full.");
     }
     
     [TestMethod]
@@ -335,7 +293,6 @@ public class PerformanceTests
         object callBackLock = new object();
 #endif
         
-        ulong                   receivedCount      = 0UL;
         ulong                   sentCount          = 0UL;
         int                     packetMessageCount = 0;
         int                     threadsWaited      = 0;
@@ -343,7 +300,7 @@ public class PerformanceTests
         int                     waitMs             = 10_000;
         byte[]                  packet;
         EquitiesWebSocketClient client  = null;
-        Action<Trade>           onTrade = (trade) => { Interlocked.Increment(ref receivedCount); };
+        Action<Trade>           onTrade = (trade) => { };
         Action<Quote>           onQuote = (quote) => { };
 
         MockClientWebSocket mockWs = new MockClientWebSocket();
@@ -351,7 +308,7 @@ public class PerformanceTests
         
         //Preload the queue with the trades
         packet = CreateTradeOnlyPacket(out packetMessageCount);
-        while(sentCount < Convert.ToUInt64(config.BufferSize)*2)
+        while(sentCount < Convert.ToUInt64(config.BufferSize))
         {
             sentCount += (ulong)packetMessageCount;
             mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
@@ -375,7 +332,7 @@ public class PerformanceTests
         // Poll until processed or timeout
         var timeout = TimeSpan.FromSeconds(60);
         var start = DateTime.UtcNow;
-        ulong startProcessedCount = receivedCount;
+        ulong startProcessedCount = client.TradeCount;
         stats = client.GetStats();
         while (stats.PriorityQueueDepth > 0UL && (DateTime.UtcNow - start) < timeout)
         {
@@ -385,7 +342,7 @@ public class PerformanceTests
         
         await client.Stop();
         
-        Assert.IsTrue(receivedCount > startProcessedCount, "Queue depth should recover after trade part of priority queue is full.");
+        Assert.IsTrue(client.TradeCount > startProcessedCount, "Queue depth should recover after trade part of priority queue is full.");
     }
     
     [TestMethod]
@@ -400,7 +357,6 @@ public class PerformanceTests
         object callBackLock = new object();
 #endif
         
-        ulong                   receivedCount      = 0UL;
         ulong                   sentCount          = 0UL;
         int                     packetMessageCount = 0;
         int                     threadsWaited      = 0;
@@ -408,7 +364,7 @@ public class PerformanceTests
         int                     waitMs             = 10_000;
         byte[]                  packet;
         EquitiesWebSocketClient client  = null;
-        Action<Trade>           onTrade = (trade) => { Interlocked.Increment(ref receivedCount); };
+        Action<Trade>           onTrade = (trade) => { };
         Action<Quote>           onQuote = (quote) => { };
 
         MockClientWebSocket mockWs = new MockClientWebSocket();
@@ -416,7 +372,7 @@ public class PerformanceTests
         
         //Preload the queue with the trades
         packet = CreateTradeOnlyPacket(out packetMessageCount);
-        while(sentCount < Convert.ToUInt64(config.BufferSize)*4)
+        while(sentCount < Convert.ToUInt64(config.BufferSize))
         {
             sentCount += (ulong)packetMessageCount;
             mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
@@ -440,7 +396,7 @@ public class PerformanceTests
         // Poll until processed or timeout
         var timeout = TimeSpan.FromSeconds(60);
         var start = DateTime.UtcNow;
-        ulong startProcessedCount = receivedCount;
+        ulong startProcessedCount = client.TradeCount;
         stats = client.GetStats();
         while (stats.PriorityQueueDepth > 0UL && (DateTime.UtcNow - start) < timeout)
         {
@@ -450,7 +406,7 @@ public class PerformanceTests
         
         await client.Stop();
         
-        Assert.IsTrue(receivedCount > startProcessedCount, "Queue depth should recover after trade part of priority queue is full.");
+        Assert.IsTrue(client.TradeCount > startProcessedCount, "Queue depth should recover after trade part of priority queue is full.");
     }
     
     private byte[] CreateAccurateRatioPacket(out int count)

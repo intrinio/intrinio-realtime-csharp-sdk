@@ -586,7 +586,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         if (msgType == 1u && _useOnQuote)
         {
             Quote quote = ParseQuote(bytes);
-            _dataQuoteCount[threadId]++;
+            ++_dataQuoteCount[threadId];
             try
             {
                 _onQuote.Invoke(quote);
@@ -610,7 +610,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         if (msgType == 0u && _useOnTrade)
         {
             Trade trade = ParseTrade(bytes);
-            _dataTradeCount[threadId]++;
+            ++_dataTradeCount[threadId];
             try
             {
                 _onTrade.Invoke(trade);
@@ -634,7 +634,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         if (msgType == 2u && _useOnRefresh)
         {
             Refresh refresh = ParseRefresh(bytes);
-            _dataRefreshCount[threadId]++;
+            ++_dataRefreshCount[threadId];
             try
             {
                 _onRefresh.Invoke(refresh);
@@ -658,7 +658,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         if (msgType > 2u && _useOnUnusualActivity)
         {
             UnusualActivity unusualActivity = ParseUnusualActivity(bytes);
-            _dataUnusualActivityCount[threadId]++;
+            ++_dataUnusualActivityCount[threadId];
             try
             {
                 _onUnusualActivity.Invoke(unusualActivity);
