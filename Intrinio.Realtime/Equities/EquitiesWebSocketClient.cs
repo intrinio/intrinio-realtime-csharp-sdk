@@ -49,16 +49,36 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     }
 
     private readonly Config _config;
-    private UInt64 _dataTradeCount = 0UL;
-    private UInt64 _dataQuoteCount = 0UL;
-    public UInt64 TradeCount { get { return Interlocked.Read(ref _dataTradeCount); } }
-    public UInt64 QuoteCount { get { return Interlocked.Read(ref _dataQuoteCount); } }
+    private readonly UInt64[] _dataTradeCount;
+    private readonly UInt64[] _dataQuoteCount;
+    public UInt64 TradeCount 
+    {
+        get
+        {
+            ulong count = 0UL;
+            for(int i = 0; i < _dataTradeCount.Length; i++)
+                count += Interlocked.Read(ref _dataTradeCount[i]);
+            return count;
+        } 
+    }
+    public UInt64 QuoteCount
+    {
+        get
+        {
+            ulong count = 0UL;
+            for(int i = 0; i < _dataQuoteCount.Length; i++)
+                count += Interlocked.Read(ref _dataQuoteCount[i]);
+            return count;
+        } 
+    }
 
     private readonly string _logPrefix;
     private const string MessageVersionHeaderKey = "UseNewEquitiesFormat";
     private const string MessageVersionHeaderValue = "v2";
     private const uint MaxMessageSize = 86u;
     private const string ChannelFormat = "{0}|TradesOnly|{1}";
+    private IDynamicBlockRingBuffer _tradePriorityQueue = null;
+    private IDynamicBlockRingBuffer _quotePriorityQueue = null;
     #endregion //Data Members
     
     #region Constuctors
@@ -78,6 +98,8 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         OnQuote = onQuote;
         _config = config;
         _plugIns = ReferenceEquals(plugIns, null) ? new ConcurrentBag<ISocketPlugIn>() : new ConcurrentBag<ISocketPlugIn>(plugIns);
+        _dataTradeCount = new UInt64[Convert.ToInt32(config.NumThreads)];
+        _dataQuoteCount = new UInt64[Convert.ToInt32(config.NumThreads)];
         
         if (ReferenceEquals(null, _config))
             throw new ArgumentException("Config may not be null.");
@@ -283,10 +305,30 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     {
         IDynamicBlockPriorityRingBufferPool queue = new DynamicBlockPriorityRingBufferPool(_bufferBlockSize);
 
-        queue.AddUpdateRingBufferToPool(0, new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, _bufferSize)); //trades
-        queue.AddUpdateRingBufferToPool(1, new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, _bufferSize)); //quotes
+        _tradePriorityQueue = new DynamicBlockNoLockRingBuffer(_bufferBlockSize, _bufferSize);
+        _quotePriorityQueue = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
+        queue.AddUpdateRingBufferToPool(0, _tradePriorityQueue);
+        queue.AddUpdateRingBufferToPool(1, _quotePriorityQueue);
         
         return queue;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected override ulong GetCustomPriorityQueueDropCount()
+    {
+        return _quotePriorityQueue.DropCount;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected override ulong GetPriorityQueueTradesFullCheckCount()
+    {
+        return _tradePriorityQueue.DropCount;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected override ulong GetPriorityQueueTradesDepth()
+    {
+        return _tradePriorityQueue.Count;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -349,7 +391,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
         return new Quote(type, symbol, price, size, timestamp, subProvider, marketCenter, condition);
     }
 
-    protected override void HandleMessage(in ReadOnlySpan<byte> bytes)
+    protected override void HandleMessage(uint threadId, in ReadOnlySpan<byte> bytes)
     { 
         MessageType msgType = (MessageType)Convert.ToInt32(bytes[0]);
         switch (msgType)
@@ -357,7 +399,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
             case MessageType.Trade:
             {
                 Trade trade = ParseTrade(bytes);
-                Interlocked.Increment(ref _dataTradeCount);
+                ++_dataTradeCount[threadId];
                 if (_useOnTrade)
                 {
                     try
@@ -386,7 +428,7 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
             case MessageType.Bid:
             {
                 Quote quote = ParseQuote(bytes);
-                Interlocked.Increment(ref _dataQuoteCount);
+                ++_dataQuoteCount[threadId];
                 if (_useOnQuote)
                 {
                     try

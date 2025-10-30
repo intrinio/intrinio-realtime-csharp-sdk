@@ -85,14 +85,50 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     }
 
     private readonly Config _config;
-    private UInt64 _dataTradeCount = 0UL;
-    private UInt64 _dataQuoteCount = 0UL;
-    private UInt64 _dataRefreshCount = 0UL;
-    private UInt64 _dataUnusualActivityCount = 0UL;
-    public UInt64 TradeCount { get { return Interlocked.Read(ref _dataTradeCount); } }
-    public UInt64 QuoteCount { get { return Interlocked.Read(ref _dataQuoteCount); } }
-    public UInt64 RefreshCount { get { return Interlocked.Read(ref _dataRefreshCount); } }
-    public UInt64 UnusualActivityCount { get { return Interlocked.Read(ref _dataUnusualActivityCount); } }
+    private readonly UInt64[] _dataTradeCount;
+    private readonly UInt64[] _dataQuoteCount;
+    private readonly UInt64[] _dataRefreshCount;
+    private readonly UInt64[] _dataUnusualActivityCount;
+    public UInt64 TradeCount 
+    {
+        get
+        {
+            ulong count = 0UL;
+            for(int i = 0; i < _dataTradeCount.Length; i++)
+                count += Interlocked.Read(ref _dataTradeCount[i]);
+            return count;
+        } 
+    }
+    public UInt64 QuoteCount 
+    {
+        get
+        {
+            ulong count = 0UL;
+            for(int i = 0; i < _dataQuoteCount.Length; i++)
+                count += Interlocked.Read(ref _dataQuoteCount[i]);
+            return count;
+        } 
+    }
+    public UInt64 RefreshCount 
+    {
+        get
+        {
+            ulong count = 0UL;
+            for(int i = 0; i < _dataRefreshCount.Length; i++)
+                count += Interlocked.Read(ref _dataRefreshCount[i]);
+            return count;
+        } 
+    }
+    public UInt64 UnusualActivityCount 
+    {
+        get
+        {
+            ulong count = 0UL;
+            for(int i = 0; i < _dataUnusualActivityCount.Length; i++)
+                count += Interlocked.Read(ref _dataUnusualActivityCount[i]);
+            return count;
+        } 
+    }
 
     private readonly string _logPrefix;
     private const string MessageVersionHeaderKey = "UseNewOptionsFormat";
@@ -100,6 +136,10 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     private const string DelayHeaderKey = "delay";
     private const string DelayHeaderValue = "true";
     private const string ChannelFormat = "{0}|TradesOnly|{1}";
+    private IDynamicBlockRingBuffer _tradePriorityQueue = null;
+    private IDynamicBlockRingBuffer _unusualActivityPriorityQueue = null;
+    private IDynamicBlockRingBuffer _refreshPriorityQueue = null;
+    private IDynamicBlockRingBuffer _quotePriorityQueue = null;
     #endregion //Data Members
     
     #region Constuctors
@@ -123,6 +163,10 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         OnRefresh = onRefresh;
         OnUnusualActivity = onUnusualActivity;
         _config = config;
+        _dataTradeCount = new ulong[Convert.ToInt32(config.NumThreads)];
+        _dataQuoteCount = new ulong[Convert.ToInt32(config.NumThreads)];
+        _dataRefreshCount = new ulong[Convert.ToInt32(config.NumThreads)];
+        _dataUnusualActivityCount = new ulong[Convert.ToInt32(config.NumThreads)];
         
         if (ReferenceEquals(null, _config))
             throw new ArgumentException("Config may not be null.");
@@ -316,11 +360,34 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     {
         IDynamicBlockPriorityRingBufferPool queue = new DynamicBlockPriorityRingBufferPool(_bufferBlockSize);
 
-        queue.AddUpdateRingBufferToPool(0, new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, _bufferSize)); //trades
-        queue.AddUpdateRingBufferToPool(1, new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, _bufferSize)); //refreshes and unusual activity
-        queue.AddUpdateRingBufferToPool(2, new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, _bufferSize)); //quotes
+        _tradePriorityQueue           = new DynamicBlockNoLockRingBuffer(_bufferBlockSize, _bufferSize);
+        _unusualActivityPriorityQueue = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
+        _refreshPriorityQueue         = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
+        _quotePriorityQueue           = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
+        queue.AddUpdateRingBufferToPool(0, _tradePriorityQueue);
+        queue.AddUpdateRingBufferToPool(1, _unusualActivityPriorityQueue);
+        queue.AddUpdateRingBufferToPool(2, _refreshPriorityQueue);
+        queue.AddUpdateRingBufferToPool(3, _quotePriorityQueue);
         
         return queue;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected override ulong GetCustomPriorityQueueDropCount()
+    {
+        return _quotePriorityQueue.DropCount;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected override ulong GetPriorityQueueTradesFullCheckCount()
+    {
+        return _tradePriorityQueue.DropCount;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected override ulong GetPriorityQueueTradesDepth()
+    {
+        return _tradePriorityQueue.Count;
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -512,14 +579,14 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         );
     }
 
-    protected override void HandleMessage(in ReadOnlySpan<byte> bytes)
+    protected override void HandleMessage(uint threadId, in ReadOnlySpan<byte> bytes)
     { 
         byte msgType = bytes[MessageTypeIndex];
         
         if (msgType == 1u && _useOnQuote)
         {
             Quote quote = ParseQuote(bytes);
-            Interlocked.Increment(ref _dataQuoteCount);
+            ++_dataQuoteCount[threadId];
             try
             {
                 _onQuote.Invoke(quote);
@@ -543,7 +610,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         if (msgType == 0u && _useOnTrade)
         {
             Trade trade = ParseTrade(bytes);
-            Interlocked.Increment(ref _dataTradeCount);
+            ++_dataTradeCount[threadId];
             try
             {
                 _onTrade.Invoke(trade);
@@ -567,7 +634,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         if (msgType == 2u && _useOnRefresh)
         {
             Refresh refresh = ParseRefresh(bytes);
-            Interlocked.Increment(ref _dataRefreshCount);
+            ++_dataRefreshCount[threadId];
             try
             {
                 _onRefresh.Invoke(refresh);
@@ -591,7 +658,7 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
         if (msgType > 2u && _useOnUnusualActivity)
         {
             UnusualActivity unusualActivity = ParseUnusualActivity(bytes);
-            Interlocked.Increment(ref _dataUnusualActivityCount);
+            ++_dataUnusualActivityCount[threadId];
             try
             {
                 _onUnusualActivity.Invoke(unusualActivity);

@@ -23,25 +23,33 @@ public abstract class WebSocketClient
     private            Tuple<string, DateTime>                _token            = new (null, DateTime.Now);
     private            WebSocketState                         _wsState          = null;
     private            UInt64                                 _dataMsgCount     = 0UL;
-    private            UInt64                                 _dataEventCount   = 0UL;
-    private            UInt64                                 _textMsgCount     = 0UL;
-    private readonly   HashSet<string>                        _channels         = new ();
+    private readonly   UInt64[]                               _dataEventCount;
+    private            UInt64                                 _textMsgCount = 0UL;
+    private readonly   HashSet<string>                        _channels     = new ();
     protected          IEnumerable<string>                    Channels { get { return _channels.ToArray(); } }
     private readonly   CancellationTokenSource                _ctSource = new ();
     protected          CancellationToken                      CancellationToken { get { return _ctSource.Token; } }
     private readonly   uint                                   _maxMessageSize;
     protected readonly uint                                   _bufferBlockSize;
-    private readonly   DynamicBlockDropOldestRingBuffer       _data;
+    private readonly   DynamicBlockNoLockDropOldestRingBuffer _data;
     private            IDynamicBlockPriorityRingBufferPool    _priorityQueue;
     private readonly   Func<Task>                             _tryReconnect;
     private readonly   IHttpClient                            _httpClient;
     private const      string                                 ClientInfoHeaderKey   = "Client-Information";
-    private const      string                                 ClientInfoHeaderValue = "IntrinioDotNetSDKv18.5";
+    private const      string                                 ClientInfoHeaderValue = "IntrinioDotNetSDKv18.6";
     private readonly   ThreadPriority                         _mainThreadPriority;
     private readonly   Thread[]                               _workerThreads;
     private            Thread?                                _receiveThread;
     private            bool                                   _started;
     private readonly   Func<IClientWebSocket>?                _socketFactory;
+    private readonly   ulong[]                                _processedCount;
+    private readonly   ulong[]                                _prevProcessedCount;
+    private            double                                 _prevProcessedTime  = DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
+#if NET9_0_OR_GREATER
+    private readonly   Lock                                   _getStatsLocker;
+#else
+    private readonly   object                                 _getStatsLocker;
+#endif
     #endregion //Data Members
     
     #region Constuctors
@@ -56,6 +64,7 @@ public abstract class WebSocketClient
     public WebSocketClient(uint processingThreadsQuantity, uint bufferSize, uint maxMessageSize, Func<IClientWebSocket>? socketFactory = null, IHttpClient? httpClient = null)
     {
         _started                   = false;
+        _getStatsLocker            = new ();
         _mainThreadPriority        = Thread.CurrentThread.Priority; //this is set outside of our scope - let's not interfere.
         _maxMessageSize            = maxMessageSize;
         _bufferBlockSize           = 256 * _maxMessageSize; //256 possible messages in a group
@@ -64,8 +73,11 @@ public abstract class WebSocketClient
         _workerThreads             = GC.AllocateUninitializedArray<Thread>(Convert.ToInt32(_processingThreadsQuantity));
         _socketFactory             = socketFactory;
         _httpClient                = httpClient ?? new HttpClientWrapper(new HttpClient());
+        _processedCount            = new ulong[processingThreadsQuantity];
+        _prevProcessedCount        = new ulong[processingThreadsQuantity];
+        _dataEventCount            = new ulong[processingThreadsQuantity];
         
-        _data = new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
+        _data = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
                 
         //_httpClient.Timeout = TimeSpan.FromMinutes(10.0);
         
@@ -149,28 +161,59 @@ public abstract class WebSocketClient
 
     public ClientStats GetStats()
     {
-        if (!_started)
+        lock (_getStatsLocker)
         {
+            ulong dataEventCount = 0UL;
+            for(int i = 0; i < _dataEventCount.Length; i++)
+                dataEventCount += Interlocked.Read(ref _dataEventCount[i]);
+            
+            if (!_started)
+            {
+                return new ClientStats(Interlocked.Read(ref _dataMsgCount),
+                                       Interlocked.Read(ref _textMsgCount),
+                                       _data.Count,
+                                       dataEventCount,
+                                       _data.BlockCapacity,
+                                       _data.DropCount,
+                                       0UL,
+                                       1UL, //Since the data is invalid anyway, and this field is usually the divisor for calculating full percentage, prevent divide by zero by using 1.
+                                       0UL,
+                                       0UL,
+                                       0UL,
+                                       0.0D);
+            }
+        
+        
+            double now               = DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
+            double prevProcessedTime = _prevProcessedTime;
+            _prevProcessedTime = now;
+            
+            ulong prevProcessedCount = 0UL;
+            ulong processedCount     = 0UL;
+            for (int i = 0; i < _prevProcessedCount.Length; i++)
+            {
+                prevProcessedCount += Interlocked.Read(ref _prevProcessedCount[i]);
+                processedCount     += Interlocked.Read(ref _processedCount[i]);
+                Interlocked.Exchange(ref _prevProcessedCount[i], processedCount);
+            }
+            
+            ulong  countDiff         = processedCount - prevProcessedCount;
+            double timeDiff          = now            - prevProcessedTime;
+            double messagesPerSecond = timeDiff > 0.0D ? Convert.ToDouble(countDiff) / timeDiff : Convert.ToDouble(countDiff) / 1D;
+        
             return new ClientStats(Interlocked.Read(ref _dataMsgCount),
                                    Interlocked.Read(ref _textMsgCount),
                                    _data.Count,
-                                   Interlocked.Read(ref _dataEventCount),
+                                   dataEventCount,
                                    _data.BlockCapacity,
                                    _data.DropCount,
-                                   0UL,
-                                   1UL, //Since the data is invalid anyway, and this field is usually the divisor for calculating full percentage, prevent divide by zero by using 1.
-                                   0UL);
+                                   _priorityQueue.Count,
+                                   _priorityQueue.TotalBlockCapacity,
+                                   GetCustomPriorityQueueDropCount(),
+                                   GetPriorityQueueTradesFullCheckCount(),
+                                   GetPriorityQueueTradesDepth(),
+                                   messagesPerSecond);
         }
-        
-        return new ClientStats(Interlocked.Read(ref _dataMsgCount),
-            Interlocked.Read(ref _textMsgCount),
-            _data.Count,
-            Interlocked.Read(ref _dataEventCount),
-            _data.BlockCapacity,
-            _data.DropCount,
-            _priorityQueue.Count,
-            _priorityQueue.TotalBlockCapacity,
-            _priorityQueue.DropCount);
     }
     
     [Serilog.Core.MessageTemplateFormatMethod("messageTemplate")]
@@ -271,9 +314,12 @@ public abstract class WebSocketClient
     protected abstract List<KeyValuePair<string, string>> GetCustomSocketHeaders();
     protected abstract byte[] MakeJoinMessage(string channel);
     protected abstract byte[] MakeLeaveMessage(string channel);
-    protected abstract void HandleMessage(in ReadOnlySpan<byte> bytes);
+    protected abstract void HandleMessage(uint threadId, in ReadOnlySpan<byte> bytes);
     protected abstract ChunkInfo GetNextChunkInfo(ReadOnlySpan<byte> bytes);
     protected abstract IDynamicBlockPriorityRingBufferPool GetPriorityRingBufferPool();
+    protected abstract ulong GetCustomPriorityQueueDropCount();
+    protected abstract ulong GetPriorityQueueTradesFullCheckCount();
+    protected abstract ulong GetPriorityQueueTradesDepth();
     
     #endregion //Abstract Methods
     
@@ -341,8 +387,8 @@ public abstract class WebSocketClient
                         case WebSocketMessageType.Binary:
                             if (result.Count > 0)
                             {
-                                Interlocked.Increment(ref _dataMsgCount);
-                                _data.TryEnqueue(bufferSpan.Slice(0, result.Count));
+                                ++_dataMsgCount;
+                                _data.TryEnqueue(bufferSpan.Slice(0, result.Count)); //don't spin on retrying on failure. This will always return true because it overwrites (drop oldest) if full.
                             }
                             break;
                         case WebSocketMessageType.Text:
@@ -387,37 +433,53 @@ public abstract class WebSocketClient
         }
     }
 
-    private void ProcessFn()
+    private void ProcessFn(object? obj)
     {
+        if (obj == null)
+            throw new ArgumentException("obj must be null");
+
+        uint threadId = (uint)obj;
+        
         CancellationToken ct = _ctSource.Token;
         Thread.CurrentThread.Priority = (ThreadPriority)(Math.Max((((int)_mainThreadPriority) - 1), 0)); //Set below main thread priority so doesn't interfere with main thread accepting messages.
-        byte[]     underlyingBuffer    = new byte[_bufferBlockSize];
-        Span<byte> datum               = new Span<byte>(underlyingBuffer);
+        byte[]     networkUnderlyingBuffer  = new byte[_bufferBlockSize];
+        Span<byte> networkDatum             = new Span<byte>(networkUnderlyingBuffer);
+        byte[]     priorityUnderlyingBuffer = new byte[_bufferBlockSize];
+        Span<byte> priorityDatum            = new Span<byte>(networkUnderlyingBuffer);
+        bool didWork = false;
         
         while (!ct.IsCancellationRequested)
         {
+            didWork = false;
             try
             {
-                //Dequeue from general queue to put on priority queue, then pull off priority queue to process.
-
+                //First process a message on the priority queue in case it's full. Pass in the buffers for reuse so they don't get recreated.
+                didWork = didWork || ProcessMessage(threadId, priorityUnderlyingBuffer, out priorityDatum);
+                
+                //Now, Dequeue from network queue to put on priority queue, then pull off priority queue to process.
                 try
                 {
-                    if (_data.TryDequeue(underlyingBuffer, out datum))
+                    if (_data.TryDequeue(networkUnderlyingBuffer, out networkDatum))
                     {
+                        didWork = true; //there's going to be at least one message in the priority queue, so anticipate that.
+                        
                         // These are grouped (many) messages.
                         // The first byte tells us how many messages there are.
                         // From there, for each message, check the message length at index 1 of each chunk to know how many bytes each chunk has.
-                        UInt64 cnt = Convert.ToUInt64(datum[0]);
-                        Interlocked.Add(ref _dataEventCount, cnt);
+                        UInt64 cnt = Convert.ToUInt64(networkDatum[0]);
+                        _dataEventCount[threadId] += cnt;
                         int startIndex = 1;
                         for (ulong i = 0UL; i < cnt; ++i)
                         {
                             ChunkInfo chunkInfo = new ChunkInfo(1, 0); //default value in case corrupt array so we don't reprocess same bytes over and over.
                             try
                             {
-                                chunkInfo = GetNextChunkInfo(datum.Slice(startIndex));
-                                ReadOnlySpan<byte> chunk = datum.Slice(startIndex, chunkInfo.ChunkLength);
-                                _priorityQueue.TryEnqueue(chunkInfo.Priority, chunk);
+                                chunkInfo = GetNextChunkInfo(networkDatum.Slice(startIndex));
+                                ReadOnlySpan<byte> chunk = networkDatum.Slice(startIndex, chunkInfo.ChunkLength);
+                                
+                                //if we can't enqueue, that means the queue inside the priority queue at that priority index doesn't allow overwrite, and is full, so try to process a message from the priority queue to make room.
+                                while (!_priorityQueue.TryEnqueue(chunkInfo.Priority, chunk))
+                                    ProcessMessage(threadId, priorityUnderlyingBuffer, out priorityDatum);
                             }
                             catch(Exception e) {LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);}
                             finally
@@ -432,21 +494,10 @@ public abstract class WebSocketClient
                     LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);
                 }
 
-                try
-                {
-                    if (_priorityQueue.TryDequeue(underlyingBuffer, out datum))
-                    {
-                        HandleMessage(datum);
-                    }
-                    else
-                    {
-                        Thread.Sleep(10);
-                    }
-                }
-                catch (Exception e)
-                {
-                    LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);
-                }
+                didWork = didWork || ProcessMessage(threadId, priorityUnderlyingBuffer, out priorityDatum);
+                
+                if (!didWork)
+                    Thread.Sleep(10);
             }
             catch (OperationCanceledException)
             {
@@ -457,7 +508,27 @@ public abstract class WebSocketClient
             }
         };
     }
-    
+
+    private bool ProcessMessage(uint threadId, byte[] underlyingBuffer, out Span<byte> datum)
+    {
+        try
+        {
+            if (_priorityQueue.TryDequeue(underlyingBuffer, out datum))
+            {
+                HandleMessage(threadId, datum);
+                ++_processedCount[threadId];
+                return true;
+            }
+        }
+        catch (Exception e)
+        {
+            LogMessage(LogLevel.ERROR, "Error parsing message: {0}; {1}", e.Message, e.StackTrace);
+        }
+
+        datum = default;
+        return false;
+    }
+
     private async Task DoBackoff(Func<CancellationToken, Task<bool>> fn)
     {
         int[] backoffsCopy = _selfHealBackoffs.ToArray(); //this could be swapped mid-method here, so get a local copy to work with. 
@@ -537,10 +608,10 @@ public abstract class WebSocketClient
         {
             _wsState.IsReady = true;
             _wsState.IsReconnecting = false;
-            foreach (Thread thread in _workerThreads)
+            for(int i = 0; i < _workerThreads.Length; i++)
             {
-                if (!thread.IsAlive && thread.ThreadState.HasFlag(ThreadState.Unstarted))
-                    thread.Start();
+                if (!_workerThreads[i].IsAlive && _workerThreads[i].ThreadState.HasFlag(ThreadState.Unstarted))
+                    _workerThreads[i].Start(System.Convert.ToUInt32(i));
             }
             if (!_receiveThread.IsAlive && _receiveThread.ThreadState.HasFlag(ThreadState.Unstarted))
                 _receiveThread.Start();
@@ -579,7 +650,7 @@ public abstract class WebSocketClient
 
     private void OnTextMessageReceived(ReadOnlySpan<byte> message)
     {
-        Interlocked.Increment(ref _textMsgCount);
+        ++_textMsgCount;
         LogMessage(LogLevel.WARNING, "Warning received: {0}", Encoding.UTF8.GetString(message));
     }
 

@@ -233,10 +233,13 @@ public class ReplayClient : IEquitiesWebSocketClient
             Convert.ToUInt64(_data.Count), 
             Interlocked.Read(ref _dataEventCount), 
             Int32.MaxValue,
-            0,
-            0,
+            0UL,
+            0UL,
             Int32.MaxValue,
-            0
+            0UL,
+            0UL,
+            0UL,
+            0D
         );
     }
     
