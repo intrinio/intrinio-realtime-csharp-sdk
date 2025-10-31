@@ -84,6 +84,49 @@ public class PerformanceTests
                    Symbols    = new string[] { }
                };
     }
+    
+    [TestMethod]
+    public async Task TestProcessing_Load()
+    {
+        MockHttpClient mockHttp = new MockHttpClient();
+        mockHttp.SetResponse("http://localhost:54321/auth?api_key=test", "fake_token");
+
+        ulong         sentCount   = 0UL;
+        ulong         fakeWork    = 0UL;
+        Action<Trade> onTrade     = (trade) => { };
+        Action<Quote> onQuote     = (quote) => { };
+        Config        config      = Create8ThreadsTestConfig();
+        int           packetCount = config.BufferSize * 10;
+
+        MockClientWebSocket mockWs = new MockClientWebSocket();
+        Func<IClientWebSocket> socketFactorySlow = () => mockWs;
+
+        byte[] packet = CreateAccurateRatioPacket(out int count);
+        for (int i = 0; i < packetCount; i++)
+        {
+            sentCount += (ulong)count;
+            mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
+        }
+
+        EquitiesWebSocketClient client = new EquitiesWebSocketClient(onTrade, onQuote, config, null, socketFactorySlow, mockHttp);
+        await client.Start();
+        await client.JoinLobby(false);
+
+        // Poll until processed or timeout
+        var timeout = TimeSpan.FromSeconds(60);
+        var start = DateTime.UtcNow;
+        ClientStats stats = client.GetStats();
+        while (((stats.EventCount == 0) || (stats.QueueDepth > 0UL || stats.PriorityQueueDepth > 0UL)) && (DateTime.UtcNow - start) < timeout)
+        {
+            await Task.Delay(1000);
+            stats = client.GetStats();
+        }
+        ulong singleThreadReceiveCount = client.TradeCount + client.QuoteCount;
+
+        await client.Stop();
+
+        Assert.IsTrue(stats.QueueDepth == 0UL && stats.PriorityQueueDepth == 0UL, "Load should complete.");
+    }
 
     [TestMethod]
     public async Task TestProcessing_MultipleThreadsBeatsSingleThread()

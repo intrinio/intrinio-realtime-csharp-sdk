@@ -31,7 +31,7 @@ public abstract class WebSocketClient
     protected          CancellationToken                      CancellationToken { get { return _ctSource.Token; } }
     private readonly   uint                                   _maxMessageSize;
     protected readonly uint                                   _bufferBlockSize;
-    private readonly   DynamicBlockNoLockDropOldestRingBuffer _data;
+    private readonly   DynamicBlockDropOldestRingBuffer       _data;
     private            IDynamicBlockPriorityRingBufferPool    _priorityQueue;
     private readonly   Func<Task>                             _tryReconnect;
     private readonly   IHttpClient                            _httpClient;
@@ -77,7 +77,7 @@ public abstract class WebSocketClient
         _prevProcessedCount        = new ulong[processingThreadsQuantity];
         _dataEventCount            = new ulong[processingThreadsQuantity];
         
-        _data = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
+        _data = new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
                 
         //_httpClient.Timeout = TimeSpan.FromMinutes(10.0);
         

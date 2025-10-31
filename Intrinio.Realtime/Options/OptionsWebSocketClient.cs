@@ -360,10 +360,10 @@ public class OptionsWebSocketClient : WebSocketClient, IOptionsWebSocketClient
     {
         IDynamicBlockPriorityRingBufferPool queue = new DynamicBlockPriorityRingBufferPool(_bufferBlockSize);
 
-        _tradePriorityQueue           = new DynamicBlockNoLockRingBuffer(_bufferBlockSize, _bufferSize);
-        _unusualActivityPriorityQueue = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
-        _refreshPriorityQueue         = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
-        _quotePriorityQueue           = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
+        _tradePriorityQueue           = new DynamicBlockRingBuffer(_bufferBlockSize, _bufferSize);
+        _unusualActivityPriorityQueue = new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
+        _refreshPriorityQueue         = new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
+        _quotePriorityQueue           = new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
         queue.AddUpdateRingBufferToPool(0, _tradePriorityQueue);
         queue.AddUpdateRingBufferToPool(1, _unusualActivityPriorityQueue);
         queue.AddUpdateRingBufferToPool(2, _refreshPriorityQueue);

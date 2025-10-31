@@ -305,8 +305,8 @@ public class EquitiesWebSocketClient : WebSocketClient, IEquitiesWebSocketClient
     {
         IDynamicBlockPriorityRingBufferPool queue = new DynamicBlockPriorityRingBufferPool(_bufferBlockSize);
 
-        _tradePriorityQueue = new DynamicBlockNoLockRingBuffer(_bufferBlockSize, _bufferSize);
-        _quotePriorityQueue = new DynamicBlockNoLockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
+        _tradePriorityQueue = new DynamicBlockRingBuffer(_bufferBlockSize, _bufferSize);
+        _quotePriorityQueue = new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, _bufferSize);
         queue.AddUpdateRingBufferToPool(0, _tradePriorityQueue);
         queue.AddUpdateRingBufferToPool(1, _quotePriorityQueue);
         
