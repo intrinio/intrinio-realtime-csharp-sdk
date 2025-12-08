@@ -124,6 +124,16 @@ public class QuoteCandleStick : CandleStick, IEquatable<QuoteCandleStick>, IComp
 
     public override string ToString()
     {
-        return $"QuoteCandleStick (Symbol: {Symbol}, QuoteType: {QuoteType.ToString()}, High: {High.ToString("f3")}, Low: {Low.ToString("f3")}, Close: {Close.ToString("f3")}, Open: {Open.ToString("f3")}, OpenTimestamp: {OpenTimestamp.ToString("f6")}, CloseTimestamp: {CloseTimestamp.ToString("f6")}, Change: {Change.ToString("f6")}, Complete: {Complete.ToString()})";
+        return $"QuoteCandleStick (Symbol: {Symbol}, QuoteType: {QuoteType.ToString()}, High: {High.ToString("f3")}, Low: {Low.ToString("f3")}, Close: {Close.ToString("f3")}, Open: {Open.ToString("f3")}, OpenTimestamp: {OpenTimestamp.ToString("f6")}, CloseTimestamp: {CloseTimestamp.ToString("f6")}, Change: {Change.ToString("f6")}, Complete: {Complete.ToString()}, Average: {Average.ToString("f6")}, Count: {TradeCount})";
+    }
+
+    public static string CsvHeader()
+    {
+        return "Symbol,Type,High,Low,Close,Open,OpenTimestamp,CloseTimestamp,Change,Complete,Average,Count,Volume";
+    }
+    
+    public string ToCsvString()
+    {
+        return $"{Symbol},{QuoteType.ToString()},{High.ToString("f3")},{Low.ToString("f3")},{Close.ToString("f3")},{Open.ToString("f3")},{OpenTimestamp.ToString("f6")},{CloseTimestamp.ToString("f6")},{Change.ToString("f6")},{Complete.ToString()},{Average.ToString("f6")},{TradeCount},"; //Volume excluded because we don't provide level 2 quotes, just NBBO, so volume isn't accurate.
     }
 }

@@ -15,7 +15,7 @@ namespace SampleApp
 			//await OptionsSampleApp.Run(args);
 			//await GreekSampleApp.Run(args);
 			//await KitchenSinkSampleApp.Run(args);
-			await OneSecondCandleCsvBuilderExample.Run(args);
+			OneSecondCandleCsvBuilderExample.Run(args);
 		}
 	}
 }

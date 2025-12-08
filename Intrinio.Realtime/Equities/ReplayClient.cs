@@ -271,12 +271,12 @@ public class ReplayClient : IEquitiesWebSocketClient
     #endregion //Public Methods
     
     #region Private Methods
-    private DateTime ParseTimeReceived(ReadOnlySpan<byte> bytes)
+    public static DateTime ParseTimeReceived(ReadOnlySpan<byte> bytes)
     {
         return DateTime.UnixEpoch + TimeSpan.FromTicks(Convert.ToInt64(BitConverter.ToUInt64(bytes) / 100UL));
     }
 
-    private Trade ParseTrade(ReadOnlySpan<byte> bytes)
+    public static Trade ParseTrade(ReadOnlySpan<byte> bytes)
     {
         int symbolLength = Convert.ToInt32(bytes[2]);
         int conditionLength = Convert.ToInt32(bytes[26 + symbolLength]);
@@ -294,7 +294,7 @@ public class ReplayClient : IEquitiesWebSocketClient
         return trade;
     }
 
-    private Quote ParseQuote(ReadOnlySpan<byte> bytes)
+    public static Quote ParseQuote(ReadOnlySpan<byte> bytes)
     {
         int symbolLength = Convert.ToInt32(bytes[2]);
         int conditionLength = Convert.ToInt32(bytes[22 + symbolLength]);
@@ -437,7 +437,7 @@ public class ReplayClient : IEquitiesWebSocketClient
     /// <param name="fullFilePath"></param>
     /// <param name="byteBufferSize"></param>
     /// <returns></returns>
-    private IEnumerable<Tick> ReplayTickFileWithoutDelay(string fullFilePath, int byteBufferSize, CancellationToken ct)
+    public IEnumerable<Tick> ReplayTickFileWithoutDelay(string fullFilePath, int byteBufferSize, CancellationToken ct)
     {
         if (File.Exists(fullFilePath))
         {
