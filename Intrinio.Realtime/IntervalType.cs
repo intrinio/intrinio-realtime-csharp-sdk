@@ -10,5 +10,6 @@ public enum IntervalType
     TenMinute = 600,
     FifteenMinute = 900,
     ThirtyMinute = 1800,
-    SixtyMinute = 3600
+    SixtyMinute = 3600,
+    OneSecond = 1
 }

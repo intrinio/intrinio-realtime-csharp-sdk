@@ -530,7 +530,7 @@ public class ReplayClient : IEquitiesWebSocketClient
         }
     }
 
-    private string MapSubProviderToApiValue(SubProvider subProvider)
+    public static string MapSubProviderToApiValue(SubProvider subProvider)
     {
         switch (subProvider)
         {
@@ -546,7 +546,7 @@ public class ReplayClient : IEquitiesWebSocketClient
         }
     }
 
-    private SubProvider[] MapProviderToSubProviders(Intrinio.Realtime.Equities.Provider provider)
+    public static SubProvider[] MapProviderToSubProviders(Intrinio.Realtime.Equities.Provider provider)
     {
         switch (provider)
         {
