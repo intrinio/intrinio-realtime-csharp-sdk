@@ -554,7 +554,8 @@ public class ReplayClient : IEquitiesWebSocketClient
             case Provider.MANUAL:        return Array.Empty<SubProvider>();
             case Provider.REALTIME:      return new SubProvider[]{SubProvider.IEX};
             case Provider.IEX:           return new SubProvider[]{SubProvider.IEX};
-            case Provider.DELAYED_SIP:   return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
+            //case Provider.DELAYED_SIP:   return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B, SubProvider.OTC};
+            case Provider.DELAYED_SIP:   return new SubProvider[]{SubProvider.UTP, SubProvider.CTA_A, SubProvider.CTA_B};
             case Provider.NASDAQ_BASIC:  return new SubProvider[]{SubProvider.NASDAQ_BASIC};
             case Provider.CBOE_ONE:      return new SubProvider[]{SubProvider.CBOE_ONE};
             case Provider.EQUITIES_EDGE: return new SubProvider[]{SubProvider.EQUITIES_EDGE};

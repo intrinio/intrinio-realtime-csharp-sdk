@@ -56,18 +56,19 @@ public static class OneSecondCandleCsvBuilderExample
 			return DelayedSeconds;
 		return 0D;
 	}
-
+	
 	private static List<string> GetReplayFiles(DateOnly date)
 	{
 		ConcurrentBag<string> filePaths    = new ConcurrentBag<string>();
 		SecurityApi           api          = new SecurityApi();
-		SubProvider[]         subProviders = Intrinio.Realtime.Equities.ReplayClient.MapProviderToSubProviders(_provider);
+		string[]              subProviders = Intrinio.Realtime.Equities.ReplayClient.MapProviderToSubProviders(_provider)
+																					.Select(ReplayClient.MapSubProviderToApiValue).ToArray();
 		Parallel.ForEach(subProviders, _parallelOptions, subProvider =>
 		{
 			try
 			{
 				Console.WriteLine($"Downloading replay file for date {date} and subProvider {subProvider}");
-				SecurityReplayFileResult result     = api.GetSecurityReplayFile(subProvider.ToString().ToLowerInvariant(), date.ToDateTime(TimeOnly.MinValue));
+				SecurityReplayFileResult result     = api.GetSecurityReplayFile(subProvider.ToLowerInvariant(), date.ToDateTime(TimeOnly.MinValue));
 				string                   decodedUrl = result.Url.Replace(@"\u0026", "&");
 				string                   tempDir    = System.IO.Path.GetTempPath();
 				string                   fileName   = Path.Combine(tempDir, result.Name);
