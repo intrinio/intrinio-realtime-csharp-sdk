@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Intrinio.Realtime;
 using Intrinio.Realtime.Equities;
 using Intrinio.SDK.Api;
@@ -30,6 +31,7 @@ public static class OneSecondCandleCsvBuilderExample
 	private static string          _writePath;
 	private static object          _writeLock = new object();
 	private static bool            _writeQuotes;
+	private static HashSet<string> _tickerWhiteList = [];
 
 	private static void OnTradeCandleStick(TradeCandleStick tradeCandleStick)
 	{
@@ -214,6 +216,12 @@ public static class OneSecondCandleCsvBuilderExample
 			if (nextTicks[i] == null && enumerators[i].MoveNext())
 				nextTicks[i] = enumerators[i].Current;
 	}
+	
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static bool IsTickerWhiteListed(string ticker)
+	{
+		return _tickerWhiteList.Count == 0 || _tickerWhiteList.Contains(ticker);
+	}
 
 	private static void ProcessReplayFiles(DateOnly date, List<string> replayFilePaths)
 	{
@@ -235,13 +243,13 @@ public static class OneSecondCandleCsvBuilderExample
 				if (tick.IsTrade())
 				{
 					ConditionFlags conditions = ConditionMapper.Map(tick.Trade);
-					if (conditions.HasFlag(ConditionFlags.UpdateVolumeConsolidated) && conditions.HasFlag(ConditionFlags.UpdateHighLowConsolidated) && conditions.HasFlag(ConditionFlags.UpdateLastConsolidated))
+					if (IsTickerWhiteListed(tick.Trade.Symbol) && conditions.HasFlag(ConditionFlags.UpdateVolumeConsolidated) && conditions.HasFlag(ConditionFlags.UpdateHighLowConsolidated) && conditions.HasFlag(ConditionFlags.UpdateLastConsolidated))
 						_candleStickClient.OnTrade(tick.Trade);
 				}
 				else
 				{
 					ConditionFlags conditions = ConditionMapper.Map(tick.Quote);
-					if (conditions.HasFlag(ConditionFlags.UpdateHighLowConsolidated) && conditions.HasFlag(ConditionFlags.UpdateLastConsolidated))
+					if (IsTickerWhiteListed(tick.Quote.Symbol) && conditions.HasFlag(ConditionFlags.UpdateHighLowConsolidated) && conditions.HasFlag(ConditionFlags.UpdateLastConsolidated))
 						_candleStickClient.OnQuote(tick.Quote);
 				}
 			}
@@ -320,6 +328,11 @@ public static class OneSecondCandleCsvBuilderExample
 		
 		_writeQuotes = args.Length > 7 && Boolean.Parse(args[7]);
 		Console.WriteLine("Using writeQuotes : {0}", _writeQuotes);
+
+		string[] tickerWhiteList = args.Length > 8 ? args[8].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) : new string[0];
+		_tickerWhiteList = new HashSet<string>(tickerWhiteList);
+		if (_tickerWhiteList.Count > 0)
+			Console.WriteLine("Using tickerWhiteList : {0}", args[8]);
 	}
 
 	public static void Run(string[] args)
