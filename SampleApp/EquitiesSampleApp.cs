@@ -13,10 +13,10 @@ public class EquitiesSampleApp
     private static IEquitiesWebSocketClient client = null;
 	private static CandleStickClient _candleStickClient = null;
 	private static Timer timer = null;
-	private static readonly ConcurrentDictionary<string, int> trades = new(5, 15_000);
-	private static readonly ConcurrentDictionary<string, int> quotes = new(5, 15_000);
-	private static int maxTradeCount = 0;
-	private static int maxQuoteCount = 0;
+	private static readonly ConcurrentDictionary<string, ulong> trades = new(Environment.ProcessorCount, 15_000);
+	private static readonly ConcurrentDictionary<string, ulong> quotes = new(Environment.ProcessorCount, 15_000);
+	private static ulong maxTradeCount = 0UL;
+	private static ulong maxQuoteCount = 0UL;
 	private static Trade maxCountTrade;
 	private static Quote maxCountQuote;
 	private static UInt64 _tradeCandleStickCount = 0UL;
@@ -32,31 +32,49 @@ public class EquitiesSampleApp
 	static void OnQuote(Quote quote)
 	{
 		string key = quote.Symbol + ":" + quote.Type;
-		int updateFunc(string _, int prevValue)
+		ulong updateFunc(string _, ulong prevValue)
 		{
-			if (prevValue + 1 > maxQuoteCount)
+			if (prevValue + 1UL > maxQuoteCount)
 			{
-				maxQuoteCount = prevValue + 1;
+				maxQuoteCount = prevValue + 1UL;
 				maxCountQuote = quote;
 			}
-			return (prevValue + 1);
+			return (prevValue + 1UL);
 		}
-		quotes.AddOrUpdate(key, 1, updateFunc);
+		quotes.AddOrUpdate(key, 1UL, updateFunc);
+		
+		if (_useQuoteCandleSticks && _candleStickClient != null)
+		{
+			ConditionFlags conditions = ConditionMapper.Map(quote);
+			if (conditions.HasFlag(ConditionFlags.UpdateVolumeConsolidated) && conditions.HasFlag(ConditionFlags.UpdateHighLowConsolidated) && conditions.HasFlag(ConditionFlags.UpdateLastConsolidated))
+			{
+				_candleStickClient.OnQuote(quote);
+			}
+		}
 	}
 
 	static void OnTrade(Trade trade)
 	{
 		string key = trade.Symbol;
-		int updateFunc(string _, int prevValue)
+		ulong updateFunc(string _, ulong prevValue)
 		{
-			if (prevValue + 1 > maxTradeCount)
+			if (prevValue + 1UL > maxTradeCount)
 			{
-				maxTradeCount = prevValue + 1;
+				maxTradeCount = prevValue + 1UL;
 				maxCountTrade = trade;
 			}
-			return (prevValue + 1);
+			return (prevValue + 1UL);
 		}
-		trades.AddOrUpdate(key, 1, updateFunc);
+		trades.AddOrUpdate(key, 1UL, updateFunc);
+
+		if (_useTradeCandleSticks && _candleStickClient != null)
+		{
+			ConditionFlags conditions = ConditionMapper.Map(trade);
+			if (conditions.HasFlag(ConditionFlags.UpdateVolumeConsolidated) && conditions.HasFlag(ConditionFlags.UpdateHighLowConsolidated) && conditions.HasFlag(ConditionFlags.UpdateLastConsolidated))
+			{
+				_candleStickClient.OnTrade(trade);
+			}
+		}
 	}
 	
 	static void OnTradeCandleStick(TradeCandleStick tradeCandleStick)
@@ -149,8 +167,6 @@ public class EquitiesSampleApp
 		// _useTradeCandleSticks = true;
 		// _useQuoteCandleSticks = true;
 		// _candleStickClient = new CandleStickClient(OnTradeCandleStick, OnQuoteCandleStick, IntervalType.OneMinute, true, null, null, 0, false);
-		// onTrade += _candleStickClient.OnTrade;
-		// onQuote += _candleStickClient.OnQuote;
 		// _candleStickClient.Start();
 
 		// //You can either automatically load the config.json by doing nothing, or you can specify your own config and pass it in.
