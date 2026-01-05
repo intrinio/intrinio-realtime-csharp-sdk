@@ -1,12 +1,9 @@
-using System;
-using System.Runtime.CompilerServices;
-
-namespace Intrinio.Realtime.Equities;
+namespace Intrinio.Realtime;
 
 public static class ConditionMapper
 {
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ConditionFlags MapTradeFlagsIex(Trade trade)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static ConditionFlags MapTradeFlagsIex(Intrinio.Realtime.Equities.Trade trade)
     {
         ConditionFlags flags = ~ConditionFlags.None; //Allow all through for now
         flags = flags & ~ConditionFlags.OpenConsolidated
@@ -16,17 +13,17 @@ public static class ConditionMapper
         return flags;
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ConditionFlags MapQuoteFlagsIex(Quote quote)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static ConditionFlags MapQuoteFlagsIex(Intrinio.Realtime.Equities.Quote quote)
     {
         ConditionFlags flags = ~ConditionFlags.None; //Allow all through for now
         return flags;
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ConditionFlags MapTradeFlagsSip(Trade trade)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static ConditionFlags MapTradeFlagsSip(Intrinio.Realtime.Equities.Trade trade)
     {
-        if (String.IsNullOrWhiteSpace(trade.Condition))
+        if (System.String.IsNullOrWhiteSpace(trade.Condition))
             return ConditionFlags.None;
         
         ConditionFlags flags = ConditionFlags.None;
@@ -301,17 +298,17 @@ public static class ConditionMapper
         return flags;
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ConditionFlags MapQuoteFlagsSip(Quote quote)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static ConditionFlags MapQuoteFlagsSip(Intrinio.Realtime.Equities.Quote quote)
     {
         ConditionFlags flags = ~ConditionFlags.None; //Allow all through for now
         return flags;
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ConditionFlags MapTradeFlagsNasdaqBasic(Trade trade)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static ConditionFlags MapTradeFlagsNasdaqBasic(Intrinio.Realtime.Equities.Trade trade)
     {
-        if (String.IsNullOrWhiteSpace(trade.Condition))
+        if (System.String.IsNullOrWhiteSpace(trade.Condition))
             return ConditionFlags.None;
         
         ConditionFlags flags = ConditionFlags.None;
@@ -466,29 +463,29 @@ public static class ConditionMapper
         return flags;
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ConditionFlags MapQuoteFlagsNasdaqBasic(Quote quote)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static ConditionFlags MapQuoteFlagsNasdaqBasic(Intrinio.Realtime.Equities.Quote quote)
     {
         ConditionFlags flags = ~ConditionFlags.None; //Allow all through for now
         return flags;
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ConditionFlags MapTradeFlagsCboeOne(Trade trade)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static ConditionFlags MapTradeFlagsCboeOne(Intrinio.Realtime.Equities.Trade trade)
     {
-        if (String.IsNullOrWhiteSpace(trade.Condition))
+        if (System.String.IsNullOrWhiteSpace(trade.Condition))
             return ConditionFlags.None;
         
         ConditionFlags flags = ConditionFlags.None;
 
-        if (Int32.TryParse(trade.Condition, out int flagsInt))
+        if (System.Int32.TryParse(trade.Condition, out int flagsInt))
             flags = (ConditionFlags)flagsInt;
         
         return flags;
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ConditionFlags MapTradeFlagsEquitiesEdge(Trade trade)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static ConditionFlags MapTradeFlagsEquitiesEdge(Intrinio.Realtime.Equities.Trade trade)
     {
         ConditionFlags flags = ~ConditionFlags.None; //Allow all through for now
         flags = flags & ~ConditionFlags.OpenConsolidated
@@ -498,22 +495,22 @@ public static class ConditionMapper
         return flags;
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ConditionFlags MapQuoteFlagsCboeOne(Quote quote)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static ConditionFlags MapQuoteFlagsCboeOne(Intrinio.Realtime.Equities.Quote quote)
     {
         ConditionFlags flags = ~ConditionFlags.None; //Allow all through for now
         return flags;
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ConditionFlags MapQuoteFlagsEquitiesEdge(Quote quote)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static ConditionFlags MapQuoteFlagsEquitiesEdge(Intrinio.Realtime.Equities.Quote quote)
     {
-        if (String.IsNullOrWhiteSpace(quote.Condition))
+        if (System.String.IsNullOrWhiteSpace(quote.Condition))
             return ConditionFlags.None;
         
         ConditionFlags flags = ConditionFlags.None;
 
-        if (Int32.TryParse(quote.Condition, out int flagsInt))
+        if (System.Int32.TryParse(quote.Condition, out int flagsInt))
             flags = (ConditionFlags)flagsInt;
         
         return flags;
@@ -529,7 +526,7 @@ public static class ConditionMapper
         return flags;
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     private static ConditionFlags MapQuoteFlagsOpra(Intrinio.Realtime.Options.Quote quote)
     {
         ConditionFlags flags = ~ConditionFlags.None; //Allow all through for now
@@ -540,27 +537,27 @@ public static class ConditionMapper
         return flags;
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ConditionFlags Map(Trade trade)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    public static ConditionFlags Map(Intrinio.Realtime.Equities.Trade trade)
     {
         switch (trade.SubProvider)
         {
-            case SubProvider.IEX:
+            case Intrinio.Realtime.Equities.SubProvider.IEX:
                 return MapTradeFlagsIex(trade);
                 break;
-            case SubProvider.UTP:
-            case SubProvider.OTC:
-            case SubProvider.CTA_A:    
-            case SubProvider.CTA_B:
+            case Intrinio.Realtime.Equities.SubProvider.UTP:
+            case Intrinio.Realtime.Equities.SubProvider.OTC:
+            case Intrinio.Realtime.Equities.SubProvider.CTA_A:    
+            case Intrinio.Realtime.Equities.SubProvider.CTA_B:
                 return MapTradeFlagsSip(trade);
                 break;
-            case SubProvider.NASDAQ_BASIC:
+            case Intrinio.Realtime.Equities.SubProvider.NASDAQ_BASIC:
                 return MapTradeFlagsNasdaqBasic(trade);
                 break;
-            case SubProvider.CBOE_ONE:
+            case Intrinio.Realtime.Equities.SubProvider.CBOE_ONE:
                 return MapTradeFlagsCboeOne(trade);
                 break;
-            case SubProvider.EQUITIES_EDGE:
+            case Intrinio.Realtime.Equities.SubProvider.EQUITIES_EDGE:
                 return MapTradeFlagsEquitiesEdge(trade);
                 break;
             default:
@@ -568,24 +565,24 @@ public static class ConditionMapper
         }
     }
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ConditionFlags Map(Quote quote)
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    public static ConditionFlags Map(Intrinio.Realtime.Equities.Quote quote)
     {
         switch (quote.SubProvider)
         {
-            case SubProvider.IEX:
+            case Intrinio.Realtime.Equities.SubProvider.IEX:
                 return MapQuoteFlagsIex(quote);
-            case SubProvider.UTP:
-            case SubProvider.OTC:
-            case SubProvider.CTA_A:    
-            case SubProvider.CTA_B:
+            case Intrinio.Realtime.Equities.SubProvider.UTP:
+            case Intrinio.Realtime.Equities.SubProvider.OTC:
+            case Intrinio.Realtime.Equities.SubProvider.CTA_A:    
+            case Intrinio.Realtime.Equities.SubProvider.CTA_B:
                 return MapQuoteFlagsSip(quote);
-            case SubProvider.NASDAQ_BASIC:
+            case Intrinio.Realtime.Equities.SubProvider.NASDAQ_BASIC:
                 return MapQuoteFlagsNasdaqBasic(quote);
-            case SubProvider.CBOE_ONE:
+            case Intrinio.Realtime.Equities.SubProvider.CBOE_ONE:
                 return MapQuoteFlagsCboeOne(quote);
                 break;
-            case SubProvider.EQUITIES_EDGE:
+            case Intrinio.Realtime.Equities.SubProvider.EQUITIES_EDGE:
                 return MapQuoteFlagsEquitiesEdge(quote);
                 break;
             default:
@@ -593,13 +590,13 @@ public static class ConditionMapper
         }
     } 
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     public static ConditionFlags Map(Intrinio.Realtime.Options.Trade trade)
     {
         return MapTradeFlagsOpra(trade);
     } 
     
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     public static ConditionFlags Map(Intrinio.Realtime.Options.Quote quote)
     {
         return MapQuoteFlagsOpra(quote);

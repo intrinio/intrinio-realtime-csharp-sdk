@@ -1,8 +1,6 @@
-using System;
+namespace Intrinio.Realtime;
 
-namespace Intrinio.Realtime.Equities;
-
-[Flags]
+[System.FlagsAttribute]
 public enum ConditionFlags
 {
     None                      = 0,
