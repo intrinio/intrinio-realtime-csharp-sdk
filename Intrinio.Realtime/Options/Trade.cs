@@ -74,7 +74,7 @@ public struct Trade
 
     public DateTime GetExpirationDate()
     {
-        return DateTime.ParseExact(Contract.Substring(6, 6), "yyMMdd", CultureInfo.InvariantCulture);
+        return Helpers.GetExpirationWithTime(GetUnderlyingSymbol(), Contract.Substring(6, 6));
     }
 
     public bool IsCall()
