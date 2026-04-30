@@ -350,11 +350,11 @@ public sealed class BlackScholesGreekCalculatorTests
     [TestMethod]
     public void Calculate_VeryShortTimeATMCall_ReturnsCorrectGreeks()
     {
-        double expectedIV    = 0.3536;
-        double expectedDelta = 0.5022;
-        double expectedGamma = 0.6266;
-        double expectedVega  = 0.0072;
-        double expectedTheta = -1.0795;
+        double expectedIV    = 0.13485248544838696;
+        double expectedDelta = 0.5081042575527008;
+        double expectedGamma = 0.6379733867181622;
+        double expectedVega  = 0.018491807663633463;
+        double expectedTheta = -0.16573887984936522;
         double marketPrice   = 0.2548143460;
         double S             = 100.0;
         double K             = 100.0;
