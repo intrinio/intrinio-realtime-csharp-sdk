@@ -184,22 +184,26 @@ public abstract class WebSocketClient
             }
         
         
-            double now               = DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1)).TotalSeconds;
+            double now               = DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalSeconds;
             double prevProcessedTime = _prevProcessedTime;
-            _prevProcessedTime = now;
+            _prevProcessedTime = now; //setting for next iteration
             
             ulong prevProcessedCount = 0UL;
             ulong processedCount     = 0UL;
             for (int i = 0; i < _prevProcessedCount.Length; i++)
             {
-                prevProcessedCount += Interlocked.Read(ref _prevProcessedCount[i]);
-                processedCount     += Interlocked.Read(ref _processedCount[i]);
-                Interlocked.Exchange(ref _prevProcessedCount[i], processedCount);
+                ulong previousThreadCount = Interlocked.Read(ref _prevProcessedCount[i]);
+                ulong currentThreadCount  = Interlocked.Read(ref _processedCount[i]);
+
+                prevProcessedCount += previousThreadCount;
+                processedCount     += currentThreadCount;
+
+                Interlocked.Exchange(ref _prevProcessedCount[i], currentThreadCount);
             }
-            
-            ulong  countDiff         = processedCount - prevProcessedCount;
-            double timeDiff          = now            - prevProcessedTime;
-            double messagesPerSecond = timeDiff > 0.0D ? Convert.ToDouble(countDiff) / timeDiff : Convert.ToDouble(countDiff) / 1D;
+
+            ulong  countDiff         = processedCount >= prevProcessedCount ? processedCount - prevProcessedCount : 0UL;
+            double timeDiff          = now - prevProcessedTime;
+            double messagesPerSecond = timeDiff > 0.0D ? Convert.ToDouble(countDiff) / timeDiff : 0.0D;
         
             return new ClientStats(Interlocked.Read(ref _dataMsgCount),
                                    Interlocked.Read(ref _textMsgCount),
