@@ -107,7 +107,7 @@ public class EquitiesSampleApp
 	{
 		IEquitiesWebSocketClient client = (IEquitiesWebSocketClient) obj;
 		ClientStats stats = client.GetStats();
-		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Drops: {3}, PriorityQueue Depth: {7}%; PriorityQueue Drops: {8}, Individual Events: {4}, Trades: {5}, Quotes: {6}",
+		Log("Socket Stats - Grouped Messages: {0}, Text Messages: {1}, Queue Depth: {2}%, Drops: {3}, PriorityQueue Depth: {7}%; PriorityQueue Drops: {8}, Individual Events: {4}, Trades: {5}, Quotes: {6}, Mps: {9}",
 			stats.SocketDataMessages,
 			stats.SocketTextMessages,
 			(stats.QueueDepth * 100) / stats.QueueCapacity,
@@ -116,7 +116,8 @@ public class EquitiesSampleApp
 			client.TradeCount,
 			client.QuoteCount,
 			(stats.PriorityQueueDepth * 100) / stats.PriorityQueueCapacity,
-			stats.PriorityQueueDroppedCount);
+			stats.PriorityQueueDroppedCount,
+			stats.MessagesPerSecond);
 		if (maxTradeCount > 0)
 		{
 			Log("Most active trade: {0} ({1} updates)", maxCountTrade, maxTradeCount);
@@ -187,6 +188,7 @@ public class EquitiesSampleApp
 		timer = new Timer(TimerCallback, client, 60000, 60000);
 		await client.Join(); //Load symbols from your config or config.json
 		// await client.Join(new string[] { "AAPL", "GOOG", "MSFT" }, false); //Specify symbols at runtime
+		// await client.JoinFirehose(false);
 		
 		// //You can also simulate a trading day by replaying a particular day's data. You can do this with the actual time between events, or without.
 		// DateTime yesterday = DateTime.Today - TimeSpan.FromDays(1);
