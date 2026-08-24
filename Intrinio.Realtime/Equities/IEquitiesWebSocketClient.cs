@@ -46,4 +46,5 @@ public interface IEquitiesWebSocketClient
     public IEnumerable<ISocketPlugIn> PlugIns { get; }
     public bool AddPlugin(ISocketPlugIn plugin);
     public bool TrySetBackoffs([DisallowNull] uint[] newBackoffs);
+    public bool TrySetConnectTimeout(uint milliseconds);
 }

@@ -105,6 +105,14 @@ public class ReplayClient : IEquitiesWebSocketClient
     {
         return true;
     }
+
+    /// <summary>
+    /// No-op. Replay does not open a live websocket.
+    /// </summary>
+    public bool TrySetConnectTimeout(uint milliseconds)
+    {
+        return true;
+    }
     public bool AddPlugin(ISocketPlugIn plugin)
     {
         try

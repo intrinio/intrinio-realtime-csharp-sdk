@@ -30,6 +30,10 @@ public class MockClientWebSocket : IClientWebSocket
     public ClientWebSocketOptions Options => _options;
     public WebSocketState State { get; set; } = WebSocketState.None;
     public string? SubProtocol { get; private set; }
+    public Func<Uri, CancellationToken, Task>? ConnectBehavior { get; set; }
+    public int ConnectAttemptCount => Volatile.Read(ref _connectAttempts);
+
+    private int _connectAttempts;
 
     public void Abort()
     {
@@ -49,10 +53,12 @@ public class MockClientWebSocket : IClientWebSocket
         return Task.CompletedTask;
     }
 
-    public Task ConnectAsync(Uri uri, CancellationToken cancellationToken)
+    public async Task ConnectAsync(Uri uri, CancellationToken cancellationToken)
     {
+        Interlocked.Increment(ref _connectAttempts);
+        if (ConnectBehavior != null)
+            await ConnectBehavior(uri, cancellationToken);
         State = WebSocketState.Open;
-        return Task.CompletedTask;
     }
 
     public Task ConnectAsync(Uri uri, HttpMessageInvoker httpMessageInvoker, CancellationToken cancellationToken)
