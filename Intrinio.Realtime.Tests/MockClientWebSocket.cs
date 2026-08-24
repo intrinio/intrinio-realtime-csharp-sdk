@@ -121,7 +121,7 @@ public class MockClientWebSocket : IClientWebSocket
 
     public void PushClose(string? reason = null)
     {
-        byte[] payload = string.IsNullOrEmpty(reason) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(reason);
+        byte[] payload = String.IsNullOrEmpty(reason) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(reason);
         PushMessage(payload, WebSocketMessageType.Close);
     }
 
