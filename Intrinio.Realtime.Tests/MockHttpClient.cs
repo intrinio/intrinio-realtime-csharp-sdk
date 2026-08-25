@@ -22,10 +22,24 @@ public class MockHttpClient : IHttpClient
 {
     private readonly HttpRequestHeaders _defaultRequestHeaders = new HttpRequestMessage().Headers;
     private Dictionary<string, string> _responses = new Dictionary<string, string>();
+    private int _getAttempts;
+
+    public Func<string?, Task<HttpResponseMessage>>? GetAsyncBehavior { get; set; }
+    public int GetAttemptCount => Volatile.Read(ref _getAttempts);
 
     public void SetResponse(string url, string response)
     {
         _responses[url] = response;
+    }
+
+    public static HttpResponseMessage Ok(string body)
+    {
+        return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) };
+    }
+
+    public static HttpResponseMessage Status(HttpStatusCode statusCode, string body = "")
+    {
+        return new HttpResponseMessage(statusCode) { Content = new StringContent(body) };
     }
 
     public Uri? BaseAddress { get; set; }
@@ -39,6 +53,9 @@ public class MockHttpClient : IHttpClient
 
     public async Task<HttpResponseMessage> GetAsync(string? requestUri)
     {
+        Interlocked.Increment(ref _getAttempts);
+        if (GetAsyncBehavior != null)
+            return await GetAsyncBehavior(requestUri);
         if (requestUri != null && _responses.TryGetValue(requestUri, out string resp))
         {
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(resp) };

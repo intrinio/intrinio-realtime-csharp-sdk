@@ -18,6 +18,7 @@ public abstract class WebSocketClient
     private readonly   uint                                   _processingThreadsQuantity;
     protected readonly uint                                   _bufferSize;
     private            int[]                                  _selfHealBackoffs = new int[] { 10_000, 30_000, 60_000, 300_000, 600_000 };
+    private            int                                    _connectTimeoutMs = 30_000;
     private readonly   object                                 _tLock            = new ();
     private readonly   object                                 _wsLock           = new ();
     private            Tuple<string, DateTime>                _token            = new (null, DateTime.Now);
@@ -36,7 +37,7 @@ public abstract class WebSocketClient
     private readonly   Func<Task>                             _tryReconnect;
     private readonly   IHttpClient                            _httpClient;
     private const      string                                 ClientInfoHeaderKey   = "Client-Information";
-    private const      string                                 ClientInfoHeaderValue = "IntrinioDotNetSDKv18.13";
+    private const      string                                 ClientInfoHeaderValue = "IntrinioDotNetSDKv18.14";
     private readonly   ThreadPriority                         _mainThreadPriority;
     private readonly   Thread[]                               _workerThreads;
     private            Thread?                                _receiveThread;
@@ -81,7 +82,7 @@ public abstract class WebSocketClient
                 
         //_httpClient.Timeout = TimeSpan.FromMinutes(10.0);
         
-        _tryReconnect = async () => await DoBackoff(Reconnect);
+        _tryReconnect = RunReconnectLoop;
     }
     #endregion //Constructors
     
@@ -97,6 +98,24 @@ public abstract class WebSocketClient
         if (newBackoffs != null && newBackoffs.Length > 0 && newBackoffs.All(b => b != 0u && b <= Convert.ToUInt32(Int32.MaxValue)))
         {
             _selfHealBackoffs = newBackoffs.Select(System.Convert.ToInt32).ToArray();
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Try to set the timeout used for a single websocket connect/handshake attempt.
+    /// When a handshake hangs (for example the server accepts TCP/TLS but never completes the HTTP upgrade),
+    /// this timeout aborts that attempt so reconnect backoff can continue.
+    /// </summary>
+    /// <param name="milliseconds">Timeout in milliseconds. Must be greater than zero and less than or equal to Int32.Max.</param>
+    /// <returns>Whether updating the connect timeout was successful or not.</returns>
+    public bool TrySetConnectTimeout(uint milliseconds)
+    {
+        if (milliseconds != 0u && milliseconds <= Convert.ToUInt32(Int32.MaxValue))
+        {
+            _connectTimeoutMs = Convert.ToInt32(milliseconds);
             return true;
         }
 
@@ -357,6 +376,40 @@ public abstract class WebSocketClient
         return CloseType.Other;
     }
 
+    private async Task RunReconnectLoop()
+    {
+        try
+        {
+            await DoBackoff(Reconnect);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception e)
+        {
+            LogMessage(LogLevel.ERROR, "Websocket - Reconnect loop ended unexpectedly: {0}", e.Message);
+            lock (_wsLock)
+            {
+                if (_wsState != null)
+                    _wsState.IsReconnecting = false;
+            }
+
+            if (_ctSource.IsCancellationRequested)
+                return;
+
+            try
+            {
+                await Task.Delay(_selfHealBackoffs[0], CancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            Task.Run(_tryReconnect);
+        }
+    }
+
     private async Task<bool> Reconnect(CancellationToken ct)
     {
         LogMessage(LogLevel.WARNING, "Websocket - Reconnecting...");
@@ -368,9 +421,21 @@ public abstract class WebSocketClient
             _wsState.IsReconnecting = true;
         }
 
-        string token = await GetToken(ct);
-        await ResetWebSocket(ct, token);
-        return false;
+        try
+        {
+            string token = await GetToken(ct);
+            await ResetWebSocket(ct, token);
+            return IsReady();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (Exception e)
+        {
+            LogMessage(LogLevel.WARNING, "Websocket - Reconnect attempt failed: {0}", e.Message);
+            return false;
+        }
     }
 
     private void ReceiveFn()
@@ -537,15 +602,38 @@ public abstract class WebSocketClient
     {
         int[] backoffsCopy = _selfHealBackoffs.ToArray(); //this could be swapped mid-method here, so get a local copy to work with. 
         int i = 0;
-        int backoff = backoffsCopy[i];
         CancellationToken ct = CancellationToken;
-        bool success = !ct.IsCancellationRequested && await fn(ct);
-        while (!success && !ct.IsCancellationRequested)
+
+        while (!ct.IsCancellationRequested)
         {
-            await Task.Delay(backoff, ct);
+            try
+            {
+                if (await fn(ct))
+                    return;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception e)
+            {
+                LogMessage(LogLevel.WARNING, "Websocket - Attempt failed: {0}", e.Message);
+            }
+
+            if (ct.IsCancellationRequested)
+                return;
+
+            int backoff = backoffsCopy[i];
             i = Math.Min(i + 1, backoffsCopy.Length - 1);
-            backoff = backoffsCopy[i];
-            success = !ct.IsCancellationRequested && await fn(ct);
+
+            try
+            {
+                await Task.Delay(backoff, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
         }
     }
 
@@ -641,7 +729,8 @@ public abstract class WebSocketClient
 
                     if (!_ctSource.IsCancellationRequested)
                     {
-                        Task.Factory.StartNew(_tryReconnect, CancellationToken);
+                        // Task.Run unwraps the inner Task so connect exceptions cannot become unobserved.
+                        Task.Run(_tryReconnect);
                     }
                 }
             }
@@ -666,29 +755,60 @@ public abstract class WebSocketClient
         return ws;
     }
 
+    private async Task ConnectWithTimeout(IClientWebSocket ws, Uri wsUrl, CancellationToken ct)
+    {
+        using CancellationTokenSource connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        connectCts.CancelAfter(_connectTimeoutMs);
+        try
+        {
+            await ws.ConnectAsync(wsUrl, connectCts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            try { ws.Abort(); } catch { /* ignore */ }
+            throw new TimeoutException($"Websocket connect timed out after {_connectTimeoutMs}ms.");
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            try { ws.Abort(); } catch { /* ignore */ }
+            throw;
+        }
+    }
+
     private async Task ResetWebSocket(CancellationToken ct, string token)
     {
         LogMessage(LogLevel.INFORMATION, "Websocket - Resetting");
         Uri wsUrl = new Uri(GetWebSocketUrl(token));
+        IClientWebSocket previous;
+        IClientWebSocket created;
         lock (_wsLock)
         {
-            _wsState.WebSocket = CreateWebSocket(token);
+            previous = _wsState.WebSocket;
+            created = CreateWebSocket(token);
+            _wsState.WebSocket = created;
             _wsState.Reset();
         }
-        await _wsState.WebSocket.ConnectAsync(wsUrl, ct);
+
+        if (!ReferenceEquals(previous, created))
+        {
+            try { previous?.Abort(); } catch { /* ignore */ }
+        }
+
+        await ConnectWithTimeout(created, wsUrl, ct);
         await OnOpen();
     }
 
     private async Task InitializeWebSockets(string token)
     {
         Uri wsUrl = new Uri(GetWebSocketUrl(token));
+        IClientWebSocket ws;
         lock (_wsLock)
         {
             LogMessage(LogLevel.VERBOSE, "Websocket - Connecting...");
-            IClientWebSocket ws = CreateWebSocket(token);
+            ws = CreateWebSocket(token);
             _wsState = new WebSocketState(ws);
         }
-        await _wsState.WebSocket.ConnectAsync(wsUrl, _ctSource.Token);
+        await ConnectWithTimeout(ws, wsUrl, _ctSource.Token);
         await OnOpen();
     }
     
