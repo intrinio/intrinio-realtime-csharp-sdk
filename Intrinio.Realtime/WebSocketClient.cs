@@ -27,14 +27,38 @@ public abstract class WebSocketClient
     private readonly   UInt64[]                               _dataEventCount;
     private            UInt64                                 _textMsgCount = 0UL;
     private readonly   HashSet<string>                        _channels     = new ();
-    protected          IEnumerable<string>                    Channels { get { return _channels.ToArray(); } }
-    private readonly   CancellationTokenSource                _ctSource = new ();
+    private readonly   object                                 _channelsLock = new ();
+    protected          IEnumerable<string>                    Channels
+    {
+        get
+        {
+            lock (_channelsLock)
+                return _channels.ToArray();
+        }
+    }
+    private            CancellationTokenSource                _ctSource = new ();
     protected          CancellationToken                      CancellationToken { get { return _ctSource.Token; } }
+    private readonly   object                                 _startStopLock = new ();
+    private enum Lifecycle
+    {
+        Stopped,
+        Starting,
+        Started,
+        Stopping
+    }
+    private            Lifecycle                              _lifecycle = Lifecycle.Stopped;
+    private            Task                                   _stopTask = Task.CompletedTask;
+    // Distinct from WebSocketState.IsReconnecting: this serializes the reconnect worker so OnClose cannot spawn a second loop that aborts an in-flight socket.
+    private            int                                    _reconnectWorkerRunning;
+    private            int                                    _reconnectWorkerEpoch;
+    private            Task                                   _reconnectWorkerTask = Task.CompletedTask;
+    private            TaskCompletionSource<bool>             _readyTcs = new (TaskCreationOptions.RunContinuationsAsynchronously);
+    private const      int                                    MaxCloseTimeoutMs = 5_000;
+    private const      int                                    WorkerJoinTimeoutMs = 10_000;
     private readonly   uint                                   _maxMessageSize;
     protected readonly uint                                   _bufferBlockSize;
     private readonly   DynamicBlockDropOldestRingBuffer       _data;
     private            IDynamicBlockPriorityRingBufferPool    _priorityQueue;
-    private readonly   Func<Task>                             _tryReconnect;
     private readonly   IHttpClient                            _httpClient;
     private const      string                                 ClientInfoHeaderKey   = "Client-Information";
     private const      string                                 ClientInfoHeaderValue = "IntrinioDotNetSDKv18.14";
@@ -81,8 +105,6 @@ public abstract class WebSocketClient
         _data = new DynamicBlockDropOldestRingBuffer(_bufferBlockSize, Convert.ToUInt32(_bufferSize));
                 
         //_httpClient.Timeout = TimeSpan.FromMinutes(10.0);
-        
-        _tryReconnect = RunReconnectLoop;
     }
     #endregion //Constructors
     
@@ -124,58 +146,112 @@ public abstract class WebSocketClient
 
     public async Task Start()
     {
-        if (_started)
-            return;
-        _started = true;
-
-        _priorityQueue = GetPriorityRingBufferPool();
-        
-        _receiveThread = new Thread(ReceiveFn){IsBackground = true};
-        for (int i = 0; i < _workerThreads.Length; i++)
-            _workerThreads[i] = new Thread(ProcessFn);
-        
-        _httpClient.DefaultRequestHeaders.Add(ClientInfoHeaderKey, ClientInfoHeaderValue);
-        foreach (KeyValuePair<string,string> customSocketHeader in GetCustomSocketHeaders())
+        while (true)
         {
-            _httpClient.DefaultRequestHeaders.Add(customSocketHeader.Key, customSocketHeader.Value);
+            Task? inFlightStop = null;
+            TaskCompletionSource<bool>? joinReady = null;
+            Task previousWorker = Task.CompletedTask;
+            lock (_startStopLock)
+            {
+                if (_lifecycle == Lifecycle.Starting || _lifecycle == Lifecycle.Started)
+                {
+                    joinReady = _readyTcs;
+                }
+                else if (_lifecycle == Lifecycle.Stopping)
+                {
+                    inFlightStop = _stopTask;
+                }
+                else
+                {
+                    previousWorker = Volatile.Read(ref _reconnectWorkerTask);
+                }
+            }
+
+            if (inFlightStop != null)
+            {
+                await inFlightStop;
+                continue;
+            }
+
+            if (joinReady != null)
+            {
+                await joinReady.Task;
+                await CompleteStartOrWaitUntilReady();
+                return;
+            }
+
+            await AwaitPreviousWorkerBounded(previousWorker);
+
+            TaskCompletionSource<bool> ready;
+            bool beganStart = false;
+            lock (_startStopLock)
+            {
+                if (_lifecycle == Lifecycle.Starting || _lifecycle == Lifecycle.Started)
+                {
+                    ready = _readyTcs;
+                }
+                else if (_lifecycle == Lifecycle.Stopping)
+                {
+                    inFlightStop = _stopTask;
+                    ready = _readyTcs;
+                }
+                else
+                {
+                    Task published = Volatile.Read(ref _reconnectWorkerTask);
+                    if (!previousWorker.IsCompleted && ReferenceEquals(published, previousWorker))
+                    {
+                        IClientWebSocket? stale;
+                        lock (_wsLock)
+                        {
+                            stale = _wsState?.WebSocket;
+                        }
+                        AbortSocket(stale);
+                        DisposeSocket(stale);
+                        Interlocked.Increment(ref _reconnectWorkerEpoch);
+                        Interlocked.Exchange(ref _reconnectWorkerRunning, 0);
+                    }
+                    BeginStartLocked();
+                    ready = _readyTcs;
+                    beganStart = true;
+                }
+            }
+
+            if (inFlightStop != null)
+            {
+                await inFlightStop;
+                continue;
+            }
+
+            if (beganStart)
+                TryStartReconnectWorker();
+
+            await ready.Task;
+            await CompleteStartOrWaitUntilReady();
+            return;
         }
-        string token = await GetToken(CancellationToken);
-        await InitializeWebSockets(token);
     }
     
     public async Task Stop()
     {
-        if (!_started)
-            return;
-
-        _ctSource.Cancel();
-        try
+        Task stopTask;
+        lock (_startStopLock)
         {
-            await _wsState.WebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client requested close", CancellationToken.None);
-        }
-        catch (Exception e)
-        {
-            LogMessage(LogLevel.ERROR, "CloseAsync errored: {0}", e.Message);
-        }
-
-        // Timed joins to ensure exit
-        if (_receiveThread?.IsAlive ?? false)
-        {
-            if (!_receiveThread.Join(10000))
-                LogMessage(LogLevel.WARNING, "Receive thread timed out on join");
-        }
-        foreach (var thread in _workerThreads)
-        {
-            if (thread?.IsAlive ?? false)
+            if (_lifecycle == Lifecycle.Stopped)
+                return;
+            if (_lifecycle == Lifecycle.Stopping)
             {
-                if (!thread.Join(10000))
-                    LogMessage(LogLevel.WARNING, "Worker thread timed out on join");
+                stopTask = _stopTask;
+            }
+            else
+            {
+                _lifecycle = Lifecycle.Stopping;
+                _started = false;
+                _stopTask = StopCoreAsync();
+                stopTask = _stopTask;
             }
         }
 
-        _started = false;
-                
-        LogMessage(LogLevel.INFORMATION, "Stopped", Array.Empty<object>());
+        await stopTask;
     }
 
     public ClientStats GetStats()
@@ -286,7 +362,12 @@ public abstract class WebSocketClient
     
     protected async Task LeaveImpl(string channel)
     {
-        if (_channels.Remove(channel))
+        bool removed;
+        lock (_channelsLock)
+        {
+            removed = _channels.Remove(channel);
+        }
+        if (removed)
         {
             byte[] message = MakeLeaveMessage(channel);
             LogMessage(LogLevel.VERBOSE, "Websocket - Leaving channel: {0}", new object[]{channel});
@@ -301,18 +382,34 @@ public abstract class WebSocketClient
         }
     }
     
-    protected async Task JoinImpl(IEnumerable<string> channels, bool skipAddCheck = false)
+    protected Task JoinImpl(IEnumerable<string> channels, bool skipAddCheck = false)
+    {
+        return JoinImpl(channels, skipAddCheck, CancellationToken);
+    }
+
+    protected async Task JoinImpl(IEnumerable<string> channels, bool skipAddCheck, CancellationToken ct)
     {
         foreach (string channel in channels)
         {
-            await JoinImpl(channel, skipAddCheck);
+            await JoinImpl(channel, skipAddCheck, ct);
         }
     }
     
-    protected async Task JoinImpl(string channel, bool skipAddCheck = false)
+    protected Task JoinImpl(string channel, bool skipAddCheck = false)
     {
-        System.Threading.CancellationToken ct = CancellationToken;
-        if (!ct.IsCancellationRequested && (_channels.Add(channel) || skipAddCheck))
+        return JoinImpl(channel, skipAddCheck, CancellationToken);
+    }
+
+    protected async Task JoinImpl(string channel, bool skipAddCheck, CancellationToken ct)
+    {
+        bool shouldSend;
+        lock (_channelsLock)
+        {
+            if (ct.IsCancellationRequested)
+                return;
+            shouldSend = skipAddCheck ? _channels.Contains(channel) : _channels.Add(channel);
+        }
+        if (shouldSend)
         {
             byte[] message = MakeJoinMessage(channel);
             LogMessage(LogLevel.VERBOSE, "Websocket - Joining channel: {0}", new object[]{channel});
@@ -322,7 +419,11 @@ public abstract class WebSocketClient
             }
             catch(Exception e)
             {
-                _channels.Remove(channel);
+                if (!skipAddCheck)
+                {
+                    lock (_channelsLock)
+                        _channels.Remove(channel);
+                }
                 LogMessage(LogLevel.WARNING, "Websocket - Warning while joining channel: {0}; Message: {1}; Stack Trace: {2}", new object[]{channel, e.Message, e.StackTrace});
             }
         }
@@ -376,11 +477,304 @@ public abstract class WebSocketClient
         return CloseType.Other;
     }
 
-    private async Task RunReconnectLoop()
+    private void EnsureHeaders()
+    {
+        if (!_httpClient.DefaultRequestHeaders.Contains(ClientInfoHeaderKey))
+            _httpClient.DefaultRequestHeaders.Add(ClientInfoHeaderKey, ClientInfoHeaderValue);
+        foreach (KeyValuePair<string, string> customSocketHeader in GetCustomSocketHeaders())
+        {
+            if (!_httpClient.DefaultRequestHeaders.Contains(customSocketHeader.Key))
+                _httpClient.DefaultRequestHeaders.Add(customSocketHeader.Key, customSocketHeader.Value);
+        }
+    }
+
+    private void BeginStartLocked()
+    {
+        if (_ctSource.IsCancellationRequested)
+        {
+            _ctSource.Dispose();
+            _ctSource = new CancellationTokenSource();
+        }
+
+        _readyTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _priorityQueue = GetPriorityRingBufferPool();
+        DrainSessionBuffers();
+        _receiveThread = new Thread(ReceiveFn) { IsBackground = true };
+        for (int i = 0; i < _workerThreads.Length; i++)
+            _workerThreads[i] = new Thread(ProcessFn);
+        EnsureHeaders();
+        _started = true;
+        _lifecycle = Lifecycle.Starting;
+    }
+
+    private async Task CompleteStartOrWaitUntilReady()
+    {
+        while (true)
+        {
+            CancellationToken ct;
+            lock (_startStopLock)
+            {
+                if (_lifecycle == Lifecycle.Stopping || _lifecycle == Lifecycle.Stopped)
+                    throw new TaskCanceledException();
+                if ((_lifecycle == Lifecycle.Starting || _lifecycle == Lifecycle.Started) && IsReady())
+                {
+                    _lifecycle = Lifecycle.Started;
+                    return;
+                }
+                ct = _ctSource.Token;
+            }
+
+            try
+            {
+                await Task.Delay(20, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new TaskCanceledException();
+            }
+        }
+    }
+
+    private async Task AwaitPreviousWorkerBounded(Task previousWorker)
+    {
+        if (previousWorker.IsCompleted)
+            return;
+        try
+        {
+            Task finished = await Task.WhenAny(previousWorker, Task.Delay(WorkerJoinTimeoutMs));
+            if (!ReferenceEquals(finished, previousWorker))
+                LogMessage(LogLevel.WARNING, "Previous reconnect worker timed out on start");
+        }
+        catch (Exception e)
+        {
+            LogMessage(LogLevel.WARNING, "Previous reconnect worker errored on start: {0}", e.Message);
+        }
+    }
+
+    private void DrainSessionBuffers()
+    {
+        byte[] drainBuffer = new byte[_bufferBlockSize];
+        while (_data.TryDequeue(drainBuffer, out _)) { }
+        Interlocked.Exchange(ref _dataMsgCount, 0UL);
+        Interlocked.Exchange(ref _textMsgCount, 0UL);
+        for (int i = 0; i < _dataEventCount.Length; i++)
+            Interlocked.Exchange(ref _dataEventCount[i], 0UL);
+        for (int i = 0; i < _processedCount.Length; i++)
+        {
+            Interlocked.Exchange(ref _processedCount[i], 0UL);
+            Interlocked.Exchange(ref _prevProcessedCount[i], 0UL);
+        }
+    }
+
+    private async Task StopCoreAsync()
     {
         try
         {
-            await DoBackoff(Reconnect);
+            _ctSource.Cancel();
+            _readyTcs.TrySetCanceled();
+
+            IClientWebSocket? socketAtStop;
+            lock (_wsLock)
+            {
+                if (_wsState != null)
+                {
+                    _wsState.IsReady = false;
+                    _wsState.IsReconnecting = false;
+                }
+                socketAtStop = _wsState?.WebSocket;
+            }
+
+            await CloseOrAbortSocket(socketAtStop);
+
+            if (_receiveThread?.IsAlive ?? false)
+            {
+                if (!_receiveThread.Join(WorkerJoinTimeoutMs))
+                    LogMessage(LogLevel.WARNING, "Receive thread timed out on join");
+            }
+            foreach (var thread in _workerThreads)
+            {
+                if (thread?.IsAlive ?? false)
+                {
+                    if (!thread.Join(WorkerJoinTimeoutMs))
+                        LogMessage(LogLevel.WARNING, "Worker thread timed out on join");
+                }
+            }
+
+            DrainSessionBuffers();
+
+            Task worker = Volatile.Read(ref _reconnectWorkerTask);
+            bool workerCompleted = worker.IsCompleted;
+            if (!workerCompleted)
+            {
+                try
+                {
+                    Task finished = await Task.WhenAny(worker, Task.Delay(WorkerJoinTimeoutMs));
+                    workerCompleted = ReferenceEquals(finished, worker);
+                    if (!workerCompleted)
+                        LogMessage(LogLevel.WARNING, "Reconnect worker timed out on stop");
+                }
+                catch (Exception e)
+                {
+                    LogMessage(LogLevel.WARNING, "Reconnect worker errored on stop: {0}", e.Message);
+                    workerCompleted = worker.IsCompleted;
+                }
+            }
+
+            IClientWebSocket? leftover;
+            lock (_wsLock)
+            {
+                leftover = _wsState?.WebSocket;
+            }
+            if (!ReferenceEquals(leftover, socketAtStop))
+                await CloseOrAbortSocket(leftover);
+
+            if (workerCompleted)
+                Interlocked.Exchange(ref _reconnectWorkerRunning, 0);
+            else
+            {
+                IClientWebSocket? current;
+                lock (_wsLock)
+                {
+                    current = _wsState?.WebSocket;
+                }
+                AbortSocket(current);
+                DisposeSocket(current);
+            }
+        }
+        finally
+        {
+            lock (_startStopLock)
+            {
+                _started = false;
+                _lifecycle = Lifecycle.Stopped;
+            }
+            LogMessage(LogLevel.INFORMATION, "Stopped", Array.Empty<object>());
+        }
+    }
+
+    private void TryStartReconnectWorker()
+    {
+        if (!_started || _ctSource.IsCancellationRequested || IsReady())
+            return;
+        if (Interlocked.CompareExchange(ref _reconnectWorkerRunning, 1, 0) != 0)
+            return;
+        if (!_started || _ctSource.IsCancellationRequested)
+        {
+            Interlocked.Exchange(ref _reconnectWorkerRunning, 0);
+            return;
+        }
+
+        CancellationToken generation = _ctSource.Token;
+        TaskCompletionSource<bool> ready = _readyTcs;
+        int epoch = Interlocked.Increment(ref _reconnectWorkerEpoch);
+        TaskCompletionSource workerDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Volatile.Write(ref _reconnectWorkerTask, workerDone.Task);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await RunReconnectLoop(generation, ready, epoch);
+            }
+            catch (Exception e)
+            {
+                LogMessage(LogLevel.ERROR, "Websocket - Reconnect worker faulted: {0}", e.Message);
+            }
+            finally
+            {
+                workerDone.TrySetResult();
+            }
+        });
+    }
+
+    private bool IsCurrentSocket(IClientWebSocket ws)
+    {
+        lock (_wsLock)
+        {
+            return _wsState != null && ReferenceEquals(_wsState.WebSocket, ws);
+        }
+    }
+
+    private void AbortSocket(IClientWebSocket? ws)
+    {
+        if (ws == null)
+            return;
+        try
+        {
+            ws.Abort();
+        }
+        catch (Exception e)
+        {
+            LogMessage(LogLevel.WARNING, "Abort errored: {0}", e.Message);
+        }
+    }
+
+    private void DisposeSocket(IClientWebSocket? ws)
+    {
+        if (ws == null)
+            return;
+        try
+        {
+            ws.Dispose();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (Exception e)
+        {
+            LogMessage(LogLevel.WARNING, "Dispose errored: {0}", e.Message);
+        }
+    }
+
+    private async Task CloseOrAbortSocket(IClientWebSocket? ws)
+    {
+        if (ws == null)
+            return;
+
+        System.Net.WebSockets.WebSocketState state;
+        try
+        {
+            state = ws.State;
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+        catch (Exception e)
+        {
+            LogMessage(LogLevel.WARNING, "Socket state errored: {0}", e.Message);
+            AbortSocket(ws);
+            DisposeSocket(ws);
+            return;
+        }
+
+        if (state == System.Net.WebSockets.WebSocketState.Open)
+        {
+            int closeTimeoutMs = Math.Min(Math.Max(_connectTimeoutMs, 1), MaxCloseTimeoutMs);
+            using CancellationTokenSource closeCts = new CancellationTokenSource(closeTimeoutMs);
+            try
+            {
+                await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client requested close", closeCts.Token);
+            }
+            catch (Exception e)
+            {
+                if (e is not OperationCanceledException)
+                    LogMessage(LogLevel.WARNING, "CloseAsync errored: {0}", e.Message);
+                AbortSocket(ws);
+            }
+            DisposeSocket(ws);
+            return;
+        }
+
+        if (state != System.Net.WebSockets.WebSocketState.Closed && state != System.Net.WebSockets.WebSocketState.Aborted)
+            AbortSocket(ws);
+        DisposeSocket(ws);
+    }
+
+    private async Task RunReconnectLoop(CancellationToken generation, TaskCompletionSource<bool> ready, int epoch)
+    {
+        try
+        {
+            await DoBackoff(ct => Reconnect(ct, ready), generation);
         }
         catch (OperationCanceledException)
         {
@@ -394,37 +788,35 @@ public abstract class WebSocketClient
                     _wsState.IsReconnecting = false;
             }
 
-            if (_ctSource.IsCancellationRequested)
-                return;
-
             try
             {
-                await Task.Delay(_selfHealBackoffs[0], CancellationToken);
+                await Task.Delay(_selfHealBackoffs[0], generation);
             }
             catch (OperationCanceledException)
             {
-                return;
             }
-
-            Task.Run(_tryReconnect);
+        }
+        finally
+        {
+            if (Volatile.Read(ref _reconnectWorkerEpoch) == epoch)
+                Interlocked.Exchange(ref _reconnectWorkerRunning, 0);
+            if (_started && !generation.IsCancellationRequested && !IsReady())
+                TryStartReconnectWorker();
         }
     }
 
-    private async Task<bool> Reconnect(CancellationToken ct)
+    private async Task<bool> Reconnect(CancellationToken ct, TaskCompletionSource<bool> ready)
     {
         LogMessage(LogLevel.WARNING, "Websocket - Reconnecting...");
-        if (_wsState.IsReady)
+        if (IsReady())
             return true;
-                
-        lock (_wsLock)
-        {
-            _wsState.IsReconnecting = true;
-        }
 
         try
         {
             string token = await GetToken(ct);
-            await ResetWebSocket(ct, token);
+            if (ct.IsCancellationRequested)
+                return false;
+            await ResetWebSocket(ct, token, ready);
             return IsReady();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -446,30 +838,41 @@ public abstract class WebSocketClient
         Span<byte> bufferSpan = new Span<byte>(buffer);
         while (!token.IsCancellationRequested)
         {
+            IClientWebSocket? ws = null;
             try
             {
-                if (_wsState.IsConnected)
+                lock (_wsLock)
                 {
-                    var result = _wsState.WebSocket.ReceiveAsync(buffer, token).Result;
-                    switch (result.MessageType)
-                    {
-                        case WebSocketMessageType.Binary:
-                            if (result.Count > 0)
-                            {
-                                ++_dataMsgCount;
-                                _data.TryEnqueue(bufferSpan.Slice(0, result.Count)); //don't spin on retrying on failure. This will always return true because it overwrites (drop oldest) if full.
-                            }
-                            break;
-                        case WebSocketMessageType.Text:
-                            OnTextMessageReceived(bufferSpan.Slice(0, result.Count));
-                            break;
-                        case WebSocketMessageType.Close:
-                            OnClose(bufferSpan.Slice(0, result.Count));
-                            break;
-                    }
+                    if (_wsState != null && _wsState.IsConnected)
+                        ws = _wsState.WebSocket;
                 }
-                else
+
+                if (ws == null)
+                {
                     Thread.Sleep(1000);
+                    continue;
+                }
+
+                var result = ws.ReceiveAsync(buffer, token).Result;
+                if (!IsCurrentSocket(ws))
+                    continue;
+
+                switch (result.MessageType)
+                {
+                    case WebSocketMessageType.Binary:
+                        if (result.Count > 0)
+                        {
+                            ++_dataMsgCount;
+                            _data.TryEnqueue(bufferSpan.Slice(0, result.Count)); //don't spin on retrying on failure. This will always return true because it overwrites (drop oldest) if full.
+                        }
+                        break;
+                    case WebSocketMessageType.Text:
+                        OnTextMessageReceived(bufferSpan.Slice(0, result.Count));
+                        break;
+                    case WebSocketMessageType.Close:
+                        OnClose(bufferSpan.Slice(0, result.Count));
+                        break;
+                }
             }
             catch (NullReferenceException)
             {
@@ -480,6 +883,9 @@ public abstract class WebSocketClient
             }
             catch (Exception exn)
             {
+                if (ws != null && !IsCurrentSocket(ws))
+                    continue;
+
                 CloseType exceptionType = GetCloseType(exn);
                 switch (exceptionType)
                 {
@@ -598,11 +1004,10 @@ public abstract class WebSocketClient
         return false;
     }
 
-    private async Task DoBackoff(Func<CancellationToken, Task<bool>> fn)
+    private async Task DoBackoff(Func<CancellationToken, Task<bool>> fn, CancellationToken ct)
     {
         int[] backoffsCopy = _selfHealBackoffs.ToArray(); //this could be swapped mid-method here, so get a local copy to work with. 
         int i = 0;
-        CancellationToken ct = CancellationToken;
 
         while (!ct.IsCancellationRequested)
         {
@@ -687,58 +1092,97 @@ public abstract class WebSocketClient
     {
         lock (_tLock)
         {
-            DoBackoff(TrySetToken).Wait(ct);
+            DoBackoff(TrySetToken, ct).Wait(ct);
         }
 
         return _token.Item1;
     }
     
-    private async Task OnOpen()
+    private async Task<bool> OnOpen(CancellationToken ct, TaskCompletionSource<bool> ready, IClientWebSocket created)
     {
         LogMessage(LogLevel.INFORMATION, "Websocket - Connected");
+        IClientWebSocket? cancelledSocket = null;
         lock (_wsLock)
         {
-            _wsState.IsReady = true;
-            _wsState.IsReconnecting = false;
-            for(int i = 0; i < _workerThreads.Length; i++)
+            bool isCurrent = _wsState != null && ReferenceEquals(_wsState.WebSocket, created);
+            if (!isCurrent)
+                return false;
+
+            if (ct.IsCancellationRequested)
             {
-                if (!_workerThreads[i].IsAlive && _workerThreads[i].ThreadState.HasFlag(ThreadState.Unstarted))
-                    _workerThreads[i].Start(System.Convert.ToUInt32(i));
+                _wsState.IsReady = false;
+                _wsState.IsReconnecting = false;
+                cancelledSocket = created;
             }
-            if (!_receiveThread.IsAlive && _receiveThread.ThreadState.HasFlag(ThreadState.Unstarted))
-                _receiveThread.Start();
+            else
+            {
+                _wsState.IsReady = true;
+                _wsState.IsReconnecting = false;
+                for(int i = 0; i < _workerThreads.Length; i++)
+                {
+                    if (!_workerThreads[i].IsAlive && _workerThreads[i].ThreadState.HasFlag(ThreadState.Unstarted))
+                        _workerThreads[i].Start(System.Convert.ToUInt32(i));
+                }
+                if (!_receiveThread.IsAlive && _receiveThread.ThreadState.HasFlag(ThreadState.Unstarted))
+                    _receiveThread.Start();
+            }
         }
 
-        await JoinImpl(_channels, true);
+        if (cancelledSocket != null)
+        {
+            AbortSocket(cancelledSocket);
+            DisposeSocket(cancelledSocket);
+            return false;
+        }
+
+        string[] snapshot;
+        lock (_channelsLock)
+        {
+            snapshot = _channels.ToArray();
+        }
+        await JoinImpl(snapshot, true, ct);
+
+        bool stillReady;
+        lock (_wsLock)
+        {
+            stillReady = !ct.IsCancellationRequested
+                         && _wsState != null
+                         && ReferenceEquals(_wsState.WebSocket, created)
+                         && _wsState.IsReady;
+        }
+        if (!stillReady)
+            return false;
+
+        ready.TrySetResult(true);
+        return true;
     }
 
     private void OnClose(ReadOnlySpan<byte> closeMessage)
     {
+        bool shouldReconnect = false;
         lock (_wsLock)
         {
             try
             {
-                if (!_wsState.IsReconnecting)
-                {
-                    if (!closeMessage.IsEmpty)
-                        LogMessage(LogLevel.INFORMATION, "Websocket - Closed. {0}", Encoding.UTF8.GetString(closeMessage));
-                    else
-                        LogMessage(LogLevel.INFORMATION, "Websocket - Closed.");
-                
-                    _wsState.IsReady = false;
+                if (_wsState == null)
+                    return;
 
-                    if (!_ctSource.IsCancellationRequested)
-                    {
-                        // Task.Run unwraps the inner Task so connect exceptions cannot become unobserved.
-                        Task.Run(_tryReconnect);
-                    }
-                }
+                if (!closeMessage.IsEmpty)
+                    LogMessage(LogLevel.INFORMATION, "Websocket - Closed. {0}", Encoding.UTF8.GetString(closeMessage));
+                else
+                    LogMessage(LogLevel.INFORMATION, "Websocket - Closed.");
+
+                _wsState.IsReady = false;
+                shouldReconnect = _started && !_ctSource.IsCancellationRequested;
             }
             catch(Exception e)
             {
                 LogMessage(LogLevel.WARNING, "Websocket - Error on close: {0}. Stack Trace: {1}", e.Message, e.StackTrace);
             }
         }
+
+        if (shouldReconnect)
+            TryStartReconnectWorker();
     }
 
     private void OnTextMessageReceived(ReadOnlySpan<byte> message)
@@ -759,57 +1203,78 @@ public abstract class WebSocketClient
     {
         using CancellationTokenSource connectCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         connectCts.CancelAfter(_connectTimeoutMs);
-        try
+        using (connectCts.Token.Register(() => { try { ws.Abort(); } catch { /* ignore */ } }))
         {
-            await ws.ConnectAsync(wsUrl, connectCts.Token);
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            try { ws.Abort(); } catch { /* ignore */ }
-            throw new TimeoutException($"Websocket connect timed out after {_connectTimeoutMs}ms.");
-        }
-        catch (Exception) when (!ct.IsCancellationRequested)
-        {
-            try { ws.Abort(); } catch { /* ignore */ }
-            throw;
+            try
+            {
+                await ws.ConnectAsync(wsUrl, connectCts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                try { ws.Abort(); } catch { /* ignore */ }
+                throw new TimeoutException($"Websocket connect timed out after {_connectTimeoutMs}ms.");
+            }
+            catch (Exception) when (!ct.IsCancellationRequested)
+            {
+                try { ws.Abort(); } catch { /* ignore */ }
+                throw;
+            }
         }
     }
 
-    private async Task ResetWebSocket(CancellationToken ct, string token)
+    private async Task ResetWebSocket(CancellationToken ct, string token, TaskCompletionSource<bool> ready)
     {
         LogMessage(LogLevel.INFORMATION, "Websocket - Resetting");
         Uri wsUrl = new Uri(GetWebSocketUrl(token));
-        IClientWebSocket previous;
+        IClientWebSocket? previous;
         IClientWebSocket created;
         lock (_wsLock)
         {
-            previous = _wsState.WebSocket;
+            if (ct.IsCancellationRequested)
+                return;
+            previous = _wsState?.WebSocket;
             created = CreateWebSocket(token);
-            _wsState.WebSocket = created;
-            _wsState.Reset();
+            if (_wsState == null)
+                _wsState = new WebSocketState(created);
+            else
+            {
+                _wsState.WebSocket = created;
+                _wsState.Reset();
+            }
+            _wsState.IsReady = false;
+            _wsState.IsReconnecting = true;
         }
 
         if (!ReferenceEquals(previous, created))
         {
-            try { previous?.Abort(); } catch { /* ignore */ }
+            AbortSocket(previous);
+            DisposeSocket(previous);
         }
 
-        await ConnectWithTimeout(created, wsUrl, ct);
-        await OnOpen();
-    }
-
-    private async Task InitializeWebSockets(string token)
-    {
-        Uri wsUrl = new Uri(GetWebSocketUrl(token));
-        IClientWebSocket ws;
-        lock (_wsLock)
+        bool opened = false;
+        try
         {
-            LogMessage(LogLevel.VERBOSE, "Websocket - Connecting...");
-            ws = CreateWebSocket(token);
-            _wsState = new WebSocketState(ws);
+            await ConnectWithTimeout(created, wsUrl, ct);
+            if (ct.IsCancellationRequested)
+                return;
+            opened = await OnOpen(ct, ready, created);
         }
-        await ConnectWithTimeout(ws, wsUrl, _ctSource.Token);
-        await OnOpen();
+        finally
+        {
+            if (!opened)
+            {
+                AbortSocket(created);
+                DisposeSocket(created);
+                lock (_wsLock)
+                {
+                    if (_wsState != null && ReferenceEquals(_wsState.WebSocket, created))
+                    {
+                        _wsState.IsReady = false;
+                        _wsState.IsReconnecting = false;
+                    }
+                }
+            }
+        }
     }
     
     #endregion //Private Methods

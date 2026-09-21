@@ -23,6 +23,7 @@ public class MockClientWebSocket : IClientWebSocket
     private readonly ClientWebSocketOptions _options = new ClientWebSocket().Options;
     private readonly ConcurrentQueue<(byte[]? msg, WebSocketMessageType type, bool end, Exception? error)> _incoming = new();
     private readonly ConcurrentQueue<byte[]> _sent = new();
+    private CancellationTokenSource _abortCts = new();
     private int _connectAttempts;
     private int _abortCount;
 
@@ -34,6 +35,7 @@ public class MockClientWebSocket : IClientWebSocket
     public WebSocketState State { get; set; } = WebSocketState.None;
     public string? SubProtocol { get; private set; }
     public Func<Uri, CancellationToken, Task>? ConnectBehavior { get; set; }
+    public Func<CancellationToken, Task>? CloseBehavior { get; set; }
     public Exception? SendException { get; set; }
     public int ConnectAttemptCount => Volatile.Read(ref _connectAttempts);
     public int AbortCount => Volatile.Read(ref _abortCount);
@@ -42,15 +44,31 @@ public class MockClientWebSocket : IClientWebSocket
     public void Abort()
     {
         Interlocked.Increment(ref _abortCount);
+        bool wasOpen = State == WebSocketState.Open;
         State = WebSocketState.Aborted;
+        try
+        {
+            if (!_abortCts.IsCancellationRequested)
+                _abortCts.Cancel();
+        }
+        catch
+        {
+            // ignore
+        }
+        if (wasOpen)
+            _incoming.Enqueue((null, WebSocketMessageType.Close, true, new WebSocketException("The websocket was aborted.")));
     }
 
-    public Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
+    public async Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
     {
+        if (State == WebSocketState.Aborted)
+            throw new ObjectDisposedException(nameof(MockClientWebSocket), "Cannot close an aborted websocket.");
+        if (CloseBehavior != null)
+            await CloseBehavior(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         CloseStatus = closeStatus;
         CloseStatusDescription = statusDescription;
         State = WebSocketState.Closed;
-        return Task.CompletedTask;
     }
 
     public Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
@@ -61,9 +79,21 @@ public class MockClientWebSocket : IClientWebSocket
     public async Task ConnectAsync(Uri uri, CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref _connectAttempts);
+        CancellationTokenSource abortCts = ReplaceAbortCts();
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, abortCts.Token);
         if (ConnectBehavior != null)
-            await ConnectBehavior(uri, cancellationToken);
+            await ConnectBehavior(uri, linked.Token);
+        if (linked.Token.IsCancellationRequested)
+            throw new OperationCanceledException(linked.Token);
         State = WebSocketState.Open;
+    }
+
+    private CancellationTokenSource ReplaceAbortCts()
+    {
+        CancellationTokenSource next = new();
+        CancellationTokenSource previous = Interlocked.Exchange(ref _abortCts, next);
+        try { previous.Dispose(); } catch { /* ignore */ }
+        return next;
     }
 
     public Task ConnectAsync(Uri uri, HttpMessageInvoker httpMessageInvoker, CancellationToken cancellationToken)
@@ -112,7 +142,19 @@ public class MockClientWebSocket : IClientWebSocket
         return default;
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        try
+        {
+            if (!_abortCts.IsCancellationRequested)
+                _abortCts.Cancel();
+        }
+        catch
+        {
+            // ignore
+        }
+        try { _abortCts.Dispose(); } catch { /* ignore */ }
+    }
 
     public void PushMessage(byte[] data, WebSocketMessageType type = WebSocketMessageType.Binary, bool endOfMessage = true)
     {
@@ -128,5 +170,10 @@ public class MockClientWebSocket : IClientWebSocket
     public void PushReceiveException(Exception exception)
     {
         _incoming.Enqueue((null, WebSocketMessageType.Close, true, exception));
+    }
+
+    public void ClearIncoming()
+    {
+        while (_incoming.TryDequeue(out _)) { }
     }
 }
