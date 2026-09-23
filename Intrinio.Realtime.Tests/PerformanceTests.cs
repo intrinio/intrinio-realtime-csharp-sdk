@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -128,72 +130,164 @@ public class PerformanceTests
         Assert.IsTrue(stats.QueueDepth == 0UL && stats.PriorityQueueDepth == 0UL, "Load should complete.");
     }
 
+    // Count messages processed during one shared wall-clock window while both pipelines
+    // still have queued work. Trade-only packets stay on the non-dropping queue; once that
+    // queue is full, each extra trade runs the callback on a worker. fakeWork in the callback
+    // is the thread-count bottleneck. Warm up both thread counts before the window.
     [TestMethod]
     public async Task TestProcessing_MultipleThreadsBeatsSingleThread()
     {
+        const int callbackWorkIterations = 32_000;
+        const int bufferSize             = 2_048;
+        const int packetCount            = 8_000;
+        const ulong minimumSingleThreadMessages = 2_048UL;
+        TimeSpan window = TimeSpan.FromSeconds(2);
+
+        ulong fakeWork = 0UL;
+        Action<Trade> onTrade = trade => Volatile.Write(ref fakeWork, BurnCallbackWork(trade.Size, callbackWorkIterations));
+        Action<Quote> onQuote = quote => Volatile.Write(ref fakeWork, BurnCallbackWork(quote.Size, callbackWorkIterations));
+
+        byte[] packet = CreateTradeOnlyPacket(out int messagesPerPacket);
+        await WarmUpProcessingThreads(onTrade, onQuote, packet, messagesPerPacket, bufferSize);
+        // Tiered compilation installs the optimized callback on a background thread after warmup.
+        await Task.Delay(200);
+
+        ProcessingMeasurement single = await MeasureProcessingThroughput(1, packet, messagesPerPacket, packetCount, bufferSize, window, onTrade, onQuote);
+        ProcessingMeasurement multiple = await MeasureProcessingThroughput(8, packet, messagesPerPacket, packetCount, bufferSize, window, onTrade, onQuote);
+
+        ulong observedWork = Volatile.Read(ref fakeWork);
+        string detail = FormatScalingDetail(single, multiple, observedWork);
+
+        Assert.IsTrue(observedWork != 0UL, "Callback work should be observed. " + detail);
+        Assert.IsTrue(single.Started && multiple.Started, "Processing should start before the window. " + detail);
+        Assert.AreEqual(single.SentCount, multiple.SentCount, detail);
+        Assert.IsTrue(single.Processed >= minimumSingleThreadMessages, "Single-thread client should process a substantial number of messages. " + detail);
+        Assert.IsTrue(single.StillWorking && multiple.StillWorking, "Both clients should still have work queued when the window ends. " + detail);
+        Assert.IsTrue(multiple.Processed * 10UL >= single.Processed * 15UL, "Multiple threads should have received more messages than a single thread, by at least 50%. " + detail);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static ulong BurnCallbackWork(ulong seed, int iterations)
+    {
+        ulong x = seed + 1UL;
+        for (int i = 0; i < iterations; i++)
+            x = unchecked(x * 1664525UL + 1013904223UL);
+        return x;
+    }
+
+    private async Task WarmUpProcessingThreads(Action<Trade> onTrade, Action<Quote> onQuote, byte[] packet, int messagesPerPacket, int bufferSize)
+    {
+        const int warmPackets = 48;
+        foreach (int threadCount in new[] { 1, 8 })
+        {
+            MockHttpClient mockHttp = new MockHttpClient();
+            mockHttp.SetResponse("http://localhost:54321/auth?api_key=test", "fake_token");
+            MockClientWebSocket mockWs = new MockClientWebSocket();
+            for (int i = 0; i < warmPackets; i++)
+                mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
+
+            Config config = CreateConfig();
+            config.NumThreads = threadCount;
+            config.BufferSize = bufferSize;
+            EquitiesWebSocketClient client = new EquitiesWebSocketClient(onTrade, onQuote, config, null, () => mockWs, mockHttp);
+            await client.Start();
+            await client.JoinLobby(false);
+
+            ulong sent = (ulong)warmPackets * (ulong)messagesPerPacket;
+            DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+            while (DateTime.UtcNow < deadline)
+            {
+                ulong done = client.TradeCount + client.QuoteCount;
+                ClientStats stats = client.GetStats();
+                if (done >= sent || (done > 0UL && stats.QueueDepth == 0UL && stats.PriorityQueueDepth == 0UL))
+                    break;
+                await Task.Delay(20);
+            }
+
+            await client.Stop();
+        }
+    }
+
+    private async Task<ProcessingMeasurement> MeasureProcessingThroughput(
+        int threadCount,
+        byte[] packet,
+        int messagesPerPacket,
+        int packetCount,
+        int bufferSize,
+        TimeSpan window,
+        Action<Trade> onTrade,
+        Action<Quote> onQuote)
+    {
         MockHttpClient mockHttp = new MockHttpClient();
         mockHttp.SetResponse("http://localhost:54321/auth?api_key=test", "fake_token");
-
-        ulong         sentCount   = 0UL;
-        ulong         fakeWork    = 0UL;
-        Action<Trade> onTrade     = (trade) => { };
-        Action<Quote> onQuote     = (quote) => { };
-        Config        slowConfig  = Create1ThreadTestConfig();
-        int           packetCount = slowConfig.BufferSize * 5;
-
-        MockClientWebSocket mockWsSlow = new MockClientWebSocket();
-        Func<IClientWebSocket> socketFactorySlow = () => mockWsSlow;
-
-        byte[] packet = CreateAccurateRatioPacket(out int count);
+        MockClientWebSocket mockWs = new MockClientWebSocket();
         for (int i = 0; i < packetCount; i++)
+            mockWs.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
+
+        Config config = CreateConfig();
+        config.NumThreads = threadCount;
+        config.BufferSize = bufferSize;
+        EquitiesWebSocketClient client = new EquitiesWebSocketClient(onTrade, onQuote, config, null, () => mockWs, mockHttp);
+        await client.Start();
+        await client.JoinLobby(false);
+
+        DateTime readyDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (client.TradeCount + client.QuoteCount == 0UL && DateTime.UtcNow < readyDeadline)
+            await Task.Delay(10);
+
+        ulong baseline = client.TradeCount + client.QuoteCount;
+        Stopwatch timer = Stopwatch.StartNew();
+        while (timer.Elapsed < window)
         {
-            sentCount += (ulong)count;
-            mockWsSlow.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
+            TimeSpan remaining = window - timer.Elapsed;
+            await Task.Delay(remaining > TimeSpan.FromMilliseconds(50) ? TimeSpan.FromMilliseconds(50) : remaining);
         }
 
-        EquitiesWebSocketClient slowClient = new EquitiesWebSocketClient(onTrade, onQuote, slowConfig, null, socketFactorySlow, mockHttp);
-        await slowClient.Start();
-        await slowClient.JoinLobby(false);
+        ulong atWindowEnd = client.TradeCount + client.QuoteCount;
+        await Task.Delay(50);
+        ulong afterWindow = client.TradeCount + client.QuoteCount;
+        ClientStats stats = client.GetStats();
+        bool stillWorking = afterWindow > atWindowEnd
+                            || stats.QueueDepth > 0UL
+                            || stats.PriorityQueueDepth > 0UL
+                            || stats.PriorityQueueTradeDepth > 0UL;
+        await client.Stop();
 
-        // Poll until processed or timeout
-        var timeout = TimeSpan.FromSeconds(60);
-        var start = DateTime.UtcNow;
-        while (slowClient.TradeCount + slowClient.QuoteCount < sentCount && (DateTime.UtcNow - start) < timeout)
+        return new ProcessingMeasurement(
+            atWindowEnd - baseline,
+            (ulong)packetCount * (ulong)messagesPerPacket,
+            stats,
+            stillWorking,
+            baseline > 0UL);
+    }
+
+    private static string FormatScalingDetail(ProcessingMeasurement single, ProcessingMeasurement multiple, ulong fakeWork)
+    {
+        string ratio = single.Processed == 0UL ? "n/a" : ((double)multiple.Processed / single.Processed).ToString("0.00");
+        return $"singleProcessed={single.Processed}, multipleProcessed={multiple.Processed}, ratio={ratio}, sent={single.SentCount}, " +
+               $"singleNetworkDrops={single.Stats.DroppedCount}, singlePriorityDrops={single.Stats.PriorityQueueDroppedCount}, singleTradeFullChecks={single.Stats.PriorityQueueTradesFullCheckCount}, " +
+               $"multipleNetworkDrops={multiple.Stats.DroppedCount}, multiplePriorityDrops={multiple.Stats.PriorityQueueDroppedCount}, multipleTradeFullChecks={multiple.Stats.PriorityQueueTradesFullCheckCount}, " +
+               $"singleQueueDepth={single.Stats.QueueDepth}, singleTradeDepth={single.Stats.PriorityQueueTradeDepth}, " +
+               $"multipleQueueDepth={multiple.Stats.QueueDepth}, multipleTradeDepth={multiple.Stats.PriorityQueueTradeDepth}, " +
+               $"fakeWork={fakeWork}";
+    }
+
+    private readonly struct ProcessingMeasurement
+    {
+        public ProcessingMeasurement(ulong processed, ulong sentCount, ClientStats stats, bool stillWorking, bool started)
         {
-            await Task.Delay(100);
-        }
-        ulong singleThreadReceiveCount = slowClient.TradeCount + slowClient.QuoteCount;
-
-        await slowClient.Stop();
-
-        ///////////////////////////////////////////////
-
-        sentCount = 0UL;
-        Config fastConfig = Create8ThreadsTestConfig();
-
-        MockClientWebSocket mockWsFast = new MockClientWebSocket();
-        Func<IClientWebSocket> socketFactoryFast = () => mockWsFast;
-
-        for (int i = 0; i < packetCount; i++)
-        {
-            sentCount += (ulong)count;
-            mockWsFast.PushMessage(packet, System.Net.WebSockets.WebSocketMessageType.Binary);
+            Processed    = processed;
+            SentCount    = sentCount;
+            Stats        = stats;
+            StillWorking = stillWorking;
+            Started      = started;
         }
 
-        EquitiesWebSocketClient fastClient = new EquitiesWebSocketClient(onTrade, onQuote, fastConfig, null, socketFactoryFast, mockHttp);
-        await fastClient.Start();
-        await fastClient.JoinLobby(false);
-
-        start = DateTime.UtcNow;
-        while (fastClient.TradeCount + fastClient.QuoteCount < sentCount && (DateTime.UtcNow - start) < timeout)
-        {
-            await Task.Delay(100);
-        }
-        ulong multipleThreadReceiveCount = fastClient.TradeCount + fastClient.QuoteCount;
-
-        await fastClient.Stop();
-
-        Assert.IsTrue(multipleThreadReceiveCount * 10UL > (singleThreadReceiveCount * 15UL), "Multiple threads should have received more messages than a single thread, by at least 50%.");
+        public ulong Processed { get; }
+        public ulong SentCount { get; }
+        public ClientStats Stats { get; }
+        public bool StillWorking { get; }
+        public bool Started { get; }
     }
     
     [TestMethod]

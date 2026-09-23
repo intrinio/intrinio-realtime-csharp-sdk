@@ -151,7 +151,7 @@ public class BaselineTests
         Assert.AreEqual(0UL,                                       stats.EventCount,                "EventCount should be 0.");
         Assert.AreEqual(0UL,                                       stats.DroppedCount,              "DroppedCount should be 0.");
         Assert.AreEqual(0UL,                                       stats.PriorityQueueDroppedCount, "PriorityQueueDroppedCount should be 0.");
-        Assert.AreEqual(Convert.ToUInt64(config.BufferSize) * 3UL, stats.PriorityQueueCapacity,     "PriorityQueueCapacity should be 0.");
+        Assert.AreEqual(Convert.ToUInt64(config.BufferSize) * 4UL, stats.PriorityQueueCapacity,     "PriorityQueueCapacity should be 0.");
         Assert.AreEqual(0UL,                                       stats.PriorityQueueDepth,        "PriorityQueueDepth should be 0.");
         
         //PriorityQueue is not instantiated until start, so asserts here on priority queue counts are meaningless.

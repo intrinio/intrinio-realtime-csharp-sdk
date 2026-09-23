@@ -269,22 +269,183 @@ public class ReconnectTests
 
     [TestMethod]
     [Timeout(15000)]
-    public async Task Start_HungInitialHandshake_ThrowsTimeoutAndDoesNotHang()
+    public async Task Start_HungInitialHandshake_RetriesUntilSuccess()
     {
         MockHttpClient http = CreateAuthClient();
         MockClientWebSocket ws = new MockClientWebSocket();
-        ws.ConnectBehavior = HangOnAttempts(ws, 1, Int32.MaxValue);
+        ws.ConnectBehavior = HangOnAttempts(ws, 1, 2);
         Equities.EquitiesWebSocketClient client = CreateEquitiesClient(ws, http);
         try
         {
-            TimeoutException ex = await Assert.ThrowsExceptionAsync<TimeoutException>(() => client.Start());
-            StringAssert.Contains(ex.Message, "timed out");
+            await client.Start();
+            Assert.IsTrue(ws.ConnectAttemptCount >= 3, $"Start should retry hung handshakes. Attempts: {ws.ConnectAttemptCount}");
             Assert.IsTrue(ws.AbortCount >= 1, "Timed-out initial connect should abort the socket.");
+            await WaitUntilReady(client, "Start should keep retrying a hung handshake until it succeeds.");
         }
         finally
         {
             await client.Stop();
         }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task Start_ConnectException_RetriesUntilSuccess()
+    {
+        MockHttpClient http = CreateAuthClient();
+        MockClientWebSocket ws = new MockClientWebSocket();
+        ws.ConnectBehavior = ThrowOnAttempts(ws, UpgradeEndedException(), 1, 2);
+        Equities.EquitiesWebSocketClient client = CreateEquitiesClient(ws, http);
+        try
+        {
+            await client.Start();
+            Assert.IsTrue(ws.ConnectAttemptCount >= 3, $"Start should retry connect failures. Attempts: {ws.ConnectAttemptCount}");
+            await WaitUntilReady(client, "Start should keep retrying connect exceptions until it succeeds.");
+        }
+        finally
+        {
+            await client.Stop();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task Start_AfterStop_RestartsAndRejoins()
+    {
+        MockHttpClient http = CreateAuthClient();
+        MockClientWebSocket ws = new MockClientWebSocket();
+        Equities.EquitiesWebSocketClient client = CreateEquitiesClient(ws, http);
+        try
+        {
+            await client.Start();
+            await client.Join("MSFT", false);
+            int sendsAfterFirstStart = ws.SentMessages.Count;
+            Assert.IsTrue(sendsAfterFirstStart >= 1, "Join should send a subscribe message.");
+            await client.Stop();
+            await client.Start();
+            Assert.IsTrue(ws.ConnectAttemptCount >= 2, "A stopped instance should connect again on Start.");
+            Assert.IsTrue(await WaitUntilAsync(() => ws.SentMessages.Count > sendsAfterFirstStart, TimeSpan.FromSeconds(8)),
+                          "OnOpen after restart should re-send join for existing channels.");
+            await WaitUntilReady(client, "The same instance should be ready after Stop then Start.");
+        }
+        finally
+        {
+            await client.Stop();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task Start_FirstOpenClosesImmediately_RetriesUntilReady()
+    {
+        MockHttpClient http = CreateAuthClient();
+        MockClientWebSocket ws = new MockClientWebSocket();
+        int connectAttempts = 0;
+        ws.ConnectBehavior = (uri, ct) =>
+        {
+            int n = Interlocked.Increment(ref connectAttempts);
+            if (n == 1)
+                ws.PushClose();
+            return Task.CompletedTask;
+        };
+        Equities.EquitiesWebSocketClient client = CreateEquitiesClient(ws, http);
+        try
+        {
+            Task startTask = client.Start();
+            Assert.IsTrue(await WaitUntilAsync(() => Volatile.Read(ref connectAttempts) >= 2, TimeSpan.FromSeconds(8)),
+                          $"A close during the first OnOpen/rejoin must retry, not cancel Start. Attempts: {connectAttempts}");
+            await startTask;
+            await WaitUntilReady(client, "Start should wait for a later successful open instead of throwing TaskCanceledException.");
+        }
+        finally
+        {
+            await client.Stop();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task Start_AfterStop_DoesNotReplayQueuedTicks()
+    {
+        MockHttpClient http = CreateAuthClient();
+        MockClientWebSocket ws = new MockClientWebSocket();
+        Equities.EquitiesWebSocketClient client = CreateEquitiesClient(ws, http);
+        try
+        {
+            await client.Start();
+            byte[] packet = CreateSingleTradePacket();
+            ws.PushMessage(packet);
+            Assert.IsTrue(await WaitUntilAsync(() => client.TradeCount > 0UL, TimeSpan.FromSeconds(5)),
+                          "Pipeline should be processing before the flood.");
+            for (int i = 0; i < 4000; i++)
+                ws.PushMessage(packet);
+            await client.Stop();
+            ws.ClearIncoming();
+            ulong tradesAfterStop = client.TradeCount;
+            await client.Start();
+            await Task.Delay(400);
+            Assert.AreEqual(tradesAfterStop, client.TradeCount, "Restart must not replay ticks still queued in _data at Stop.");
+        }
+        finally
+        {
+            await client.Stop();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task Start_WhileStopping_StartsNewSession()
+    {
+        MockHttpClient http = CreateAuthClient();
+        MockClientWebSocket ws = new MockClientWebSocket();
+        Equities.EquitiesWebSocketClient client = CreateEquitiesClient(ws, http);
+        try
+        {
+            await client.Start();
+            Assert.AreEqual(1, ws.ConnectAttemptCount);
+            Task stopTask = client.Stop();
+            Task startTask = client.Start();
+            await Task.WhenAll(stopTask, startTask);
+            Assert.IsTrue(ws.ConnectAttemptCount >= 2, "Start issued while Stop is in flight should start a new session.");
+            await WaitUntilReady(client, "Client should be ready after Start waits for Stop.");
+        }
+        finally
+        {
+            await client.Stop();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task Stop_WhenCalledTwiceConcurrently_Completes()
+    {
+        MockHttpClient http = CreateAuthClient();
+        MockClientWebSocket ws = new MockClientWebSocket();
+        Equities.EquitiesWebSocketClient client = CreateEquitiesClient(ws, http);
+        await client.Start();
+        Task first = client.Stop();
+        Task second = client.Stop();
+        Task both = Task.WhenAll(first, second);
+        Task completed = await Task.WhenAny(both, Task.Delay(TimeSpan.FromSeconds(8)));
+        Assert.AreSame(both, completed, "Concurrent Stop calls should both complete.");
+        await both;
+        Assert.AreEqual(WebSocketCloseStatus.NormalClosure, ws.CloseStatus);
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
+    public async Task Stop_HungCloseHandshake_TimesOutAndCompletes()
+    {
+        MockHttpClient http = CreateAuthClient();
+        MockClientWebSocket ws = new MockClientWebSocket();
+        ws.CloseBehavior = ct => Task.Delay(Timeout.Infinite, ct);
+        Equities.EquitiesWebSocketClient client = CreateEquitiesClient(ws, http);
+        await client.Start();
+        Task stopTask = client.Stop();
+        Task completed = await Task.WhenAny(stopTask, Task.Delay(TimeSpan.FromSeconds(8)));
+        Assert.AreSame(stopTask, completed, "Stop should abort a hung close handshake instead of waiting forever.");
+        await stopTask;
+        Assert.IsTrue(ws.AbortCount >= 1, "A close handshake that never completes should be aborted.");
     }
 
     [TestMethod]
@@ -1057,6 +1218,35 @@ public class ReconnectTests
 
     [TestMethod]
     [Timeout(15000)]
+    public async Task Stop_DuringHungInitialHandshake_UnblocksStart()
+    {
+        MockHttpClient http = CreateAuthClient();
+        MockClientWebSocket ws = new MockClientWebSocket();
+        ws.ConnectBehavior = HangOnAttempts(ws, 1, Int32.MaxValue);
+        Equities.EquitiesWebSocketClient client = CreateEquitiesClient(ws, http);
+        Assert.IsTrue(client.TrySetConnectTimeout(30_000u));
+        Task startTask = Task.Run(() => client.Start());
+        try
+        {
+            Assert.IsTrue(await WaitUntilAsync(() => ws.ConnectAttemptCount >= 1, TimeSpan.FromSeconds(5)));
+            Task stopTask = client.Stop();
+            Task completed = await Task.WhenAny(stopTask, Task.Delay(TimeSpan.FromSeconds(8)));
+            Assert.AreSame(stopTask, completed, "Stop should cancel a hung initial handshake.");
+            await stopTask;
+            Assert.IsTrue(ws.AbortCount >= 1, "A hung handshake should be aborted rather than closed.");
+            Assert.IsNull(ws.CloseStatus, "Aborting a connecting socket must not call CloseAsync after Abort.");
+            Task startCompleted = await Task.WhenAny(startTask, Task.Delay(TimeSpan.FromSeconds(5)));
+            Assert.AreSame(startTask, startCompleted, "Start should unblock after Stop cancels the initial handshake.");
+            await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => startTask);
+        }
+        finally
+        {
+            try { await startTask; } catch { /* Start is cancelled by Stop */ }
+        }
+    }
+
+    [TestMethod]
+    [Timeout(15000)]
     public async Task Stop_DuringHungReconnectHandshake_Completes()
     {
         MockHttpClient http = CreateAuthClient();
@@ -1102,10 +1292,11 @@ public class ReconnectTests
             await stopTask;
             Task startCompleted = await Task.WhenAny(startTask, Task.Delay(TimeSpan.FromSeconds(5)));
             Assert.AreSame(startTask, startCompleted, "Start should unblock after Stop cancels auth backoff.");
+            await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => startTask);
         }
         finally
         {
-            try { await startTask; } catch { /* Start may throw once cancelled */ }
+            try { await startTask; } catch { /* Start is cancelled by Stop */ }
         }
     }
 
@@ -1154,6 +1345,70 @@ public class ReconnectTests
                           $"New sockets should still retry after a connect exception. Attempts: {connectAttempts}");
             await WaitUntilReady(client, "Client should recover when each reconnect uses a new socket instance.");
             Assert.IsTrue(sockets.Count >= 3, "ResetWebSocket should create a new socket per attempt.");
+        }
+        finally
+        {
+            await client.Stop();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(20000)]
+    public async Task Reconnect_NewSocketPerAttempt_CloseImmediatelyAfterRejoin_StillRecovers()
+    {
+        MockHttpClient http = CreateAuthClient();
+        int connectAttempts = 0;
+        MockClientWebSocket? latest = null;
+        List<MockClientWebSocket> sockets = new List<MockClientWebSocket>();
+        Func<IClientWebSocket> factory = () =>
+        {
+            MockClientWebSocket created = new MockClientWebSocket();
+            created.ConnectBehavior = (uri, ct) =>
+            {
+                int n = Interlocked.Increment(ref connectAttempts);
+                if (n == 2)
+                    created.PushClose();
+                return Task.CompletedTask;
+            };
+            latest = created;
+            sockets.Add(created);
+            return created;
+        };
+
+        Equities.EquitiesWebSocketClient client = new Equities.EquitiesWebSocketClient(
+            _ => { },
+            _ => { },
+            CreateEquitiesConfig(),
+            null,
+            factory,
+            http);
+        Assert.IsTrue(client.TrySetBackoffs(FastBackoffs));
+        Assert.IsTrue(client.TrySetConnectTimeout(FastConnectTimeoutMs));
+        try
+        {
+            await client.Start();
+            Assert.IsNotNull(latest);
+            await client.Join("MSFT", false);
+            latest!.PushClose();
+            Assert.IsTrue(await WaitUntilAsync(() => Volatile.Read(ref connectAttempts) >= 3, TimeSpan.FromSeconds(10)),
+                          $"Close immediately after OnOpen/rejoin should reconnect on a new socket. Attempts: {connectAttempts}");
+            await WaitUntilReady(client, "Client should recover when a new socket closes immediately after OnOpen/rejoin.");
+            Assert.IsTrue(sockets.Count >= 3, "ResetWebSocket should create a new socket per attempt.");
+            Assert.IsTrue(sockets.Count <= 6, "A single reconnect worker should prevent a reconnect storm.");
+            for (int i = 0; i < sockets.Count - 1; i++)
+                Assert.IsTrue(sockets[i].AbortCount >= 1, $"Replaced socket {i} should have been aborted.");
+
+            bool sawJoin = false;
+            foreach (MockClientWebSocket socket in sockets)
+            {
+                foreach (byte[] sent in socket.SentMessages)
+                {
+                    if (sent.Length > 0 && sent[0] == 74)
+                        sawJoin = true;
+                }
+            }
+
+            Assert.IsTrue(sawJoin, "OnOpen should rejoin channels after reconnect.");
         }
         finally
         {
