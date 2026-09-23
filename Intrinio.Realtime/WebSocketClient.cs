@@ -61,7 +61,7 @@ public abstract class WebSocketClient
     private            IDynamicBlockPriorityRingBufferPool    _priorityQueue;
     private readonly   IHttpClient                            _httpClient;
     private const      string                                 ClientInfoHeaderKey   = "Client-Information";
-    private const      string                                 ClientInfoHeaderValue = "IntrinioDotNetSDKv18.14";
+    private const      string                                 ClientInfoHeaderValue = "IntrinioDotNetSDKv18.15";
     private readonly   ThreadPriority                         _mainThreadPriority;
     private readonly   Thread[]                               _workerThreads;
     private            Thread?                                _receiveThread;
