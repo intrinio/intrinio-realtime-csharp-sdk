@@ -32,16 +32,19 @@ public class EquitiesSampleApp
 	static void OnQuote(Quote quote)
 	{
 		string key = quote.Symbol + ":" + quote.Type;
-		ulong updateFunc(string _, ulong prevValue)
-		{
-			if (prevValue + 1UL > maxQuoteCount)
+		quotes.AddOrUpdate<Quote>(
+			key,
+			static (_, _) => 1UL,
+			static (_, prevValue, quote) =>
 			{
-				maxQuoteCount = prevValue + 1UL;
-				maxCountQuote = quote;
-			}
-			return (prevValue + 1UL);
-		}
-		quotes.AddOrUpdate(key, 1UL, updateFunc);
+				if (prevValue + 1UL > maxQuoteCount)
+				{
+					maxQuoteCount = prevValue + 1UL;
+					maxCountQuote = quote;
+				}
+				return prevValue + 1UL;
+			},
+			quote);
 		
 		if (_useQuoteCandleSticks && _candleStickClient != null)
 		{
@@ -56,16 +59,19 @@ public class EquitiesSampleApp
 	static void OnTrade(Trade trade)
 	{
 		string key = trade.Symbol;
-		ulong updateFunc(string _, ulong prevValue)
-		{
-			if (prevValue + 1UL > maxTradeCount)
+		trades.AddOrUpdate<Trade>(
+			key,
+			static (_, _) => 1UL,
+			static (_, prevValue, trade) =>
 			{
-				maxTradeCount = prevValue + 1UL;
-				maxCountTrade = trade;
-			}
-			return (prevValue + 1UL);
-		}
-		trades.AddOrUpdate(key, 1UL, updateFunc);
+				if (prevValue + 1UL > maxTradeCount)
+				{
+					maxTradeCount = prevValue + 1UL;
+					maxCountTrade = trade;
+				}
+				return prevValue + 1UL;
+			},
+			trade);
 
 		if (_useTradeCandleSticks && _candleStickClient != null)
 		{

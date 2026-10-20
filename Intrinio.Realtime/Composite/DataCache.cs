@@ -45,6 +45,19 @@ internal class DataCache : IDataCache
         _readonlySupplementaryData = new ReadOnlyDictionary<string, double?>(_supplementaryData);
     }
 
+    private ISecurityData GetOrCreateSecurityData(string tickerSymbol)
+    {
+        if (!_securities.TryGetValue(tickerSymbol, out ISecurityData securityData))
+        {
+            securityData = _securities.AddOrUpdate(
+                tickerSymbol,
+                static symbol => new SecurityData(symbol, null, null, null, null, null, null),
+                static (symbol, oldValue) => oldValue ?? new SecurityData(symbol, null, null, null, null, null, null));
+        }
+
+        return securityData;
+    }
+
     #endregion // Constructors
     
     #region Supplementary Data
@@ -53,7 +66,11 @@ internal class DataCache : IDataCache
 
     public bool SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update)
     {
-        bool result = datum == _supplementaryData.AddOrUpdate(key, datum, (string key, double? oldValue) => update(key, oldValue, datum));
+        bool result = datum == _supplementaryData.AddOrUpdate<(double? Datum, SupplementalDatumUpdate Update)>(
+            key,
+            static (_, values) => values.Datum,
+            static (key, oldValue, values) => values.Update(key, oldValue, values.Datum),
+            (datum, update));
         if (result && SupplementalDatumUpdatedCallback != null)
         {
             try
@@ -82,13 +99,7 @@ internal class DataCache : IDataCache
     {
         if (!String.IsNullOrWhiteSpace(tickerSymbol))
         {
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(tickerSymbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(tickerSymbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(tickerSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(tickerSymbol);
             return ((SecurityData)securityData).SetSupplementaryDatum(key, datum, SecuritySupplementalDatumUpdatedCallback, this, update);
         }
 
@@ -106,13 +117,7 @@ internal class DataCache : IDataCache
     {
         if (!String.IsNullOrWhiteSpace(tickerSymbol))
         {
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(tickerSymbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(tickerSymbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(tickerSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(tickerSymbol);
             return ((SecurityData)securityData).SetOptionsContractSupplementalDatum(contract, key, datum, OptionsContractSupplementalDatumUpdatedCallback, this, update);
         }
 
@@ -134,13 +139,7 @@ internal class DataCache : IDataCache
     {
         if (!String.IsNullOrWhiteSpace(tickerSymbol))
         {
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(tickerSymbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(tickerSymbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(tickerSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(tickerSymbol);
             return ((SecurityData)securityData).SetOptionsContractGreekData(contract, key, data, OptionsContractGreekDataUpdatedCallback, this, update);
         }
 
@@ -187,13 +186,7 @@ internal class DataCache : IDataCache
         if (trade.HasValue)
         {
             string symbol = trade.Value.Symbol;
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(symbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(symbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(symbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(symbol);
             return ((SecurityData)securityData).SetEquitiesTrade(trade, EquitiesTradeUpdatedCallback, this);
         }
 
@@ -224,13 +217,7 @@ internal class DataCache : IDataCache
         if (quote.HasValue)
         {
             string symbol = quote.Value.Symbol;
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(symbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(symbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(symbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(symbol);
             return ((SecurityData)securityData).SetEquitiesQuote(quote, EquitiesQuoteUpdatedCallback, this);
         }
 
@@ -254,13 +241,7 @@ internal class DataCache : IDataCache
         if (tradeCandleStick != null)
         {
             string symbol = tradeCandleStick.Symbol;
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(symbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(symbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(symbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(symbol);
             return ((SecurityData)securityData).SetEquitiesTradeCandleStick(tradeCandleStick, EquitiesTradeCandleStickUpdatedCallback, this);
         }
 
@@ -286,13 +267,7 @@ internal class DataCache : IDataCache
         if (quoteCandleStick != null)
         {
             string symbol = quoteCandleStick.Symbol;
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(symbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(symbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(symbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(symbol);
             return ((SecurityData)securityData).SetEquitiesQuoteCandleStick(quoteCandleStick, EquitiesQuoteCandleStickUpdatedCallback, this);
         }
 
@@ -315,13 +290,7 @@ internal class DataCache : IDataCache
         if (trade.HasValue)
         {
             string underlyingSymbol = trade.Value.GetUnderlyingSymbol();
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(underlyingSymbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(underlyingSymbol);
             return ((SecurityData)securityData).SetOptionsContractTrade(trade, OptionsTradeUpdatedCallback, this);
         }
 
@@ -345,13 +314,7 @@ internal class DataCache : IDataCache
         if (quote.HasValue)
         {
             string underlyingSymbol = quote.Value.GetUnderlyingSymbol();
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(underlyingSymbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(underlyingSymbol);
             return ((SecurityData)securityData).SetOptionsContractQuote(quote, OptionsQuoteUpdatedCallback, this);
         }
 
@@ -375,13 +338,7 @@ internal class DataCache : IDataCache
         if (refresh.HasValue)
         {
             string underlyingSymbol = refresh.Value.GetUnderlyingSymbol();
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(underlyingSymbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(underlyingSymbol);
             return ((SecurityData)securityData).SetOptionsContractRefresh(refresh, OptionsRefreshUpdatedCallback, this);
         }
 
@@ -405,13 +362,7 @@ internal class DataCache : IDataCache
         if (unusualActivity.HasValue)
         {
             string underlyingSymbol = unusualActivity.Value.GetUnderlyingSymbol();
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(underlyingSymbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(underlyingSymbol);
             return ((SecurityData)securityData).SetOptionsContractUnusualActivity(unusualActivity, OptionsUnusualActivityUpdatedCallback, this);
         }
 
@@ -435,13 +386,7 @@ internal class DataCache : IDataCache
         if (tradeCandleStick != null)
         {
             string underlyingSymbol = tradeCandleStick.GetUnderlyingSymbol();
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(underlyingSymbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(underlyingSymbol);
             return ((SecurityData)securityData).SetOptionsContractTradeCandleStick(tradeCandleStick, OptionsTradeCandleStickUpdatedCallback, this);
         }
 
@@ -467,13 +412,7 @@ internal class DataCache : IDataCache
         if (quoteCandleStick != null)
         {
             string underlyingSymbol = quoteCandleStick.GetUnderlyingSymbol();
-            ISecurityData securityData;
-            
-            if (!_securities.TryGetValue(underlyingSymbol, out securityData))
-            {
-                SecurityData newDatum = new SecurityData(underlyingSymbol, null, null, null, null, null, null);
-                securityData = _securities.AddOrUpdate(underlyingSymbol, newDatum, (key, oldValue) => oldValue == null ? newDatum : oldValue);
-            }
+            ISecurityData securityData = GetOrCreateSecurityData(underlyingSymbol);
             return ((SecurityData)securityData).SetOptionsContractQuoteCandleStick(quoteCandleStick, OptionsQuoteCandleStickUpdatedCallback, this);
         }
 

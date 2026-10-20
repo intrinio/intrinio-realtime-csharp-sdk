@@ -281,7 +281,11 @@ internal class OptionsContractData : IOptionsContractData
 
     public bool SetSupplementaryDatum(string key, double? datum, SupplementalDatumUpdate update)
     {
-        return datum == _supplementaryData.AddOrUpdate(key, datum, (string key, double? oldValue) => update(key, oldValue, datum));
+        return datum == _supplementaryData.AddOrUpdate<(double? Datum, SupplementalDatumUpdate Update)>(
+            key,
+            static (_, values) => values.Datum,
+            static (key, oldValue, values) => values.Update(key, oldValue, values.Datum),
+            (datum, update));
     }
 
     public bool SetSupplementaryDatum(string key, double? datum, OnOptionsContractSupplementalDatumUpdated? onOptionsContractSupplementalDatumUpdated, ISecurityData securityData, IDataCache dataCache, SupplementalDatumUpdate update)
@@ -318,7 +322,11 @@ internal class OptionsContractData : IOptionsContractData
 
     public bool SetGreekData(string key, Greek? data, GreekDataUpdate update)
     {
-        Greek? ret = _greekData.AddOrUpdate(key, data, (string key, Greek? oldValue) => update(key, oldValue, data));
+        Greek? ret = _greekData.AddOrUpdate<(Greek? Data, GreekDataUpdate Update)>(
+            key,
+            static (_, values) => values.Data,
+            static (key, oldValue, values) => values.Update(key, oldValue, values.Data),
+            (data, update));
         return (ret.HasValue && data.HasValue && ret.Equals(data)) 
                || (!ret.HasValue && !data.HasValue);
     }
