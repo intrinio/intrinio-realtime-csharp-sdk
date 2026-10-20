@@ -200,7 +200,13 @@ public class GreekClient : Intrinio.Realtime.Equities.ISocketPlugIn, Intrinio.Re
 
     public bool TryAddOrUpdateGreekCalculation(string name, CalculateNewGreek? calc)
     {
-        return !String.IsNullOrWhiteSpace(name) && calc != null && _calcLookup.AddOrUpdate(name, calc, (key, old) => calc) == calc;
+        return !String.IsNullOrWhiteSpace(name)
+               && calc != null
+               && _calcLookup.AddOrUpdate<CalculateNewGreek>(
+                   name,
+                   static (_, calc) => calc,
+                   static (_, _, calc) => calc,
+                   calc) == calc;
     }
 
     public void AddBlackScholes(Options.Provider provider = Provider.OPRA)
