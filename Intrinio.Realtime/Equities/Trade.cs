@@ -57,7 +57,7 @@ public readonly struct Trade : IEquatable<Trade>
     public bool Equals(Trade other)
     {
         return String.Equals(Symbol, other.Symbol, StringComparison.Ordinal)             &&
-               Price        == other.Price                                               &&
+               Price.Equals(other.Price)                                                 &&
                Size         == other.Size                                                &&
                Timestamp    == other.Timestamp                                           &&
                SubProvider  == other.SubProvider                                         &&

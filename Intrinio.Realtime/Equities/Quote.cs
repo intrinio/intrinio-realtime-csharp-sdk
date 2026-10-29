@@ -40,7 +40,7 @@ public struct Quote : IEquatable<Quote>
     {
         return String.Equals(Symbol, other.Symbol, StringComparison.Ordinal) &&
                Type         == other.Type                                    &&
-               Price        == other.Price                                   &&
+               Price.Equals(other.Price)                                     &&
                Size         == other.Size                                    &&
                Timestamp    == other.Timestamp                               &&
                SubProvider  == other.SubProvider                             &&
