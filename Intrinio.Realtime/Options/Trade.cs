@@ -4,7 +4,7 @@ namespace Intrinio.Realtime.Options;
 
 using System;
 
-public struct Trade
+public struct Trade : IEquatable<Trade>
 {
     private readonly string _contract;
     private readonly Exchange _exchange;
@@ -113,5 +113,56 @@ public struct Trade
         int unscaledUnderlyingPriceAtExecution = Convert.ToInt32(underlyingPriceAtExecution * 10000.0);
         Trade trade = new Trade(contract, exchange, priceType, priceType, unscaledPrice, size, nanoSecondsSinceUnixEpoch, totalVolume, qualifiers, unscaledAskPriceAtExecution, unscaledBidPriceAtExecution, unscaledUnderlyingPriceAtExecution);
         return trade;
+    }
+
+    public bool Equals(Trade other)
+    {
+        return String.Equals(_contract, other._contract, StringComparison.Ordinal) &&
+            _exchange            == other._exchange                         &&
+            _priceType           == other._priceType                        &&
+            _underlyingPriceType == other._underlyingPriceType              &&
+            _price               == other._price                            &&
+            _size                == other._size                             &&
+            _timestamp           == other._timestamp                        &&
+            _totalVolume         == other._totalVolume                      &&
+            _qualifiers.Equals(other._qualifiers)                           &&
+            _askPriceAtExecution        == other._askPriceAtExecution       &&
+            _bidPriceAtExecution        == other._bidPriceAtExecution       &&
+            _underlyingPriceAtExecution == other._underlyingPriceAtExecution;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is Trade other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+
+        hash.Add(_contract, StringComparer.Ordinal);
+        hash.Add(_exchange);
+        hash.Add(_priceType);
+        hash.Add(_underlyingPriceType);
+        hash.Add(_price);
+        hash.Add(_size);
+        hash.Add(_timestamp);
+        hash.Add(_totalVolume);
+        hash.Add(_qualifiers);
+        hash.Add(_askPriceAtExecution);
+        hash.Add(_bidPriceAtExecution);
+        hash.Add(_underlyingPriceAtExecution);
+
+        return hash.ToHashCode();
+    }
+
+    public static bool operator ==(Trade left, Trade right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(Trade left, Trade right)
+    {
+        return !left.Equals(right);
     }
 }

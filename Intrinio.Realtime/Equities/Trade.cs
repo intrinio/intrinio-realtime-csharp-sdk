@@ -2,7 +2,7 @@ namespace Intrinio.Realtime.Equities;
 
 using System;
 
-public readonly struct Trade
+public readonly struct Trade : IEquatable<Trade>
 {
     public readonly string Symbol;
     public readonly double Price;
@@ -52,5 +52,48 @@ public readonly struct Trade
             default:
                 return false;
         }
+    }
+    
+    public bool Equals(Trade other)
+    {
+        return String.Equals(Symbol, other.Symbol, StringComparison.Ordinal)             &&
+               Price        == other.Price                                               &&
+               Size         == other.Size                                                &&
+               Timestamp    == other.Timestamp                                           &&
+               SubProvider  == other.SubProvider                                         &&
+               MarketCenter == other.MarketCenter                                        &&
+               String.Equals(Condition,    other.Condition,    StringComparison.Ordinal) &&
+               TotalVolume  == other.TotalVolume;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is Trade other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+
+        hash.Add(Symbol, StringComparer.Ordinal);
+        hash.Add(Price);
+        hash.Add(Size);
+        hash.Add(Timestamp);
+        hash.Add(SubProvider);
+        hash.Add(MarketCenter);
+        hash.Add(Condition, StringComparer.Ordinal);
+        hash.Add(TotalVolume);
+
+        return hash.ToHashCode();
+    }
+
+    public static bool operator ==(Trade left, Trade right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(Trade left, Trade right)
+    {
+        return !left.Equals(right);
     }
 }
