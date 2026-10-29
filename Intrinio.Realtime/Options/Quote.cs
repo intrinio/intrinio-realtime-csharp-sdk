@@ -4,7 +4,7 @@ namespace Intrinio.Realtime.Options;
 
 using System;
 
-public struct Quote
+public struct Quote : IEquatable<Quote>
 {
     private readonly string _contract;
     private readonly byte _priceType;
@@ -105,5 +105,46 @@ public struct Quote
         ulong  nanoSecondsSinceUnixEpoch = seconds * 1_000_000_000UL + nanos;
         Quote quote = new Quote(contract, priceType, unscaledAskPrice, askSize, unscaledBidPrice, bidSize, nanoSecondsSinceUnixEpoch);
         return quote;
+    }
+    
+    public bool Equals(Quote other)
+    {
+        return String.Equals(_contract, other._contract, StringComparison.Ordinal) &&
+               _priceType == other._priceType                                      &&
+               _askPrice  == other._askPrice                                       &&
+               _askSize   == other._askSize                                        &&
+               _bidPrice  == other._bidPrice                                       &&
+               _bidSize   == other._bidSize                                        &&
+               _timeStamp == other._timeStamp;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is Quote other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+
+        hash.Add(_contract, StringComparer.Ordinal);
+        hash.Add(_priceType);
+        hash.Add(_askPrice);
+        hash.Add(_askSize);
+        hash.Add(_bidPrice);
+        hash.Add(_bidSize);
+        hash.Add(_timeStamp);
+
+        return hash.ToHashCode();
+    }
+
+    public static bool operator ==(Quote left, Quote right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(Quote left, Quote right)
+    {
+        return !left.Equals(right);
     }
 }

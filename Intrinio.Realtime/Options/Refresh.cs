@@ -4,7 +4,7 @@ namespace Intrinio.Realtime.Options;
 
 using System;
 
-public struct Refresh
+public struct Refresh : IEquatable<Refresh>
 {
     private readonly string _contract;
     private readonly byte _priceType;
@@ -94,5 +94,46 @@ public struct Refresh
         
         Refresh refresh = new Refresh(contract, priceType, openInterest, unscaledOpenPrice, unscaledClosePrice, unscaledHighPrice, unscaledLowPrice);
         return refresh;
+    }
+    
+    public bool Equals(Refresh other)
+    {
+        return String.Equals(_contract, other._contract, StringComparison.Ordinal) &&
+               _openInterest == other._openInterest                                &&
+               _priceType    == other._priceType                                   &&
+               _openPrice    == other._openPrice                                   &&
+               _closePrice   == other._closePrice                                  &&
+               _highPrice    == other._highPrice                                   &&
+               _lowPrice     == other._lowPrice;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is Refresh other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+
+        hash.Add(_contract, StringComparer.Ordinal);
+        hash.Add(_openInterest);
+        hash.Add(_priceType);
+        hash.Add(_openPrice);
+        hash.Add(_closePrice);
+        hash.Add(_highPrice);
+        hash.Add(_lowPrice);
+
+        return hash.ToHashCode();
+    }
+
+    public static bool operator ==(Refresh left, Refresh right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(Refresh left, Refresh right)
+    {
+        return !left.Equals(right);
     }
 }

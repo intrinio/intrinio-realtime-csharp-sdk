@@ -4,7 +4,7 @@ namespace Intrinio.Realtime.Options;
 
 using System;
 
-public struct UnusualActivity
+public struct UnusualActivity : IEquatable<UnusualActivity>
 {
     private readonly string _contract;
     private readonly UAType _unusualActivityType;
@@ -113,5 +113,56 @@ public struct UnusualActivity
         int unscaledUnderlyingPriceAtExecution = Convert.ToInt32(underlyingPriceAtExecution * 10000.0);
         UnusualActivity ua = new UnusualActivity(contract, unusualActivityType, sentimentType, priceType, priceType, unscaledTotalValue, totalSize, unscaledAveragePrice, unscaledAskPriceAtExecution, unscaledBidPriceAtExecution, unscaledUnderlyingPriceAtExecution, nanoSecondsSinceUnixEpoch);
         return ua;
+    }
+    
+    public bool Equals(UnusualActivity other)
+    {
+        return String.Equals(_contract, other._contract, StringComparison.Ordinal) &&
+               _unusualActivityType        == other._unusualActivityType           &&
+               _priceType                  == other._priceType                     &&
+               _underlyingPriceType        == other._underlyingPriceType           &&
+               _sentiment                  == other._sentiment                     &&
+               _totalValue                 == other._totalValue                    &&
+               _timestamp                  == other._timestamp                     &&
+               _totalSize                  == other._totalSize                     &&
+               _averagePrice               == other._averagePrice                  &&
+               _askPriceAtExecution        == other._askPriceAtExecution           &&
+               _bidPriceAtExecution        == other._bidPriceAtExecution           &&
+               _underlyingPriceAtExecution == other._underlyingPriceAtExecution;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is UnusualActivity other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+
+        hash.Add(_contract, StringComparer.Ordinal);
+        hash.Add(_unusualActivityType);
+        hash.Add(_priceType);
+        hash.Add(_underlyingPriceType);
+        hash.Add(_sentiment);
+        hash.Add(_totalValue);
+        hash.Add(_timestamp);
+        hash.Add(_totalSize);
+        hash.Add(_averagePrice);
+        hash.Add(_askPriceAtExecution);
+        hash.Add(_bidPriceAtExecution);
+        hash.Add(_underlyingPriceAtExecution);
+
+        return hash.ToHashCode();
+    }
+
+    public static bool operator ==(UnusualActivity left, UnusualActivity right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(UnusualActivity left, UnusualActivity right)
+    {
+        return !left.Equals(right);
     }
 }
