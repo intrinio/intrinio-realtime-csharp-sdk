@@ -64,8 +64,12 @@ public class MockHttpClient : IHttpClient
     }
 
     // Other overloads and methods throw NotImplementedException
-    public Task<HttpResponseMessage> GetAsync(string? requestUri, HttpCompletionOption completionOption) => throw new NotImplementedException();
-    public Task<HttpResponseMessage> GetAsync(string? requestUri, HttpCompletionOption completionOption, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public Task<HttpResponseMessage> GetAsync(string? requestUri, HttpCompletionOption completionOption) => GetAsync(requestUri);
+    public Task<HttpResponseMessage> GetAsync(string? requestUri, HttpCompletionOption completionOption, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return GetAsync(requestUri);
+    }
     public Task<HttpResponseMessage> GetAsync(string? requestUri, CancellationToken cancellationToken) => throw new NotImplementedException();
     public Task<HttpResponseMessage> GetAsync(Uri? requestUri) => throw new NotImplementedException();
     public Task<HttpResponseMessage> GetAsync(Uri? requestUri, HttpCompletionOption completionOption) => throw new NotImplementedException();

@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using Intrinio.Realtime;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Intrinio.Collections.RingBuffers;
+using NetWebSocketState = System.Net.WebSockets.WebSocketState;
 
 namespace Intrinio.Realtime.Tests;
 
@@ -32,7 +33,7 @@ public class MockClientWebSocket : IClientWebSocket
     public IReadOnlyDictionary<string, IEnumerable<string>>? HttpResponseHeaders { get; } = null;
     public HttpStatusCode HttpStatusCode { get; private set; } = HttpStatusCode.SwitchingProtocols;
     public ClientWebSocketOptions Options => _options;
-    public WebSocketState State { get; set; } = WebSocketState.None;
+    public NetWebSocketState State { get; set; } = NetWebSocketState.None;
     public string? SubProtocol { get; private set; }
     public Func<Uri, CancellationToken, Task>? ConnectBehavior { get; set; }
     public Func<CancellationToken, Task>? CloseBehavior { get; set; }
@@ -44,8 +45,8 @@ public class MockClientWebSocket : IClientWebSocket
     public void Abort()
     {
         Interlocked.Increment(ref _abortCount);
-        bool wasOpen = State == WebSocketState.Open;
-        State = WebSocketState.Aborted;
+        bool wasOpen = State == NetWebSocketState.Open;
+        State = NetWebSocketState.Aborted;
         try
         {
             if (!_abortCts.IsCancellationRequested)
@@ -61,14 +62,14 @@ public class MockClientWebSocket : IClientWebSocket
 
     public async Task CloseAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
     {
-        if (State == WebSocketState.Aborted)
+        if (State == NetWebSocketState.Aborted)
             throw new ObjectDisposedException(nameof(MockClientWebSocket), "Cannot close an aborted websocket.");
         if (CloseBehavior != null)
             await CloseBehavior(cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         CloseStatus = closeStatus;
         CloseStatusDescription = statusDescription;
-        State = WebSocketState.Closed;
+        State = NetWebSocketState.Closed;
     }
 
     public Task CloseOutputAsync(WebSocketCloseStatus closeStatus, string? statusDescription, CancellationToken cancellationToken)
@@ -85,7 +86,7 @@ public class MockClientWebSocket : IClientWebSocket
             await ConnectBehavior(uri, linked.Token);
         if (linked.Token.IsCancellationRequested)
             throw new OperationCanceledException(linked.Token);
-        State = WebSocketState.Open;
+        State = NetWebSocketState.Open;
     }
 
     private CancellationTokenSource ReplaceAbortCts()

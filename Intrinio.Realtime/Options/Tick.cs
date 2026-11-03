@@ -1,6 +1,7 @@
 namespace Intrinio.Realtime.Options;
 
 using System;
+using System.Buffers.Binary;
 using System.Text;
 using System.Runtime.CompilerServices;
 
@@ -28,14 +29,14 @@ public class Tick
         int contractLengthInt32 = System.Convert.ToInt32(contractLength);
         char exchangeChar = (char)trade.Exchange;
         byte exchangeByte = (byte) exchangeChar;
-        byte[] priceBytes = BitConverter.GetBytes(trade.Price); // 8 byte float
-        byte[] sizeBytes = BitConverter.GetBytes(trade.Size); // 4 byte uint32
-        byte[] timestampBytes = BitConverter.GetBytes(trade.Timestamp); // 8 byte float
-        byte[] totalVolumeBytes = BitConverter.GetBytes(trade.TotalVolume); // 8 byte uint64
+        byte[] priceBytes = GetLittleEndianBytes(trade.Price); // 8 byte float
+        byte[] sizeBytes = GetLittleEndianBytes(trade.Size); // 4 byte uint32
+        byte[] timestampBytes = GetLittleEndianBytes(trade.Timestamp); // 8 byte float
+        byte[] totalVolumeBytes = GetLittleEndianBytes(trade.TotalVolume); // 8 byte uint64
         Conditions qualifiers = trade.Qualifiers;
-        byte[] askPriceAtExecutionBytes = BitConverter.GetBytes(trade.AskPriceAtExecution); // 8 byte float
-        byte[] bidPriceAtExecutionBytes = BitConverter.GetBytes(trade.BidPriceAtExecution); // 8 byte float
-        byte[] underlyingPriceAtExecutionBytes = BitConverter.GetBytes(trade.UnderlyingPriceAtExecution); // 8 byte float
+        byte[] askPriceAtExecutionBytes = GetLittleEndianBytes(trade.AskPriceAtExecution); // 8 byte float
+        byte[] bidPriceAtExecutionBytes = GetLittleEndianBytes(trade.BidPriceAtExecution); // 8 byte float
+        byte[] underlyingPriceAtExecutionBytes = GetLittleEndianBytes(trade.UnderlyingPriceAtExecution); // 8 byte float
         
         // byte 0       | type | byte
         // byte 1       | messageLength (includes bytes 0 and 1) | byte
@@ -98,17 +99,17 @@ public class Tick
         bufferToWriteTo[1] = Convert.ToByte(length);
         bufferToWriteTo[2] = Convert.ToByte(contractLength);
         bufferToWriteTo[3 + contractLength] = (byte)(char)trade.Exchange;
-        bool success = BitConverter.TryWriteBytes(bufferToWriteTo.Slice(4 + contractLength, 8), trade.Price);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(12 + contractLength, 4), trade.Size);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(16 + contractLength, 8), trade.Timestamp);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(24 + contractLength, 8), trade.TotalVolume);
+        bool success = TryWriteLittleEndian(bufferToWriteTo.Slice(4 + contractLength, 8), trade.Price);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(12 + contractLength, 4), trade.Size);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(16 + contractLength, 8), trade.Timestamp);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(24 + contractLength, 8), trade.TotalVolume);
         bufferToWriteTo[32 + contractLength] = qualifiers[0];
         bufferToWriteTo[33 + contractLength] = qualifiers[1];
         bufferToWriteTo[34 + contractLength] = qualifiers[2];
         bufferToWriteTo[35 + contractLength] = qualifiers[3];
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(36 + contractLength, 8), trade.AskPriceAtExecution);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(44 + contractLength, 8), trade.BidPriceAtExecution);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(52 + contractLength, 8), trade.UnderlyingPriceAtExecution);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(36 + contractLength, 8), trade.AskPriceAtExecution);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(44 + contractLength, 8), trade.BidPriceAtExecution);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(52 + contractLength, 8), trade.UnderlyingPriceAtExecution);
         
         return success;
     }
@@ -118,11 +119,11 @@ public class Tick
         byte[] contractBytes = Encoding.ASCII.GetBytes(quote.Contract);
         byte contractLength = System.Convert.ToByte(contractBytes.Length);
         int contractLengthInt32 = System.Convert.ToInt32(contractLength);
-        byte[] askPriceBytes = BitConverter.GetBytes(quote.AskPrice); // 8 byte float
-        byte[] askSizeBytes = BitConverter.GetBytes(quote.AskSize); // 4 byte uint32
-        byte[] bidPriceBytes = BitConverter.GetBytes(quote.BidPrice); // 8 byte float
-        byte[] bidSizeBytes = BitConverter.GetBytes(quote.BidSize); // 4 byte uint32
-        byte[] timestampBytes= BitConverter.GetBytes(quote.Timestamp); // 8 byte float
+        byte[] askPriceBytes = GetLittleEndianBytes(quote.AskPrice); // 8 byte float
+        byte[] askSizeBytes = GetLittleEndianBytes(quote.AskSize); // 4 byte uint32
+        byte[] bidPriceBytes = GetLittleEndianBytes(quote.BidPrice); // 8 byte float
+        byte[] bidSizeBytes = GetLittleEndianBytes(quote.BidSize); // 4 byte uint32
+        byte[] timestampBytes= GetLittleEndianBytes(quote.Timestamp); // 8 byte float
         
         // byte 0       | type | byte
         // byte 1       | messageLength (includes bytes 0 and 1) | byte
@@ -168,11 +169,11 @@ public class Tick
         bufferToWriteTo[0] = System.Convert.ToByte((int)(Options.MessageType.Quote));
         bufferToWriteTo[1] = Convert.ToByte(length);
         bufferToWriteTo[2] = System.Convert.ToByte(contractLength);
-        bool success = BitConverter.TryWriteBytes(bufferToWriteTo.Slice(3 + contractLength, 8), quote.AskPrice);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(11 + contractLength, 4), quote.AskSize);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(15 + contractLength, 8), quote.BidPrice);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(23 + contractLength, 4), quote.BidSize);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(27 + contractLength, 8), quote.Timestamp);
+        bool success = TryWriteLittleEndian(bufferToWriteTo.Slice(3 + contractLength, 8), quote.AskPrice);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(11 + contractLength, 4), quote.AskSize);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(15 + contractLength, 8), quote.BidPrice);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(23 + contractLength, 4), quote.BidSize);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(27 + contractLength, 8), quote.Timestamp);
         
         return success;
     }
@@ -182,11 +183,11 @@ public class Tick
         byte[] contractBytes = Encoding.ASCII.GetBytes(refresh.Contract);
         byte contractLength = System.Convert.ToByte(contractBytes.Length);
         int contractLengthInt32 = System.Convert.ToInt32(contractLength);
-        byte[] openInterestBytes = BitConverter.GetBytes(refresh.OpenInterest); // 4 byte uint32
-        byte[] openPriceBytes = BitConverter.GetBytes(refresh.OpenPrice); // 8 byte float
-        byte[] closePriceBytes = BitConverter.GetBytes(refresh.ClosePrice); // 8 byte float
-        byte[] highPriceBytes = BitConverter.GetBytes(refresh.HighPrice); // 8 byte float
-        byte[] lowPriceBytes = BitConverter.GetBytes(refresh.LowPrice); // 8 byte float
+        byte[] openInterestBytes = GetLittleEndianBytes(refresh.OpenInterest); // 4 byte uint32
+        byte[] openPriceBytes = GetLittleEndianBytes(refresh.OpenPrice); // 8 byte float
+        byte[] closePriceBytes = GetLittleEndianBytes(refresh.ClosePrice); // 8 byte float
+        byte[] highPriceBytes = GetLittleEndianBytes(refresh.HighPrice); // 8 byte float
+        byte[] lowPriceBytes = GetLittleEndianBytes(refresh.LowPrice); // 8 byte float
         
         // byte 0       | type | byte
         // byte 1       | messageLength (includes bytes 0 and 1) | byte
@@ -232,11 +233,11 @@ public class Tick
         bufferToWriteTo[0] = System.Convert.ToByte((int)(Options.MessageType.Refresh));
         bufferToWriteTo[1] = Convert.ToByte(length);
         bufferToWriteTo[2] = System.Convert.ToByte(contractLength);
-        bool success = BitConverter.TryWriteBytes(bufferToWriteTo.Slice(3 + contractLength, 4), refresh.OpenInterest);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(7 + contractLength, 8), refresh.OpenPrice);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(15 + contractLength, 8), refresh.ClosePrice);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(23 + contractLength, 8), refresh.HighPrice);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(31 + contractLength, 8), refresh.LowPrice);
+        bool success = TryWriteLittleEndian(bufferToWriteTo.Slice(3 + contractLength, 4), refresh.OpenInterest);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(7 + contractLength, 8), refresh.OpenPrice);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(15 + contractLength, 8), refresh.ClosePrice);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(23 + contractLength, 8), refresh.HighPrice);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(31 + contractLength, 8), refresh.LowPrice);
         
         return success;
     }
@@ -250,13 +251,13 @@ public class Tick
         byte unusualActivityTypeByte = (byte) unusualActivityTypeInt32;
         int sentimentInt32 = (int)unusualActivity.Sentiment;
         byte sentimentByte = (byte) sentimentInt32;        
-        byte[] totalValueBytes = BitConverter.GetBytes(unusualActivity.TotalValue); // 8 byte float
-        byte[] totalSizeBytes = BitConverter.GetBytes(unusualActivity.TotalSize); // 4 byte uint32
-        byte[] averagePriceBytes = BitConverter.GetBytes(unusualActivity.AveragePrice); // 8 byte float
-        byte[] askPriceAtExecutionBytes = BitConverter.GetBytes(unusualActivity.AskPriceAtExecution); // 8 byte float
-        byte[] bidPriceAtExecutionBytes = BitConverter.GetBytes(unusualActivity.BidPriceAtExecution); // 8 byte float
-        byte[] underlyingPriceAtExecutionBytes = BitConverter.GetBytes(unusualActivity.UnderlyingPriceAtExecution); // 8 byte float
-        byte[] timestampBytes = BitConverter.GetBytes(unusualActivity.Timestamp); // 8 byte float
+        byte[] totalValueBytes = GetLittleEndianBytes(unusualActivity.TotalValue); // 8 byte float
+        byte[] totalSizeBytes = GetLittleEndianBytes(unusualActivity.TotalSize); // 4 byte uint32
+        byte[] averagePriceBytes = GetLittleEndianBytes(unusualActivity.AveragePrice); // 8 byte float
+        byte[] askPriceAtExecutionBytes = GetLittleEndianBytes(unusualActivity.AskPriceAtExecution); // 8 byte float
+        byte[] bidPriceAtExecutionBytes = GetLittleEndianBytes(unusualActivity.BidPriceAtExecution); // 8 byte float
+        byte[] underlyingPriceAtExecutionBytes = GetLittleEndianBytes(unusualActivity.UnderlyingPriceAtExecution); // 8 byte float
+        byte[] timestampBytes = GetLittleEndianBytes(unusualActivity.Timestamp); // 8 byte float
         
         //// byte 0       | type | byte
         //// byte 1       | messageLength (includes bytes 0 and 1) | byte
@@ -316,13 +317,13 @@ public class Tick
         bufferToWriteTo[2] = System.Convert.ToByte(contractLength);
         bufferToWriteTo[3 + contractLength] = (byte)(int)unusualActivity.UnusualActivityType;
         bufferToWriteTo[4 + contractLength] = (byte)(int)unusualActivity.Sentiment;
-        bool success = BitConverter.TryWriteBytes(bufferToWriteTo.Slice(5 + contractLength, 8), unusualActivity.TotalValue);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(13 + contractLength, 4), unusualActivity.TotalSize);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(17 + contractLength, 8), unusualActivity.AveragePrice);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(25 + contractLength, 8), unusualActivity.AskPriceAtExecution);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(33 + contractLength, 8), unusualActivity.BidPriceAtExecution);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(41 + contractLength, 8), unusualActivity.UnderlyingPriceAtExecution);
-        success = success && BitConverter.TryWriteBytes(bufferToWriteTo.Slice(49 + contractLength, 8), unusualActivity.Timestamp);
+        bool success = TryWriteLittleEndian(bufferToWriteTo.Slice(5 + contractLength, 8), unusualActivity.TotalValue);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(13 + contractLength, 4), unusualActivity.TotalSize);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(17 + contractLength, 8), unusualActivity.AveragePrice);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(25 + contractLength, 8), unusualActivity.AskPriceAtExecution);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(33 + contractLength, 8), unusualActivity.BidPriceAtExecution);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(41 + contractLength, 8), unusualActivity.UnderlyingPriceAtExecution);
+        success = success && TryWriteLittleEndian(bufferToWriteTo.Slice(49 + contractLength, 8), unusualActivity.Timestamp);
         
         return success;
     }
@@ -349,13 +350,13 @@ public class Tick
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public byte[] GetTimeReceivedBytes()
     {
-        return BitConverter.GetBytes(System.Convert.ToUInt64((_timeReceived - DateTime.UnixEpoch).Ticks) * 100UL);
+        return GetLittleEndianBytes(System.Convert.ToUInt64((_timeReceived - DateTime.UnixEpoch).Ticks) * 100UL);
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool GetTimeReceivedBytes(Span<byte> bufferToWriteTo)
     {
-        return BitConverter.TryWriteBytes(bufferToWriteTo.Slice(0, 8), Convert.ToUInt64((_timeReceived - DateTime.UnixEpoch).Ticks) * 100UL);
+        return TryWriteLittleEndian(bufferToWriteTo.Slice(0, 8), Convert.ToUInt64((_timeReceived - DateTime.UnixEpoch).Ticks) * 100UL);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -383,5 +384,50 @@ public class Tick
                 : _refresh.HasValue
                     ? GetRefreshBytes(bufferToWriteTo, _refresh.Value, out length)
                     : _unusualActivity.HasValue && GetUnusualActivityBytes(bufferToWriteTo, _unusualActivity.Value, out length);
+    }
+
+    private static byte[] GetLittleEndianBytes(double value)
+    {
+        byte[] bytes = new byte[sizeof(double)];
+        BinaryPrimitives.WriteInt64LittleEndian(bytes, BitConverter.DoubleToInt64Bits(value));
+        return bytes;
+    }
+
+    private static byte[] GetLittleEndianBytes(uint value)
+    {
+        byte[] bytes = new byte[sizeof(uint)];
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes, value);
+        return bytes;
+    }
+
+    private static byte[] GetLittleEndianBytes(ulong value)
+    {
+        byte[] bytes = new byte[sizeof(ulong)];
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes, value);
+        return bytes;
+    }
+
+    private static bool TryWriteLittleEndian(Span<byte> destination, double value)
+    {
+        if (destination.Length < sizeof(double))
+            return false;
+        BinaryPrimitives.WriteInt64LittleEndian(destination, BitConverter.DoubleToInt64Bits(value));
+        return true;
+    }
+
+    private static bool TryWriteLittleEndian(Span<byte> destination, uint value)
+    {
+        if (destination.Length < sizeof(uint))
+            return false;
+        BinaryPrimitives.WriteUInt32LittleEndian(destination, value);
+        return true;
+    }
+
+    private static bool TryWriteLittleEndian(Span<byte> destination, ulong value)
+    {
+        if (destination.Length < sizeof(ulong))
+            return false;
+        BinaryPrimitives.WriteUInt64LittleEndian(destination, value);
+        return true;
     }
 }
