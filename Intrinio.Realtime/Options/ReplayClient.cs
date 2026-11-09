@@ -381,7 +381,7 @@ public sealed class ReplayClient : IOptionsWebSocketClient
         QueueCapacity,
         0UL,
         0UL,
-        0UL,
+        QueueCapacity,
         0UL,
         0UL,
         0UL,
