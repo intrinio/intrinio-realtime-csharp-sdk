@@ -505,14 +505,7 @@ public static class ConditionMapper
     [System.Runtime.CompilerServices.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     private static ConditionFlags MapQuoteFlagsEquitiesEdge(Intrinio.Realtime.Equities.Quote quote)
     {
-        if (System.String.IsNullOrWhiteSpace(quote.Condition))
-            return ConditionFlags.None;
-        
-        ConditionFlags flags = ConditionFlags.None;
-
-        if (System.Int32.TryParse(quote.Condition, out int flagsInt))
-            flags = (ConditionFlags)flagsInt;
-        
+        ConditionFlags flags = ~ConditionFlags.None; //Allow all through for now
         return flags;
     }
     
